@@ -1,53 +1,48 @@
 # -*- coding: utf-8 -*-
 """
 Created on Tue Jul 19 10:40:46 2016
+Most recently edited: 16I23
 
-@author: soren
+@author: Scott
 
-This file holds methods for importing and organizing experimental data. Made as
-part of EC_MS, but saved seperately just because spyder3 doesn't have code folding
-and I don't want to get lost in the scroll bar.
-
+This file holds methods for importing and organizing experimental data from text.
+In the future also from SQL
 """
+# make python2-compatible:
+from __future__ import print_function
+from __future__ import division
 
 import os
 import re
 import codecs
 from copy  import deepcopy
 
-
-
-def import_text(full_path_name='default', verbose=1):   
+def import_text(full_path_name='current', verbose=1):   
     '''
     This method will import the full text of a file selected by user input as a 
     list of lines
     '''    
     if verbose:
-        print('\n\nfunction \'import_text\' at your service!')
+        print('\n\nfunction \'import_text\' at your command!\n')
     
     if full_path_name == 'input':
-        full_path_name = input('Enter full path for the file name as \'directory/file.extension\'')
-    elif full_path_name == 'default':
-        full_path_name = '/home/soren/Desktop/Sniffer_Experiments/O18_NiNPs/00_python/test_files/02_O16_to_O18_10_CA_C01.mpt'
-    
-    if full_path_name[0] == '~':
-        full_path_name = '/home/soren' + full_path_name[1:]
-        
-    file_name_object = re.search(r'/[^/]*\Z', full_path_name)
-    file_name = file_name_object.group()[1:]
-    directory_name = full_path_name[:file_name_object.start()]
+        full_path_name = input('Enter full path for the file name as \'directory' + os.sep + 'file.extension\'')
+    if full_path_name == 'current':
+        full_path_name = os.getcwd()
 
+    [directory_name, file_name] = os.path.split(full_path_name)
     original_directory = os.getcwd()
     os.chdir(directory_name)
-    ls_string = str(os.listdir())    
-    if verbose:
-        print('\n' + full_path_name + '\n ls: \n' + ls_string + '\n')
-    if len(file_name)==0:
+            
+    if os.path.isdir(full_path_name) and not os.path.isfile(file_name):
+        directory_name = full_path_name
+        os.chdir(directory_name)
+        ls_string = str(os.listdir())    
         print('\n' + full_path_name + '\n ls: \n' + ls_string + '\n')
         file_name = input('Directory given. Enter the full name of the file to import\n')
+
     if verbose:   
         print('importing data from ' + file_name )
-
 
     possible_encodings = ['utf8','iso8859_15']  
     #mpt files seem to be the latter encoding, even though they refer to themselves as ascii
@@ -65,8 +60,9 @@ def import_text(full_path_name='default', verbose=1):
         print('couldn\'t read ' + file_name + '\n ... may by due to an encoding issue')
         
     os.chdir(original_directory)
+    
     if verbose:
-        print('function \'import_text\' finished!\n\n')
+        print('\nfunction \'import_text\' finished!\n\n')    
     return file_lines
 
 
@@ -80,7 +76,7 @@ def text_to_data(file_lines, title='get_from_file',
     {'title':title, 'header':header, 'colheader1':[data1], 'colheader2':[data2]...}
     '''    
     if verbose:
-        print('\n\nfunction \'text_to_data\' at your service!')
+        print('\n\nfunction \'text_to_data\' at your command!\n')
     
     #disect header
     N_lines = len(file_lines)        #number of header lines
@@ -178,13 +174,13 @@ def text_to_data(file_lines, title='get_from_file',
     DataDict['header'] = header_string
     DataDict['timestamp'] = timestamp
     DataDict['data_type'] = data_type
-
+    
     if verbose:
-        print('function \'text_to_data\' finished!\n\n')    
+        print('\nfunction \'text_to_data\' finished!\n\n')    
     return DataDict
 
 
-def import_data(full_path_name='default', title='get_from_file',
+def import_data(full_path_name='current', title='get_from_file',
                  data_type='EC', N_blank=10, verbose=1):
                  
     file_lines = import_text(full_path_name, verbose)
@@ -196,16 +192,13 @@ def import_data(full_path_name='default', title='get_from_file',
 
 if __name__ == '__main__':
     
-    default_directory = '/home/soren/Desktop/Sniffer_Experiments/O18_NiNPs/00_python/test_files/'    
+    default_directory =   os.path.abspath(os.path.join(os.getcwd(), os.pardir)) 
     
-    CA_file = default_directory + '02_O16_to_O18_10_CA_C01.mpt'
-    CV_file = default_directory + '02_O16_to_O18_06_CVA_C01.mpt'
-    MS_file = default_directory + 'QMS_data.txt'
+    CA_Data = import_data(default_directory, data_type='EC')
+
+    MS_Data = import_data(data_type='MS')
     
-    CA_Data = import_data(CA_file)
-    CV_Data = import_data(CV_file)
-    MS_Data = import_data(MS_file,data_type='MS')
-    
+    python_script = import_text()     #this one imports from the python package.
     
     
     

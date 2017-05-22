@@ -1,26 +1,23 @@
 # -*- coding: utf-8 -*-
 """
 Created on Tue Aug  2 22:50:34 2016
+last edited: 16I23
 
-@author: soren
+@author: Scott
+
+This module has functions designed to analyze OER in EC-MS with isotopic labeling
 """
 
-from Data_Importing import import_data
-from EC_MS import numerize, synchronize, time_cut, plot_masses, plot_masses_and_I
+# make python2-compatible:
+from __future__ import print_function
+from __future__ import division
+
 import numpy as np
 from matplotlib import pyplot as plt
 from copy import deepcopy
 
-def predict_M34(MS_Data, subtract_background = 1, verbose = 1):
-    '''
-    predicts the M34 signal expected based on M32 and M36 signals using the 
-    statitistics of oxidation evolution from isotopically mixed water.
-    Appends the predicted M34 signal to the dataset
-    '''    
-    
-    if verbose:
-        print('\n\npredicting M34 for ' + MS_Data['title'] + '\n\n')
-        
+
+def predict_M34(MS_Data, subtract_background = 1):
     x_34 = 1/2 * (MS_Data['M32-x'] + MS_Data['M36-x'])
     
     y_32 = MS_Data['M32-y']
@@ -48,20 +45,21 @@ def predict_M34(MS_Data, subtract_background = 1, verbose = 1):
 
 if __name__ == '__main__':
     
+    from Data_Importing import import_data
+    from Combining import numerize, synchronize, time_cut, plot_masses, plot_masses_and_I    
+
     plt.close()    
     
-    default_directory = '/home/soren/Desktop/Sniffer_Experiments/O18_NiNPs/00_python/test_files/'    
+    default_directory = os.path.abspath(os.path.join(os.getcwd(), os.pardir))  
 
-
-    MS_file = default_directory + 'QMS_data.txt'
-    CA_file = default_directory + '02_O16_to_O18_10_CA_C01.mpt'
-    #CA_file = default_directory + '03_O18_10_CA_C01.mpt'
-    #CA_file = default_directory + '04_O18_to_O16_10_CA_C01.mpt'    
-    CV_file = default_directory + '02_O16_to_O18_06_CVA_C01.mpt'
-
-    MS_Data = numerize(import_data(MS_file,data_type = 'MS'))
-    CA_Data = numerize(import_data(CA_file))
-    CV_Data = numerize(import_data(CV_file))    
+    #MS_Data = numerize(import_data(MS_file,data_type = 'MS'))
+    import_raw_data = 1
+    if import_raw_data:
+        MS_Data_0 = import_data(default_directory, data_type='MS')
+        CA_Data_0 = import_data(default_directory, data_type='EC')
+        
+    CV_Data = numerize(MS_Data_0)
+    CA_Data = numerize(CA_Data_0)    
     
     
     CA_and_MS = synchronize([MS_Data, CA_Data], cutit = 0)    

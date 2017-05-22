@@ -1,72 +1,21 @@
 # -*- coding: utf-8 -*-
 """
 Created on Tue Jul 19 10:40:46 2016
+Most recently edited: 16I23
 
-@author: soren
+@author: Scott
+
+This is the core file of the package. Includes functions for combining EC and MS 
 """
 
-#import os
-#import re
-#import codecs
+# make python2-compatible:
+from __future__ import print_function
+from __future__ import division
+
 import numpy as np
 from matplotlib import pyplot as plt
 import re
-#from copy  import deepcopy
-from Data_Importing import import_data #honestly, I would just have everything in one module if you could fold code in spyder3
-
-
-def plot_vs_time(Dataset, cols_1='input', cols_2='input', verbose=1):
-    
-    if verbose:
-        print('\n\nfunction \'plot_vs_time\' at your service!')
-    
-    if cols_1=='input':
-        data_cols = Dataset['data_cols']
-        prompt = ('Choose combinations of time and non-time variables for axis 1, \n' +
-            'with every other choice a time variable.')
-        I_axis_1 = indeces_from_input(data_cols, prompt)
-        cols_1 = [[data_cols[i], data_cols[j]] for i,j in zip(I_axis_1[::2],I_axis_1[1::2])]        
-            
-    figure1 = plt.figure()
-    axes_1 = figure1.add_subplot(211)
-    for pltpair in cols_1:
-        label_object = re.search(r'\A[^-]*-',pltpair[1])
-        if label_object:
-            label_string = label_object.group()[:-1]
-        else:
-            label_string = pltpair[1]
-        x = Dataset[pltpair[0]]
-        y = np.log(Dataset[pltpair[1]])/np.log(10)
-        axes_1.plot(x,y, label = label_string)
-        
-    axes_1.set_xlabel('time / s')
-    axes_1.set_ylabel('log(signal/[a.u.])')
-    axes_1.legend()    
-    
-    if cols_2=='input':
-        
-        data_cols = Dataset['data_cols']
-        prompt = ('Choose combinations of time and non-time variables for axis 2, \n' +
-            'with every other choice a time variable.')
-        I_axis_2 = indeces_from_input(data_cols, prompt)
-        cols_2 = [[data_cols[i], data_cols[j]] for i,j in zip(I_axis_2[::2],I_axis_2[1::2])]
-
-    axes_2 = figure1.add_subplot(212)
-    for pltpair in cols_2:
-        label_string = pltpair[1]
-        x = np.insert(Dataset[pltpair[0]],0,0)
-        y = np.insert(Dataset[pltpair[1]],0,0)
-        axes_2.plot(x,y,'k--',label=label_string)
-    axes_2.set_ylabel('current / mA')
-    axes_2.set_xlabel('time / s')
-    axes_2.legend()
-    #so capacitance doesn't blow it up:
-    I_plt_top = np.where(x>2)[0][0]
-    y_max = np.max(y[I_plt_top:])
-    axes_2.set_ylim(np.min(y),y_max)
-    if verbose:
-        print('function \'plot_vs_time\' finished!\n\n')
-        
+   
         
 def synchronize(Dataset_List, verbose = 1, cutit = 0, t_zero = 'start'):
     '''
@@ -202,38 +151,27 @@ def time_cut(MS_Data_0,tspan, verbose=1):
     return MS_Data
 
 
-def select_cycles(EC_Data_0, cycles = 1, verbose = 1 ):
-    ''' 
-    This function selects one or more cycles from EC_Data.
-    Use this before synchronizing!
-    Works for both CA and CV
+def smooth_pulses(CA_Data_0, verbose=1):
+    '''
+    This function turns the CA data into a square wave by averaging the
+    potential over the duration of a pulse (where it should be constant).
+    Useful when noise makes the figures look ugly dispite otherwise good data.
+    If you have to use this function, though, I would say the results are not 
+    publication-ready.
     '''
     if verbose:
-        print('\nSelecting cycles ' + str(cycles) + ' from \'' + EC_Data_0['title'] + '\'\n')
-    
-    EC_Data = EC_Data_0.copy()
-    
-    #it looks like I actually want Ns for CA's
-    if 'Ns' in EC_Data['data_cols']:
-        cycle_numbers = EC_Data['Ns']
-    else:
-        cycle_numbers = EC_Data['cycle number']
-    
-    N = len(cycle_numbers)
-    if type(cycles)==int:
-        cycles = [cycles]
-    I_keep = np.array([I for I in range(N) if cycle_numbers[I] in cycles])
-    #list comprehension is awesome.
-
-    for col in EC_Data['data_cols']:
-        EC_Data[col] = EC_Data[col][I_keep]
-        
-    t0 = timestamp_to_seconds(EC_Data['timestamp'])
-    EC_Data['tspan'] = [min(EC_Data['time/s']) + t0, max(EC_Data['time/s']) + t0]
-    EC_Data['data_type'] += ' selected'   
-    
-    return EC_Data
-
+        print('\n\nfunction \'smooth_pulses\' at your service!')
+    CA_Data = CA_Data_0.copy()
+    cycle_numbers = CA_Data['Ns']
+    cycles = np.unique(cycle_numbers)
+    for c in cycles:
+        I_cycle = np.array([i for (i,cycle) in enumerate(cycle_numbers) if cycle==c])
+        V_avg = np.average(CA_Data['Ewe/V'][I_cycle])
+        CA_Data['Ewe/V'][I_cycle] = V_avg
+    if verbose:
+        print('function \'smooth_pulses\' finished!\n\n')
+    return CA_Data
+  
     
 def is_time(col, verbose = 0):
     '''
@@ -299,8 +237,65 @@ def indeces_from_input(options, prompt):
     return choices
 
 
-def plot_masses(MS_Data, tspan = 0, logplot = 1, verbose = 1, 
-                Colors = {'M2':'b','M4':'r','M18':'0.5','M28':'g','M32':'k'}, ax1='new'):
+def plot_vs_time(Dataset, cols_1='input', cols_2='input', verbose=1):
+    '''
+    Completely replaced by the more convenient plot_masses and plot_masses_and_I
+    '''
+    if verbose:
+        print('\n\nfunction \'plot_vs_time\' at your service!')
+    
+    if cols_1=='input':
+        data_cols = Dataset['data_cols']
+        prompt = ('Choose combinations of time and non-time variables for axis 1, \n' +
+            'with every other choice a time variable.')
+        I_axis_1 = indeces_from_input(data_cols, prompt)
+        cols_1 = [[data_cols[i], data_cols[j]] for i,j in zip(I_axis_1[::2],I_axis_1[1::2])]        
+            
+    figure1 = plt.figure()
+    axes_1 = figure1.add_subplot(211)
+    for pltpair in cols_1:
+        label_object = re.search(r'\A[^-]*-',pltpair[1])
+        if label_object:
+            label_string = label_object.group()[:-1]
+        else:
+            label_string = pltpair[1]
+        x = Dataset[pltpair[0]]
+        y = np.log(Dataset[pltpair[1]])/np.log(10)
+        axes_1.plot(x,y, label = label_string)
+        
+    axes_1.set_xlabel('time / s')
+    axes_1.set_ylabel('log(signal/[a.u.])')
+    axes_1.legend()    
+    
+    if cols_2=='input':
+        
+        data_cols = Dataset['data_cols']
+        prompt = ('Choose combinations of time and non-time variables for axis 2, \n' +
+            'with every other choice a time variable.')
+        I_axis_2 = indeces_from_input(data_cols, prompt)
+        cols_2 = [[data_cols[i], data_cols[j]] for i,j in zip(I_axis_2[::2],I_axis_2[1::2])]
+
+    axes_2 = figure1.add_subplot(212)
+    for pltpair in cols_2:
+        label_string = pltpair[1]
+        x = np.insert(Dataset[pltpair[0]],0,0)
+        y = np.insert(Dataset[pltpair[1]],0,0)
+        axes_2.plot(x,y,'k--',label=label_string)
+    axes_2.set_ylabel('current / mA')
+    axes_2.set_xlabel('time / s')
+    axes_2.legend()
+    #so capacitance doesn't blow it up:
+    I_plt_top = np.where(x>2)[0][0]
+    y_max = np.max(y[I_plt_top:])
+    axes_2.set_ylim(np.min(y),y_max)
+    if verbose:
+        print('function \'plot_vs_time\' finished!\n\n')
+
+
+
+def plot_masses(MS_Data, tspan=0, logplot=1, verbose=1,
+                Colors = {'M2':'b','M4':'r','M18':'0.5','M28':'g','M32':'k'}, 
+                ax1='new', saveit=1, leg=1):
     '''
     plots selected masses for a selected time range from MS data or EC_MS data
     '''
@@ -329,8 +324,8 @@ def plot_masses(MS_Data, tspan = 0, logplot = 1, verbose = 1,
             y = y[I_start:I_finish]
         
         lines[mass] = ax1.plot(x, y, color, label = mass)          
-    
-    ax1.legend(loc = 'lower right')
+    if leg:
+        ax1.legend(loc = 'lower right')
     ax1.set_xlabel('time / [s]')
     y_string = 'signal / [A]'
     ax1.set_ylabel(y_string)           
@@ -340,10 +335,12 @@ def plot_masses(MS_Data, tspan = 0, logplot = 1, verbose = 1,
         print('function \'plot_masses\' finsihed! \n\n')
     return ax1
 
-def plot_masses_and_I(EC_and_MS, tspan = 0, overlay = 0, logplot = [1,0], verbose = 1, 
-                      Colors = {'M2':'b','M4':'r','M18':'0.5','M28':'g','M32':'k'}, 
-                      plotpotential = 0, Ref_vs_RHE = 0):
-    '''this plots current on one axis and masses on another'''
+def plot_masses_and_I(EC_and_MS, tspan=0, overlay=0, logplot=[1,0], verbose=1, 
+                      Colors={'M2':'b','M4':'r','M18':'0.5','M28':'g','M32':'k'}, 
+                      plotpotential=1, Ref_vs_RHE=0, saveit=1, title='default', leg=1, A_el=0):
+    '''
+    this plots current and potential on one axis and masses on another
+    '''
     
     if verbose:
         print('\n\nfunction \'plot_masses_and_I\' at your service!\n Plotting from: ' + EC_and_MS['title'])
@@ -355,15 +352,20 @@ def plot_masses_and_I(EC_and_MS, tspan = 0, overlay = 0, logplot = [1,0], verbos
     else:
         ax1 = figure1.add_subplot(211)
         ax2 = figure1.add_subplot(212)
-    plot_masses(EC_and_MS, tspan, logplot[0], verbose, Colors, ax1)
+    plot_masses(EC_and_MS, tspan, logplot[0], verbose=verbose, Colors=Colors, ax1=ax1, saveit=0, leg=leg)
     x = EC_and_MS['time/s']
     if 'I/mA' in EC_and_MS['data_cols']:
         y = EC_and_MS['I/mA']       #for CA files
     else:
         y = EC_and_MS['<I>/mA']     #for CVA files
     
+    if A_el==0 and 'A_el' in EC_and_MS:
+        A_el = EC_and_MS['A_el']    
+    y_string = 'I /[mA]'
+    if A_el:
+        y = y/A_el
+        y_string = 'J /[mA/cm^2]'
     ax2.plot(x,y,'r')
-    y_string = 'I / [mA]'
     ax2.set_ylabel(y_string)
     ax2.set_xlabel('time / [s]')
     xlim = ax1.get_xlim()
@@ -376,7 +378,7 @@ def plot_masses_and_I(EC_and_MS, tspan = 0, overlay = 0, logplot = [1,0], verbos
         y3 = EC_and_MS['Ewe/V'].copy()
         
         y3_string = 'E vs RHE / V'
-        if 'Ref_vs_RHE':
+        if Ref_vs_RHE:
             y3 = y3 + Ref_vs_RHE
         elif 'Ref_vs_RHE' in EC_and_MS:
             y3 = y3 + EC_and_MS['Ref_vs_RHE']
@@ -388,30 +390,33 @@ def plot_masses_and_I(EC_and_MS, tspan = 0, overlay = 0, logplot = [1,0], verbos
             if logplot[2]:
                 ax3.set_yscale('log')
         ax3.set_xlim(xlim)
+    if saveit:
+        if title == 'default':
+            title == EC_and_MS['title'] + '.png'
+        figure1.savefig(title)
+        
     if verbose:
         print('function \'plot_masses_and_I\' finished!\n\n')
     if plotpotential:
         return ax1, ax2, ax3
     return ax1, ax2
 
+
+
 if __name__ == '__main__':
     
-    default_directory = '/home/soren/Desktop/Sniffer_Experiments/O18_NiNPs/00_python/test_files/'    
+    from Data_Importing import import_data #honestly, I would just have everything in one module if you could fold code in spyder3
+    import os    
     
-    CA_file = default_directory + '04_O18_to_O16_10_CA_C01.mpt'
-    CV_file = default_directory + '02_O16_to_O18_06_CVA_C01.mpt'
-    MS_file = default_directory + 'QMS_data.txt'
+    default_directory = os.path.abspath(os.path.join(os.getcwd(), os.pardir))     
 #    
-    CA_Data = import_data(CA_file)
-    CV_Data = import_data(CV_file)
-    MS_Data = import_data(MS_file,data_type = 'MS')
+    CA_Data = import_data(default_directory, data_type='EC')
+    MS_Data = import_data(default_directory, data_type='MS')
     
     CA_and_MS = synchronize([CA_Data,MS_Data], cutit = 1)
     
-    
-    
     plot_vs_time(CA_and_MS,
-                 cols_1=[('M18-x','M18-y'),('M20-x','M20-y'),('M32-x','M32-y'),('M34-x','M34-y'),('M36-x','M36-y')],  
+                 cols_1=[('M4-x','M4-y'),('M18-x','M18-y'),('M28-x','M28-y'),('M32-x','M32-y')],  
 #                 cols_2=[('time/s', '<I>/mA'),],       #for CV
                  cols_2=[('time/s', 'I/mA'),],          #for CA
                  )

@@ -1,10 +1,26 @@
-from Data_Importing import import_data
-from EC_MS import numerize, synchronize, time_cut, plot_masses, plot_masses_and_I
-from Isotope_Ratio import predict_M34
+
+
+"""
+Most recently edited: 16I23
+
+@author: Scott
+
+This module has functions specifically designed to investigate 
+single-turnover phenomena in EC-MS.
+"""
+
 import numpy as np
 from matplotlib import pyplot as plt
-import Chem  #physical constants and Molar Masses
 from scipy.integrate import odeint
+import os
+
+if os.path.split(os.getcwd())[1] == 'EC_MS':      
+                                #then we're running from inside the package
+    from Combining import plot_masses
+    import Chem
+else:                           #then we use relative import
+    from .Combining import plot_masses
+    from . import Chem
 
 
 def get_monolayer_signal_area(CA_and_MS, N_sites = 4.0e13, verbose = 1, 
@@ -163,49 +179,80 @@ def solve_diffusion_ode(ax1 = 'new', Area = 9.93e-10, t_pulse = 0.001, verbose =
         print('function \'solve_diffusion_ode\' finished!')
     return [t,s]
 
+
+
+
 if __name__ == '__main__':
     
+    from Data_Importing import import_data
+    from Combining import numerize, synchronize, time_cut, plot_masses, plot_masses_and_I
+    from EC import select_cycles
     #plt.close()    
     
-    default_directory = '/home/soren/Desktop/Sniffer_Experiments/O18_NiNPs/00_python/test_files/'    
+    default_directory = os.path.abspath(os.path.join(os.getcwd(), os.pardir))  
 
-    MS_file = default_directory + 'QMS_data.txt'
-    #CA_file = default_directory + '01_O16_10_CA_C01.mpt'
-    CA_file = default_directory + '02_O16_to_O18_10_CA_C01.mpt'
-    #CA_file = default_directory + '03_O18_10_CA_C01.mpt'
-    #CA_file = default_directory + '04_O18_to_O16_10_CA_C01.mpt'
+    #MS_Data = numerize(import_data(MS_file,data_type = 'MS'))
+    import_raw_data = 0
+    if import_raw_data:
+        MS_Data_0 = import_data(default_directory, data_type='MS')
+        CA_Data_0 = import_data(default_directory, data_type='EC')
 
-
-    MS_Data = numerize(import_data(MS_file,data_type = 'MS'))
-    CA_Data = numerize(import_data(CA_file))
+    cycles = np.array([17])
     
-    CA_and_MS = synchronize([MS_Data, CA_Data])
+    #get the time span of the pulse from select cycles
+    tspan0 = select_cycles(CA_Data, cycles)['tspan'] 
     
-    tspan0 = CA_and_MS['tspan_2']    #'tspan' is given in seconds since midnight
-                                    #'tspan_2' is given in seconds since start of CA file
-                                    #'tspan_1' is given in seconds since start of QMS file                             
+    #synchronize the entire files, with t=0 at the start of the pulse
+    CA_and_MS = synchronize([MS_Data, CA_Data], cutit = 0, t_zero = tspan0[0])    
+    
+    #define a span from a bit before to a bit after the pulse, which starts at t=0
     tspan = [0,0]
-    tspan[1] = tspan0[1] + 100 + 0*(tspan0[1]-tspan0[0])
-    tspan[0] = tspan0[0] - 20 - 0*(tspan0[1]-tspan0[0]) 
+    tspan[0] =  -20
+    tspan[1] = tspan0[1] - tspan0[0] + 50
+    #cut the data accordingly
+    CA_and_MS = time_cut(deepcopy(CA_and_MS),tspan)      
     
-    Area = get_monolayer_signal_area(CA_and_MS, verbose = 1, 
-                                     #tspan = [1000, 1500]) # for O18_to_O16
-                                     )
-    CA_and_MS = time_cut(CA_and_MS,tspan)
-    CA_and_MS = predict_M34(CA_and_MS)
+    n_el_test = -2    #number of electrons in HER
+    n_el = -6          #number of electrons for CORR to methane
+    sensitivity_ratio = 3.419/0.969    #ratio of sensitivity factors on M15 for methane to M2 for H2
+    # from NIST: http://physics.nist.gov/PhysRefData/Ionization/molTable.html
     
-    (ax1,ax2,ax3) = plot_masses_and_I(CA_and_MS,
-                 Colors = {'M32':'b', 'M34':'r', 'M36':'g', 'M18':'c', 'M20':'m', 'predicted M34':'--k'},
-     #           Colors = {'M32':'b', 'M34':'r', 'M36':'g', 'M18':'c', 'M20':'m'},
-                 plotpotential = 1, Ref_vs_RHE = 0.918)
-    #MS_Data_1 = predict_M34(MS_Data_1)  
-    
+    a0_Cu = 3.61e-10 #lattice constant for Cu / m
+    site_density = 4/(np.sqrt(3)*a0_Cu**2) #density of surface sites on Cu(111) / m^-2
+    A_electrode = 0.2e-4    #electrode area, m^2
+    coverage = 2*0.05       #SA_Cu/SA_electrode at 5% projected coverage and assuming hemispherical NPs
+    N_sites = A_electrode*coverage*site_density    
 
-    solve_diffusion_ode(ax1, Area=Area, t_pulse = 1, logplot = 1)
-    
-  
-    
+    tspan_SS = [0.5*(tspan0[1]-tspan0[0]), tspan0[1]-tspan0[0]]    
+    #steady state tspan to calibrate with M2 signal during CA / s
     
     
+    Colors = {'M2':'b', 'M15':'r', 'M27':'g'}
+    A_ML = get_monolayer_signal_area(CA_and_MS, N_sites = N_sites, verbose = 0, 
+                              tspan = tspan_SS, masses = ['M2'], Colors = Colors,
+                              n_el = n_el, n_el_test = n_el_test,
+                              FA = 1, sensitivity_ratio = sensitivity_ratio)
     
+    D_CH4 =  1.49e-9        #diffusion constant of methane in water / [m^2/s]
     
+    #and plot it!
+    fig1 = plt.figure()
+    ax1 = fig1.add_subplot(121)
+    plot_masses(CA_and_MS, 
+                Colors = Colors,
+     #          Colors = {'M2':'k','M32':'b', 'M34':'r', 'M36':'g', 'M18':'c', 'M20':'m'})
+                ax1 = ax1
+                )
+                
+    [t,s] = solve_diffusion_ode(Area = A_ML, t_pulse = 5, verbose = 0, 
+                        spec = 'k--', plot_label = 'predicted ML signal', logplot = 1, 
+                        background = 2.0e-12,
+                        N = 30 ,             #discretization in x
+                        L = 100e-6  ,        #distance between electrode and membrane in m
+                        D = D_CH4 ,        #diffusion constant of oxygen in water in m^2/s
+                        h = 3e-5           #mass transport coefficient at sniffer membrane, from Master's thesis, m/s 
+                        )
+    t = t + 3 #apply offset to account for the shitty slow QMS
+    
+    ax1.plot(t,s,'k--',label = 'predicted')        
+    ax1.legend_.remove()

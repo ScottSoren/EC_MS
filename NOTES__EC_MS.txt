@@ -1,5 +1,25 @@
-Last modified 16H07
 
-This is an antiquated set of EC_MS scripts, one of the earliest iterations, 
-used to make figures for Scott's poster at the 2016 CINF summer school.
-Before it was made into a python package.
+
+EC-MS data processing package by Scott (scott@fysik.dtu.dk)
+Last modified 16I23
+
+
+--------------------------------------------------------------
+Modified 16I23 so that it performs better as a cross-platform package.
+16I23 modifications make the package compatible with Windows and with python2, in addition to the intended python3 on Linux.
+Most of the modules have an "if __name__=='__main__':" part that demonstrates the usage of some of its functions.
+The modules can be run from within the package, or, as is the main intention, imported with the EC_MS package. This is done with a
+"from EC_MS import ..." statement in a script. In the folder Experiment sketched below, plot_01.py would import functions from EC_MS and 
+use them to operate on the data in MS_data.txt and EC_data.mpt to generate plot_01.png
+
+-Experiment
+|- MS_data.txt
+|- EC_data.mpt
+|- EC_MS
+||- __init__.py
+||- ...
+|
+|- plot_01.py
+|- plot_01.png
+|- ...
+
