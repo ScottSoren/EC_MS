@@ -1,13 +1,24 @@
 
-
 EC-MS data processing package by Scott (scott@fysik.dtu.dk)
-Last modified 16J27
+Last modified 16K17
+
+
+-------------------- 16K17 ------------------------------------------
+Object_Files module added to facilitate interaction of objects (of i.e. Molecule) with databases. Molecules module adjusted accordingly.
+Calibration module added, cal_ML_strip and cal_steady_state written. Calibration functions added to Molecules.
+O2, H2, CO2, and Cl2 calibrated from CP and CO stripping experiments. Results all (automatically!) saved in ./data/
+
+
+-------------------- 16J29 ------------------------------------------
+Improved 'synchronize' to append data from multiple EC and/or MS files
+Added import_folder to Data_Importing.
+plot_masses_and_I renamed plot_experiment
 
 
 -------------------- 16J27 ------------------------------------------
 Time_Response module added to model mass transport in working volume and fit signal shapes
-Molecules module added to interact with a database for quantification
-Several functions added to EC, including CV_difference for e.g. CO stripping, and sync_metadata to deal once and for all with RE and A_el 
+Molecules module added to interact with a database (./data/) for quantification
+Several functions added to EC, including CV_difference for e.g. CO stripping, and sync_metadata to deal once and for all with RE_vs_RHE and A_el. 
 functions in Plotting and Combining updated accordingly
 
 

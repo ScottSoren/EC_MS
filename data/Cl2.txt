@@ -1,0 +1,41 @@
+kH	=	0.42
+D	=	1.25e-09
+n_el	=	2.0
+calibration_16J13_16K17_Cl2_CP_pulse_1
+	Notes:
+		sputtered Pt in 0.1M HCl
+		Cl2 signal did not reach steady state!
+	title: 16J13_16K17_Cl2_CP_pulse_1
+	n_mol	=	4.66394767065e-09
+	Q_el	=	0.00180003391631
+	raw_data: 01_steady_OER_HER_C01.mpr__as_0__and___PtTF02_new_chip_16J13_new_el_mass70__as_1__
+	QMS settings
+		range: auto
+		SEM_voltage	=	100
+		speed	=	7
+	experiment date: 16J13
+	mass: M70
+	Q_QMS	=	1.68541783801e-09
+	type: steady_state
+	chip: 16J13
+	F_cal	=	0.361371515512
+	analysis date: 16K17
+calibration_16J13_16K17_Cl2_CP_pulse_2
+	Notes:
+		sputtered Pt in 0.1M HCl
+		Cl2 signal did not reach steady state!
+	title: 16J13_16K17_Cl2_CP_pulse_2
+	n_mol	=	6.99387722271e-09
+	Q_el	=	0.00269926189065
+	raw_data: 01_steady_OER_HER_C01.mpr__as_0__and___PtTF02_new_chip_16J13_new_el_mass70__as_1__
+	QMS settings
+		range: auto
+		SEM_voltage	=	100
+		speed	=	7
+	experiment date: 16J13
+	mass: M70
+	Q_QMS	=	3.4586479426e-09
+	type: steady_state
+	chip: 16J13
+	F_cal	=	0.494525115678
+	analysis date: 16K17

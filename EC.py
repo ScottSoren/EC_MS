@@ -49,8 +49,11 @@ def select_cycles(EC_data_0, cycles=1, verbose=1, tzero=None):
     #list comprehension is awesome.
 
     for col in EC_data['data_cols']:
-        EC_data[col] = EC_data[col][I_keep]
-        
+        try:
+            EC_data[col] = EC_data[col][I_keep]
+        except IndexError:
+            print('trouble selecting cycle ' + str(cycles) + ' of ' + col + '\n' +
+                    'type(I_keep) = ' + str(type(I_keep)))
     t0 = timestamp_to_seconds(EC_data['timestamp'])
     EC_data['tspan'] = [min(EC_data['time/s']) + t0, max(EC_data['time/s']) + t0]
     EC_data['data_type'] += ' selected'   
@@ -77,7 +80,7 @@ def remove_delay(CV_data):
     return CV_data
         
 
-def CV_difference(cycles_data, tspan=None, redox=1, Vspan=[0.5, 1.0], 
+def CV_difference(cycles_data, redox=1, Vspan=[0.5, 1.0], 
                   ax=None, color='g', verbose=1):
     '''
     This will calculate the difference in area between two cycles in a CV, 
@@ -123,8 +126,8 @@ def CV_difference(cycles_data, tspan=None, redox=1, Vspan=[0.5, 1.0],
         Q += [q[I_keep[-1]] - q[I_keep[0]]]       
         JV += [np.trapz(J, V)]
         
-    dQ = Q[1] - Q[0]
-    dJV = JV[1] - JV[0]
+    dQ = Q[0] - Q[1] 
+    dJV = JV[0] - JV[1]
     
     if verbose:
         try:
@@ -134,7 +137,7 @@ def CV_difference(cycles_data, tspan=None, redox=1, Vspan=[0.5, 1.0],
             print('didn''t find A_el.')
         print('difference in charge passed: a = ' + str(dQ) + ' C\n' + 
                 'difference in CV area: b = ' + str(dJV) + ' V*mA/cm^2\n' + 
-                'scan rate: b/a*A_el = ' + str(dJV / dQ * A_el) + ' mV/(s*cm^2)') 
+                'scan rate: b/a*A_el = ' + str(dJV / dQ * A_el) + ' mV/s') 
     
     if len(Vs[0]) != len(Vs[1]):  #then we'll have to interpolate
         if 1 in redox:

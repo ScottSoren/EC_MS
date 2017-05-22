@@ -13,9 +13,12 @@ import os
 if os.path.split(os.getcwd())[1] == 'EC_MS':      
                                 #then we're running from inside the package
     from EC import sync_metadata
+    from Data_Importing import import_folder
+    from Combining import synchronize
 else:                           #then we use relative import
     from .EC import sync_metadata
-
+    from .Data_Importing import import_folder
+    from .Combining import synchronize
 
 
 def plot_vs_potential(CV_and_MS, colors, tspan=0, RE_vs_RHE=None, A_el=None, 
@@ -103,7 +106,7 @@ def plot_vs_time(Dataset, cols_1='input', cols_2='input', verbose=1):
         prompt = ('Choose combinations of time and non-time variables for axis 1, \n' +
             'with every other choice a time variable.')
         I_axis_1 = indeces_from_input(data_cols, prompt)
-        cols_1 = [[data_cols[i], data_cols[j]] for i,j in zip(I_axis_1[::2],I_axis_1[1::2])]        
+        cols_1 = [[data_cols[i], data_cols[j]] for i,j in zip(I_axis_1[::2], I_axis_1[1::2])]        
             
     figure1 = plt.figure()
     axes_1 = figure1.add_subplot(211)
@@ -127,7 +130,7 @@ def plot_vs_time(Dataset, cols_1='input', cols_2='input', verbose=1):
         prompt = ('Choose combinations of time and non-time variables for axis 2, \n' +
             'with every other choice a time variable.')
         I_axis_2 = indeces_from_input(data_cols, prompt)
-        cols_2 = [[data_cols[i], data_cols[j]] for i,j in zip(I_axis_2[::2],I_axis_2[1::2])]
+        cols_2 = [[data_cols[i], data_cols[j]] for i,j in zip(I_axis_2[::2], I_axis_2[1::2])]
 
     axes_2 = figure1.add_subplot(212)
     for pltpair in cols_2:
@@ -205,7 +208,7 @@ def plot_masses(MS_Data, tspan=0, logplot=1, verbose=1,
         print('function \'plot_masses\' finsihed! \n\n')
     return ax1
 
-def plot_masses_and_I(EC_and_MS, tspan=0, overlay=0, logplot=[1,0], verbose=1, 
+def plot_experiment(EC_and_MS, tspan=0, overlay=0, logplot=[1,0], verbose=1, 
                       colors={'M2':'b','M4':'r','M18':'0.5','M28':'g','M32':'k'}, 
                       plotpotential=1, RE_vs_RHE=None, A_el=None, 
                       saveit=0, title='default', leg=1):
@@ -263,12 +266,28 @@ def plot_masses_and_I(EC_and_MS, tspan=0, overlay=0, logplot=[1,0], verbose=1,
         return ax1, ax2, ax3
     return ax1, ax2
     
-    
-    
+def plot_masses_and_I(*args, **kwargs):
+    print('plot_masses_and_I renamed plot_experiment. Remember that next time!')
+    return plot_experiment(*args, **kwargs)
+
+def plot_folder(folder_name, 
+                colors={'M2':'b','M4':'r','M18':'0.5','M28':'g','M32':'k'}, 
+                RE_vs_RHE=None, A_el=None):
+    '''
+    Plots an EC and MS data from an entire folder, generally corresponding to
+    a full day of measurements on one sample.
+    Will probably only be used to get an overview.
+    Could add text showing starts of the data files
+    '''
+    Datasets = import_folder(folder_name)
+    Combined_data = synchronize(Datasets, t_zero='first')
+    sync_metadata(Combined_data, RE_vs_RHE, A_el)
+    return plot_masses_and_I(Combined_data, colors=colors)
+
+ 
 if __name__ == '__main__':
     import os
     from Data_Importing import import_data
-    from Combining import synchronize
     from EC import select_cycles, remove_delay
     
     plt.close('all')
@@ -276,7 +295,8 @@ if __name__ == '__main__':
     importrawdata = 1
     if importrawdata:
         default_directory = os.path.abspath(os.path.join(os.getcwd(), os.pardir)) 
-        CV_data_0 = import_data(default_directory + os.sep) # + '18_CO_dose_and_strip_C01.mpt', data_type='EC')
+        CV_data_0 = import_data(default_directory + os.sep, # + '18_CO_dose_and_strip_C01.mpt', data_type='EC')
+                                data_type='EC')        
         MS_data_0 = import_data(default_directory + os.sep,# + 'QMS_16I27_18h35m30.txt'
                                 data_type='MS')
     

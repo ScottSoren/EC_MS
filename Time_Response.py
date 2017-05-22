@@ -278,7 +278,7 @@ def stagnant_pulse(tj=None, tpulse=10, tspan=[-10,20], j_el = -5,
         
         if plot_type == 'both':
             ax2 = ax1.twinx()
-            ax2.set_ylabel('flux / [umol/(m^2*s)]')
+            ax2.set_ylabel('flux / [um/(m^2*s)]')
             ax2.plot(t, j*1e6, 'k-')
             cbar.remove()
             ax3 = img.figure.add_axes([0.85, 0.1, 0.03, 0.8])

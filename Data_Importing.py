@@ -43,6 +43,7 @@ def import_text(full_path_name='current', verbose=1):
         file_name = input('Directory given. Enter the full name of the file to import\n')
 
     if verbose:   
+        print('directory: ' + directory_name)
         print('importing data from ' + file_name )
 
     possible_encodings = ['utf8','iso8859_15']  
@@ -190,6 +191,11 @@ def text_to_data(file_lines, title='get_from_file',
     DataDict['timestamp'] = timestamp
     DataDict['data_type'] = data_type
     
+    if data_type == 'EC':           #so that synchronize can combine current data from different EC-lab techniques
+        if '<I>/mA' in DataDict['data_cols'] and 'I/mA' not in DataDict['data_cols']:
+            DataDict['data_cols'].append('I/mA')
+            DataDict['I/mA'] = DataDict['<I>/mA']
+
     if verbose:
         print('\nfunction \'text_to_data\' finished!\n\n')    
     return DataDict
@@ -216,6 +222,24 @@ def import_data(full_path_name='current', title='get_from_file',
     return DataDict
 
 
+def import_folder(directory, verbose=1):
+    '''
+    import an entire folder of data at once
+    '''
+    if verbose:
+        print('\n\nIMPORTING EVERYTHING!!!! \nImporting from ' + directory +'\n')
+    if directory[-1] != os.sep:
+        directory += os.sep
+    lslist = os.listdir(directory)
+    Datasets = []
+    for f in lslist:
+        if f[-4:] == '.mpt':
+            Datasets += [import_data(directory + f, data_type='EC')]
+        elif 'QMS' in f: 
+            Datasets += [import_data(directory + f, data_type='MS')]
+    
+    return Datasets
+        
 
 if __name__ == '__main__':
     

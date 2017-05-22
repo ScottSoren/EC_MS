@@ -15,27 +15,40 @@ import numpy as np
 import re
 import os    
 
-def synchronize(Dataset_List, verbose=1, cutit=0, t_zero='start'):
+def synchronize(Dataset_List, t_zero='start', append=1, cutit=0, verbose=1):
     '''
     This will combine array data from multiple dictionaries into a single 
     dictionary with all time variables aligned according to absolute time.
     Data will be retained where the time spans overlap, unless cutit = 0, in 
     which case all data will be retained, but with t=0 at the start of the overlap.
     if t_zero is specified, however, t=0 will be set to t_zero seconds after midnight
+    (added 16J29:) if append=1, data columns of the same name will be joined
     '''
     if verbose:
         print('\n\nfunction \'synchronize\' at your service!')
+        
+    if type(Dataset_List) is dict:
+        print('''The first argument to synchronize should be a list of datasets! 
+                You have instead input a dictionary as the first argument. 
+                I will assume that the first two arguments are the datasets you
+                would like to synchronize with standard settings.''')
+        Dataset_List = [Dataset_List, t_zero]
+        t_zero = 'start'
     
-    t_start = 0             #start time of overlap in seconds since midnight
-    t_finish = 60*60*24*7     #I'm going to have to change things if experiments cross midnight
-    t_first = 60*60*24*7    #earliest timestamp in seconds since midnight
-    t_last = 0              #latest timestamp in seconds since midnight
+                              #prepare to collect:
+    recstarts = []            #first recorded time in each file in seconds since midnight
+    t_start = 0               #latest start time (start of overlap) in seconds since midnight
+    t_finish = 60*60*24*7     #earliest finish time (finish of overlap) in seconds since midnight 
+    t_first = 60*60*24*7      #earliest timestamp in seconds since midnight
+    t_last = 0                #latest timestamp in seconds since midnight
+
+    
     Combined_Data = {'data_type':'combined', 'data_cols':[]}
     title_combined = ''
     
     #go through once to generate the title and get the start and end times
     for nd, Dataset in enumerate(Dataset_List):
-        
+        Dataset['combining_number'] = nd
         title_combined += Dataset['title'] + '__as_' + str(nd) + '__and___'
         #Dataset = numerize(Dataset)    #16I28: the dDataset should already be numerized by importdata
         
@@ -48,8 +61,10 @@ def synchronize(Dataset_List, verbose=1, cutit=0, t_zero='start'):
             if is_time(col):
                 t_s = min(t_s, t_0 + Dataset[col][0])   #earliest start of time data in dataset
                 t_f = max(t_f, t_0 + Dataset[col][-1])  #latest finish of time data in dataset
-                
-        t_first = min([t_start, t_0])    #earliest timestamp  
+        
+        recstarts += [t_s]               #first recorded time
+    
+        t_first = min([t_first, t_0])    #earliest timestamp  
         t_last = max([t_last, t_0])      #latest timestamp 
         t_start = max([t_start, t_s])    #latest start of time variable overall
         t_finish = min([t_finish, t_f])  #earliest finish of time variable overall
@@ -66,47 +81,55 @@ def synchronize(Dataset_List, verbose=1, cutit=0, t_zero='start'):
     elif t_zero == 'last':
         t_zero = t_last
     if verbose:
-        print('start: ' + str(t_start) + ', first: ' + str(t_first) + 
-        ', last: ' + str(t_last))
+        print('first: ' + str(t_first) + ', last: ' + str(t_last) + 
+        ', start: ' + str(t_start) + ', finish: ' + str(t_finish))
     Combined_Data['tspan_2'] = [t_start - t_zero, t_finish - t_zero]    #start and finish times of overlap as seconds since zero point   
+     
     
-    t_span = t_finish - t_start    
+    I_sort = np.argsort(recstarts)
+    Dataset_List = [Dataset_List[I] for I in I_sort]       
+        #sort by first recorded absolute time. This is so that successive datasets of same type can be joined,
+        #with the time variables increasing all the way through 
+        #(note: EC lab techniques started together have same timestamp but different recstart)
     
     #and again to synchronize the data and put it into the combined dictionary
-    for nd, Dataset in enumerate(Dataset_List):
+    for Dataset in Dataset_List:
+        nd = Dataset['combining_number']           
+        #this way names in Combined_Data match the order the datasets are input with
         t_0 = timestamp_to_seconds(Dataset['timestamp'])
         offset = t_0 - t_zero
-        #first figure out where I need to cut
-        I_min = 0
-        I_max = 10**9       #I'm never going to have more than a billion data points.
+        
+        #first figure out where I need to cut, by getting the indeces striclty corresponding to times lying within the overlap
+            #a kind of ugly way to get the number of rows in dataset:
+        I_keep = [I for (I, v) in enumerate(Dataset[Dataset['data_cols'][0]])]     
+            #figure out what to keep:
         for col in Dataset['data_cols']:
             if is_time(col):
-                data = Dataset[col]            
-                data = data + offset
-                I_min = max(np.where(data>0)[0][0], I_min)  #to cut points before overlap
-                excess = np.where(data>t_span)    #to cut points after overlap
-                if np.size(excess)>0:                  #so that I don't get an empty np.where problem
-                    I_max = min(excess[0][0], I_max)
-            
+                t = Dataset[col] + t_0 #absolute time
+                I_keep = [I for I in I_keep if t_start < t[I] < t_finish]
+        
         #then cut, and put it in the new data set
         for col in Dataset['data_cols']:
             data = Dataset[col] 
             if cutit:           #cut data to only return where it overlaps
-                data = data[I_min:I_max] 
+                data = data[I_keep] 
             if is_time(col):
                 data = data + offset
-            new_col = col
-            if new_col in Combined_Data:
-                new_col = new_col + '_' + str(nd)
-            Combined_Data[new_col] = data
-            Combined_Data['data_cols'].append(new_col)  
+            if col in Combined_Data:
+                if append:
+                    Combined_Data[col] = np.append(Combined_Data[col], data)
+                    continue                    
+                col = col + '_' + str()
+            Combined_Data[col] = data
+            Combined_Data['data_cols'].append(col)  
             
         #keep all of the metadata from the original datasets (added 16J27)
         for col, value in Dataset.items():
-            if col in Combined_Data.keys():
-                Combined_Data[col + '_' + str(nd)] = value
-            else:
-                Combined_Data[col] = value
+            if col not in Dataset['data_cols'] and col not in ['combining_number', 'data_cols']:     #fixed 16J29
+                if col in Combined_Data.keys():
+                    Combined_Data[col + '_' + str(nd)] = value
+                else:
+                    Combined_Data[col] = value
            
     if verbose:
         print('function \'synchronize\' finsihed!\n\n')   
@@ -116,8 +139,8 @@ def synchronize(Dataset_List, verbose=1, cutit=0, t_zero='start'):
 
 def time_cut(MS_Data_0, tspan, verbose=1):
     '''
-    cuts a data set, retaining the portion of the data set within a specified
-    time interval
+    cuts an MS data set, retaining the portion of the data set within a specified
+    time interval. Does nothing to the EC data.
     '''
     if verbose:
         print('\n\nfunction \'time_cut\' at your service! \n Time cutting ' + MS_Data_0['title'])
