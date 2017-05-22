@@ -1,6 +1,13 @@
 
 EC-MS data processing package by Scott (scott@fysik.dtu.dk)
-Last modified 17A12
+Last modified 17A28
+
+
+-------------------- 17A28 ------------------------------------------
+Added Electrolytes module to implement all the electrolyte modelling in Scott's thesis Seciton 3.1, generalized to use with any electrolyte.
+./data/Electrolytes.txt has data to interface with 'Electrolyte' class, among other things pKa's and ion mobilities for a number of common electrolytes.
+Tafel plots made easy with functions 'get_datapoints' in Integrate_Signals module and 'plot_datapoints' in Plotting module 
+
 
 -------------------- 17A12 ------------------------------------------
 Lots of small improvements and additions, mostly in the area of better integrating quantification in all of the older scripts.
@@ -15,6 +22,7 @@ Expanded molecular database and added QMS spectra from NIST, ionization cross se
 'plot_flux' added to Plotting. 'plot_masses' renamed 'plot_signal'.
 'plot_experiment' modified to plot fluxes in nmol/s rather than QMS signal if given parameter 'mols={<molecule1>:<color1>, ...}'.
 Integration of transient fixed 
+
 
 -------------------- 16K17 ------------------------------------------
 Object_Files module added to facilitate interaction of objects (of i.e. Molecule) with databases. Molecules module adjusted accordingly.

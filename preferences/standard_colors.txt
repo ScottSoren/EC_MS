@@ -1,0 +1,22 @@
+standard colors
+	M43: greenyellow
+	M70: purple
+	M30: olive
+	M15: r
+	M31: palegreen
+	M2: b
+	M34: darkred
+	M40: c
+	M28: 0.5
+	M4: m
+	M44: brown
+	M32: k
+	M3: darkgoldenrod
+	M17: chocolate
+	M16: indigo
+	M19: teal
+	M36: darkgreen
+	M18: y
+	M26: g
+	M27: limegreen
+	M20: slateblue

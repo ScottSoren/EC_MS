@@ -17,5 +17,6 @@ from EC_MS.Object_Files import *
 from EC_MS.Integrate_Signals import *
 from EC_MS.Time_Response import *
 from EC_MS.Calibration import *
+from EC_MS.Electrolytes import *
 import EC_MS.Chem as Chem
 

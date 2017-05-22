@@ -275,11 +275,17 @@ def plot_flux(MS_data, mols={'H2':'b', 'CH4':'r', 'C2H4':'g', 'O2':'k'},
         ax = fig1.add_subplot(111)  
     if type(tspan) is str:
         tspan = MS_data[tspan]
+    if type(mols) is list:
+        mols = dict(zip(mols, ['b','r','g','k','c','m','y','0.5']))
         
     for (mol, color) in mols.items():
-        [x,y] = get_flux(MS_data, mol, unit=unit, verbose=verbose)   
+        [x,y] = get_flux(MS_data, mol, unit=unit, verbose=verbose, tspan=tspan)
+        '''  17A28: this is now taken care of in the line above.
         if tspan is not None:
+            if verbose:
+                print('cutting ' + str(mol) + ' at ' + str(tspan))
             x,y = cut(x, y, tspan)
+        '''
         if removebackground:
             y = y - 0.99 * min(y) #0.99 to avoid issues when log plotting.
         ax.plot(x, y, color, label=mol)
@@ -416,6 +422,34 @@ def plot_folder(folder_name,
     Combined_data = synchronize(Datasets, t_zero='first')
     sync_metadata(Combined_data, RE_vs_RHE, A_el)
     return plot_experiment(Combined_data, colors=colors)
+
+
+def plot_datapoints(integrals, colors, ax='new', label='', V=None, logplot=True):
+    '''
+    integrals will most often come from functino 'get_datapoitns' in module
+    Integrate_Signals
+    '''
+    print(logplot)
+    if ax == 'new':
+        fig1 = plt.figure()
+        ax = fig1.add_subplot(111)
+    if V is None:
+        V = integrals['V']
+        
+    for (quantity, color) in colors.items():
+        value = integrals[quantity]
+        if type(color) is dict:
+            plot_datapoints(value, color, ax=ax, logplot=logplot,
+                            label=label+quantity+'_', V=V)
+        else:
+           # print(quantity + '\n\tvalue=' + str(value) + 
+           #         '\n\tcolor=' + str(color) + '\n\tV=' + str(V))
+            ax.plot(V, value, '.', markersize=15, color=color, label=label+quantity)
+    if logplot:
+        ax.set_yscale('log')
+        print('making logscale')
+    return ax
+
     
 if __name__ == '__main__':
     import os

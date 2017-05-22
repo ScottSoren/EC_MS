@@ -178,8 +178,8 @@ def RSF_to_F_cal(quantmol = {'H2':'M2', 'He':'M4', 'CH4':'M15', 'H2O':'M18',
     ax.set_ylim([0,20])
 
 
-def get_flux(MS_data, mol, tspan=None, removebackground=False, 
-             unit='nmol/s', verbose=True):
+def get_flux(MS_data, mol, tspan='tspan_2', removebackground=False, 
+             unit='pmol/s', verbose=True):
     '''
     returns [x, y] where x is the t corresponding to the primary mass of the
     molecule in 'mol' and y is the molecular flux in nmol/s, calculated from 
@@ -213,7 +213,7 @@ def get_flux(MS_data, mol, tspan=None, removebackground=False,
     
     if removebackground:
         if type(removebackground) is float:
-            background = removebackground*min(y)
+            background = removebackground * min(y)
         else:
             background = min(y)
         y = y - background + 1e-5
@@ -287,7 +287,7 @@ def predict_current(EC_and_MS, mols, tspan=None, RE_vs_RHE=None, A_el=None,
 if __name__ == '__main__':
     plt.close('all')
     #calibration_compare()
-    RSF_to_F_cal(calmol = {'H2':'M2','O2':'M32','CO2':'M44'}, writeprimary=False)
+    RSF_to_F_cal(calmol = {'CO2':'M44'}, writeprimary=True)
     
         
     

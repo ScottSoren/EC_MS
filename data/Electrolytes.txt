@@ -1,0 +1,54 @@
+
+#commonly used electrolytes
+standard
+	electrolyte_type: carbonate
+	pH	=	12
+	concentration	=	1.0
+
+
+#electrolyte systems
+carbonate
+	cation: K+
+	anion: CO3--
+	buffer	=	['H2CO3', 'HCO3-', 'CO3--']
+	spectator: K+
+	pKa	=	[3.6, 10.32] 	#from wikipedia
+	gas: CO2
+	Keq	=	1.7e-3		# = c(H2CO3)/c(CO2)
+	Kh	=	29.6		# = p(CO2)/c(CO2) in bar/mol
+
+phosphate
+	cation: K+
+	anion: PO4---
+	buffer	=	['H3PO4', 'H2PO4-', 'HPO4--', 'PO4---']
+	spectator: K+
+	pKa	=	[2.15, 7.20, 12.32] 	#from wikipedia
+
+hydroxide
+	cation: K+
+	
+sulfate
+	cation: K+
+	anion: SO4--
+	buffer	=	['H2SO4', 'HSO4-', 'SO4--']
+	spectator: K+
+	pKa	=	[-3, 1.99]	#from wikipedia
+
+
+#mu0, ion mobilities in limit of infinite dilution, units: (m/s)/(V/m)) = m^2/(V*s)
+mobility
+	K+	=	7.620e-8	#from Bard and Faulkner (BF)
+	H+	=	3.626e-7	#BF
+	OH-	=	2.052e-7	#BF
+	HCO3-	=	4.610e-8	#BF
+	CO3--	=	7.462e-8	#from Dow, http://www.fondriest.com/environmental-measurements/wp-content/uploads/2014/05/DOW.pdf
+	NH4+	=	7.62e-8		#Dow
+	Na+	=	5.19e-8		#Dow
+	Cl-	=	7.908e-8	#Dow
+	H2PO4-	=	3.731e-8	#Dow
+	HPO4--	=	5.534e-8	#Dow
+	PO4---	=	7.1512e-8	#Dow
+	SO4--	=	8.271e-8	#Dow
+	HSO4-	=	5.18e-8		#from http://www.unige.ch/cabe/dynamic/ESTDynamicPartISI.pdf and mu0=D*abs(z)*qe/(kB*T)
+
+

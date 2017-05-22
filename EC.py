@@ -75,7 +75,7 @@ def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True):
         for col in EC_data['data_cols']:
             if is_time(col):
                 EC_data[col] = EC_data[col] - tspan_2[0]
-                EC_data['tspan_2'] = tspan_2 - tspan_2[0]
+        EC_data['tspan_2'] = tspan_2 - tspan_2[0]
     
     return EC_data
 

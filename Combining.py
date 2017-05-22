@@ -72,7 +72,7 @@ def synchronize(Dataset_List, t_zero='start', append=1, cutit=0,
     
     title_combined = title_combined[:-6]
     Combined_Data['title'] = title_combined
-    Combined_Data['timestamp'] = seconds_to_timestamp(t_start)
+    #Combined_Data['timestamp'] = seconds_to_timestamp(t_start)
     Combined_Data['tspan'] =    [t_start, t_finish] #overlap start and finish times as seconds since midnight
     Combined_Data['tspan_1'] = [t_start - t_first, t_finish - t_first]    # start and finish times as seconds since earliest start
     if t_zero == 'start':
@@ -81,6 +81,7 @@ def synchronize(Dataset_List, t_zero='start', append=1, cutit=0,
         t_zero = t_first
     elif t_zero == 'last':
         t_zero = t_last
+    Combined_Data['timestamp'] = seconds_to_timestamp(t_zero) #this should probably be t_zero and not t_start #17B01
     if verbose:
         print('first: ' + str(t_first) + ', last: ' + str(t_last) + 
         ', start: ' + str(t_start) + ', finish: ' + str(t_finish))
