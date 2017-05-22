@@ -15,7 +15,8 @@ from __future__ import division
 import os
 import re
 import codecs
-from copy  import deepcopy
+from copy  import deepcopy #necessary?
+import numpy as np
 
 def import_text(full_path_name='current', verbose=1):   
     '''
@@ -23,7 +24,7 @@ def import_text(full_path_name='current', verbose=1):
     list of lines
     '''    
     if verbose:
-        print('\n\nfunction \'import_text\' at your command!\n')
+        print('\n\nfunction \'import_text\' at your service!\n')
     
     if full_path_name == 'input':
         full_path_name = input('Enter full path for the file name as \'directory' + os.sep + 'file.extension\'')
@@ -76,7 +77,7 @@ def text_to_data(file_lines, title='get_from_file',
     {'title':title, 'header':header, 'colheader1':[data1], 'colheader2':[data2]...}
     '''    
     if verbose:
-        print('\n\nfunction \'text_to_data\' at your command!\n')
+        print('\n\nfunction \'text_to_data\' at your service!\n')
     
     #disect header
     N_lines = len(file_lines)        #number of header lines
@@ -85,6 +86,7 @@ def text_to_data(file_lines, title='get_from_file',
     n_blank = 0                      #header ends with a number of blank lines in MS
         
     DataDict = {}
+    commacols = []                   #will catch if data is recorded with commas as decimals.
     
     for nl, line in enumerate(file_lines):
         
@@ -139,7 +141,8 @@ def text_to_data(file_lines, title='get_from_file',
             #col_header_line = line
             col_headers = line.strip().split('\t')
             DataDict['N_col']=len(col_headers) 
-            DataDict['data_cols'] = deepcopy(col_headers)   #will store names of columns containing data
+            DataDict['data_cols'] = deepcopy(col_headers)   #do we need deepcopy? #will store names of columns containing data
+            #DataDict['data_cols'] = col_headers.copy()
             for col in col_headers:
                 DataDict[col] = []              #data will go here    
             header_string = header_string+line #include this line in the header
@@ -161,11 +164,23 @@ def text_to_data(file_lines, title='get_from_file',
                     try:
                         data = float(data)
                     except ValueError:
-                        if verbose:
-                            print(list(zip(col_headers,line_data)))
-                            print(title + ' in text_to_data: \nRemoved \'' + str(col) +'\' from data columns because of value \'' + 
-                                str(data) + '\' at line ' + str(nl) +'\n')
-                        DataDict['data_cols'].remove(col)
+                        try:
+                            if verbose and not col in commacols:
+                                print('ValueError on value ' + data + ' in column ' + col + ' line ' + str(nl) + 
+                                      '\n Checking if you''re using commas as decimals in that column... ')
+                            data = data.replace('.','')        #in case there's also '.' as thousands separator, just get rid of it.
+                            data = data.replace(',','.')       #put '.' as decimals
+                            data = float(data)
+                            if not col in commacols:
+                                if verbose:
+                                    print('... and you were, dumbass. I''ll fix it.')
+                                commacols += [col]
+                        except ValueError:
+                            if verbose :
+                                print(list(zip(col_headers,line_data)))
+                                print(title + ' in text_to_data: \nRemoved \'' + str(col) +'\' from data columns because of value \'' + 
+                                    str(data) + '\' at line ' + str(nl) +'\n')
+                            DataDict['data_cols'].remove(col)
                             
                 DataDict[col].append(data)
                     
@@ -180,11 +195,23 @@ def text_to_data(file_lines, title='get_from_file',
     return DataDict
 
 
+def numerize(Data):
+    '''
+    replaces numerical data lists with numpy arrays
+    '''
+    for key in Data.keys():
+        if key in Data['data_cols']:
+            if type(Data[key]) is list:
+                Data[key] = np.array(Data[key])
+    return Data
+
+
 def import_data(full_path_name='current', title='get_from_file',
                  data_type='EC', N_blank=10, verbose=1):
                  
     file_lines = import_text(full_path_name, verbose)
     DataDict = text_to_data(file_lines, title, data_type, N_blank, verbose)
+    DataDict = numerize(DataDict)
 
     return DataDict
 

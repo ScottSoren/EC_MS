@@ -1,11 +1,22 @@
 
 
 EC-MS data processing package by Scott (scott@fysik.dtu.dk)
-Last modified 16I23
+Last modified 16I29
 
 
---------------------------------------------------------------
-Modified 16I23 so that it performs better as a cross-platform package.
+-------------------- 16I29 ------------------------------------------
+Plotting functions moved to their own module
+plot_masses_and_I uses tspan_2 by default
+numerize is now done automatically when import_data is called
+plot_vs_potential added to Plotting
+remove_delay added to EC
+text_to_data protected against commas as decimals. I hate commas as decimals.
+np.where() replaced by a list comprehension in plot_masses
+Implemented a few minor changes suggested 16I23 (see Improvements file)
+
+
+-------------------- 16I23 ------------------------------------------
+Modified 16I23 so that EC_MS performs better as a cross-platform package.
 16I23 modifications make the package compatible with Windows and with python2, in addition to the intended python3 on Linux.
 Most of the modules have an "if __name__=='__main__':" part that demonstrates the usage of some of its functions.
 The modules can be run from within the package, or, as is the main intention, imported with the EC_MS package. This is done with a

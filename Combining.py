@@ -13,9 +13,7 @@ from __future__ import print_function
 from __future__ import division
 
 import numpy as np
-from matplotlib import pyplot as plt
 import re
-   
         
 def synchronize(Dataset_List, verbose = 1, cutit = 0, t_zero = 'start'):
     '''
@@ -38,7 +36,7 @@ def synchronize(Dataset_List, verbose = 1, cutit = 0, t_zero = 'start'):
     for nd, Dataset in enumerate(Dataset_List):
         
         title_combined += Dataset['title'] + '__as_' + str(nd) + '__and___'
-        Dataset = numerize(Dataset)
+        #Dataset = numerize(Dataset)    #16I28: the dDataset should already be numerized by importdata
         
         t_0 = timestamp_to_seconds(Dataset['timestamp'])
         
@@ -214,16 +212,6 @@ def seconds_to_timestamp(seconds):
     timestamp = '{0:2d}:{1:2d}:{2:2d}'.format(h,m,s)
     timestamp = timestamp.replace(' ','0')
     return timestamp
- 
-def numerize(Data):
-    '''
-    replaces numerical data lists with numpy arrays
-    '''
-    for key in Data.keys():
-        if key in Data['data_cols']:
-            if type(Data[key]) is list:
-                Data[key] = np.array(Data[key])
-    return Data
 
 
 def indeces_from_input(options, prompt):
@@ -294,8 +282,8 @@ def plot_vs_time(Dataset, cols_1='input', cols_2='input', verbose=1):
 
 
 def plot_masses(MS_Data, tspan=0, logplot=1, verbose=1,
-                Colors = {'M2':'b','M4':'r','M18':'0.5','M28':'g','M32':'k'}, 
-                ax1='new', saveit=1, leg=1):
+                colors = {'M2':'b','M4':'r','M18':'0.5','M28':'g','M32':'k'}, 
+                ax1='new', saveit=0, leg=1):
     '''
     plots selected masses for a selected time range from MS data or EC_MS data
     '''
@@ -308,7 +296,7 @@ def plot_masses(MS_Data, tspan=0, logplot=1, verbose=1,
         ax1 = fig1.add_subplot(111)    
     lines = {}
     
-    for mass, color in Colors.items():
+    for mass, color in colors.items():
         if verbose:
             print('plotting: ' + mass)
         x = MS_Data[mass+'-x']
@@ -336,8 +324,8 @@ def plot_masses(MS_Data, tspan=0, logplot=1, verbose=1,
     return ax1
 
 def plot_masses_and_I(EC_and_MS, tspan=0, overlay=0, logplot=[1,0], verbose=1, 
-                      Colors={'M2':'b','M4':'r','M18':'0.5','M28':'g','M32':'k'}, 
-                      plotpotential=1, Ref_vs_RHE=0, saveit=1, title='default', leg=1, A_el=0):
+                      colors={'M2':'b','M4':'r','M18':'0.5','M28':'g','M32':'k'}, 
+                      plotpotential=1, Ref_vs_RHE=0, saveit=0, title='default', leg=1, A_el=0):
     '''
     this plots current and potential on one axis and masses on another
     '''
@@ -352,7 +340,7 @@ def plot_masses_and_I(EC_and_MS, tspan=0, overlay=0, logplot=[1,0], verbose=1,
     else:
         ax1 = figure1.add_subplot(211)
         ax2 = figure1.add_subplot(212)
-    plot_masses(EC_and_MS, tspan, logplot[0], verbose=verbose, Colors=Colors, ax1=ax1, saveit=0, leg=leg)
+    plot_masses(EC_and_MS, tspan, logplot[0], verbose=verbose, colors=colors, ax1=ax1, saveit=0, leg=leg)
     x = EC_and_MS['time/s']
     if 'I/mA' in EC_and_MS['data_cols']:
         y = EC_and_MS['I/mA']       #for CA files
@@ -406,6 +394,7 @@ def plot_masses_and_I(EC_and_MS, tspan=0, overlay=0, logplot=[1,0], verbose=1,
 if __name__ == '__main__':
     
     from Data_Importing import import_data #honestly, I would just have everything in one module if you could fold code in spyder3
+    from Plotting import plot_vs_time
     import os    
     
     default_directory = os.path.abspath(os.path.join(os.getcwd(), os.pardir))     
