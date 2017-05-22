@@ -1,0 +1,12 @@
+D	=	1.88e-09
+kH	=	67.0
+sigma_100eV	=	2.615
+Spectrum
+	M14	=	13.7913791379
+	M28	=	100.0
+	M29	=	0.740074007401
+	Title: NIST_16L14
+Hiden	=	('M28', 1.0)
+#extrapolated from rsf on mass M28 16L15
+F_cal	=	[ 12.78417511]
+primary: M28

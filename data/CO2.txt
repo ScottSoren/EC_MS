@@ -96,3 +96,17 @@ calibration_16J13_16K17_Cl2_CP_pulse_2
 	chip: 16J13
 	F_cal	=	15.273086189
 	analysis date: 16K17
+sigma_100eV	=	3.735
+Spectrum
+	M22	=	1.900190019
+	M28	=	9.81098109811
+	M29	=	0.100010001
+	M44	=	100.0
+	M12	=	8.71087108711
+	Title: NIST_16L14
+	M45	=	1.200120012
+	M46	=	0.400040004
+	M16	=	9.61096109611
+Hiden	=	('M44', 1.17)
+#fit to calibrations on mass M44 16L15
+F_cal	=	14.9574848754

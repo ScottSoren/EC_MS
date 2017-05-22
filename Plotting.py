@@ -15,10 +15,12 @@ if os.path.split(os.getcwd())[1] == 'EC_MS':
     from EC import sync_metadata
     from Data_Importing import import_folder
     from Combining import synchronize
+    from Quantification import get_flux
 else:                           #then we use relative import
     from .EC import sync_metadata
     from .Data_Importing import import_folder
     from .Combining import synchronize
+    from .Quantification import get_flux
 
 
 def plot_vs_potential(CV_and_MS, colors, tspan=0, RE_vs_RHE=None, A_el=None, 
@@ -148,9 +150,9 @@ def plot_vs_time(Dataset, cols_1='input', cols_2='input', verbose=1):
     if verbose:
         print('function \'plot_vs_time\' finished!\n\n')
 
-
 def indeces_from_input(options, prompt):
-    '''not sure I'll ever actually use this'''
+    '''something I used all the time back in the (Matlab) days.
+        not sure I'll ever actually use it again though'''
     print(prompt + '\n... enter the indeces you\'re interested in, in order,' +
     'seperated by spaces, for example:\n>>>1 4 3')
     for nc, option in enumerate(options):
@@ -159,32 +161,32 @@ def indeces_from_input(options, prompt):
     choices = choice_string.split(' ')
     choices = [int(choice) for choice in choices]
     return choices
+    
+    
 
-
-def plot_masses(MS_Data, tspan=0, logplot=1, verbose=1,
-                colors = {'M2':'b','M4':'r','M18':'0.5','M28':'g','M32':'k'}, 
-                ax1='new', saveit=0, leg=1):
+def plot_signal(MS_data,
+                masses = {'M2':'b','M4':'r','M18':'0.5','M28':'g','M32':'k'},
+                tspan=0, ax1='new', 
+                logplot=True, saveit=False, leg=False, verbose=True):
     '''
     plots selected masses for a selected time range from MS data or EC_MS data
+    Could probably be simplified a lot, to be the same length as plot_fluxes
     '''
-
-
     if verbose:
-        print('\n\nfunction \'plot_masses\' at your service! \n Plotting from: ' + MS_Data['title'])
+        print('\n\nfunction \'plot_masses\' at your service! \n Plotting from: ' + 
+              MS_data['title'])
 
     if ax1 == 'new':
         fig1 = plt.figure()
         ax1 = fig1.add_subplot(111)    
     lines = {}
-    
     if tspan == 0:                  #then use the range of overlap
-        tspan = CV_and_MS['tspan_2']    
-    
-    for mass, color in colors.items():
+        tspan = MS_data['tspan_2']    
+    for mass, color in masses.items():
         if verbose:
             print('plotting: ' + mass)
-        x = MS_Data[mass+'-x']
-        y = MS_Data[mass+'-y']
+        x = MS_data[mass+'-x']
+        y = MS_data[mass+'-y']
         try:
             #np.where() keeps giving me headaches, so I'll try with list comprehension.
             index_list = np.array([i for (i,x_i) in enumerate(x) if tspan[0]<x_i and x_i<tspan[1]])     
@@ -198,22 +200,64 @@ def plot_masses(MS_Data, tspan=0, logplot=1, verbose=1,
         lines[mass] = ax1.plot(x, y, color, label = mass) 
         #as it is, lines is not actually used for anything         
     if leg:
-        ax1.legend(loc = 'lower right')
+        ax1.legend(loc='lower right')
     ax1.set_xlabel('time / [s]')
-    y_string = 'signal / [A]'
-    ax1.set_ylabel(y_string)           
+    ax1.set_ylabel('signal / [A]')           
     if logplot: 
         ax1.set_yscale('log') 
     if verbose:
         print('function \'plot_masses\' finsihed! \n\n')
     return ax1
 
-def plot_experiment(EC_and_MS, tspan=0, overlay=0, logplot=[1,0], verbose=1, 
-                      colors={'M2':'b','M4':'r','M18':'0.5','M28':'g','M32':'k'}, 
-                      plotpotential=1, RE_vs_RHE=None, A_el=None, 
-                      saveit=0, title='default', leg=1):
+def plot_masses(*args, **kwargs):
+    print('plot_masses renamed plot_signal. Remember that next time!')
+    return plot_signal(*args, **kwargs)
+    
+def plot_flux(MS_data, mols={'H2':'b', 'CH4':'r', 'C2H4':'g', 'O2':'k'},
+            tspan=None, ax='new', removebackground=True,
+            logplot=True, leg=False, verbose=True):
     '''
-    this plots current and potential on one axis and masses on another
+    Plots the molecular flux to QMS in nmol/s for each of the molecules in
+    'fluxes.keys()', using the primary mass and the F_cal value read from
+    the molecule's text file, with the plot specs from 'fluxes.values()'
+    '''
+    if verbose:
+        print('\n\nfunction \'plot_flux\' at your service!\n')
+    if ax == 'new':
+        fig1 = plt.figure()
+        ax = fig1.add_subplot(111)  
+    if type(tspan) is str:
+        tspan = MS_data[tspan]
+        
+    for (mol, color) in mols.items():
+        [x,y] = get_flux(MS_data, mol, verbose=verbose)   
+        if tspan is not None:
+            I_keep = [I for (I, x_I) in enumerate(x) if tspan[0]<x_I and x_I<tspan[-1]]
+            x = x[I_keep]
+            y = y[I_keep]
+            if removebackground:
+                y = y - min(y) + 1e-5
+        ax.plot(x, y, color, label=mol)
+    if leg:
+        ax.legend(loc='lower right')
+    ax.set_xlabel('time / [s]')
+    ax.set_ylabel('flux / [nmol/s]')
+    if logplot:
+        ax.set_yscale('log')
+    
+    if verbose:
+        print('\nfunction \'plot_flux\' finished!\n\n')    
+    return ax    
+
+    
+def plot_experiment(EC_and_MS,
+                    colors={'M2':'b','M4':'r','M18':'0.5','M28':'g','M32':'k'},
+                    tspan=0, overlay=0, logplot=[1,0], verbose=1,   
+                    plotpotential=1, RE_vs_RHE=None, A_el=None, 
+                    saveit=0, title='default', leg=1,
+                    masses=None, mols=None): #mols will overide masses will overide colors
+    '''
+    this plots signals or fluxes on one axis and current and potential on one axis
     '''
     
     if verbose:
@@ -229,7 +273,23 @@ def plot_experiment(EC_and_MS, tspan=0, overlay=0, logplot=[1,0], verbose=1,
         
     if tspan == 0:                  #then use the whole range of overlap
         tspan = EC_and_MS['tspan_2']    
-    plot_masses(EC_and_MS, tspan, logplot[0], verbose=verbose, colors=colors, ax1=ax1, saveit=0, leg=leg)
+
+    quantified = False      #added 16L15
+    if mols is not None:
+        quantified = True
+    elif colors.keys()[0][0] == 'M':
+        if masses is not None:
+            masses = colors
+    else:
+        quantified = True
+        mols = colors
+        
+    if quantified:
+        plot_flux(EC_and_MS, mols=mols, tspan=tspan,
+                  ax=ax1, leg=leg, logplot=logplot[0], verbose=verbose)
+    else:
+        plot_signal(EC_and_MS, masses=masses, tspan=tspan,
+                    ax1=ax1, leg=leg, logplot=logplot[0], verbose=verbose)
     
     t = EC_and_MS['time/s']
     
@@ -282,9 +342,8 @@ def plot_folder(folder_name,
     Datasets = import_folder(folder_name)
     Combined_data = synchronize(Datasets, t_zero='first')
     sync_metadata(Combined_data, RE_vs_RHE, A_el)
-    return plot_masses_and_I(Combined_data, colors=colors)
-
- 
+    return plot_experiment(Combined_data, colors=colors)
+    
 if __name__ == '__main__':
     import os
     from Data_Importing import import_data

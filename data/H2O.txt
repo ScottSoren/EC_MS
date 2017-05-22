@@ -1,0 +1,15 @@
+n_el	=	0.0
+D	=	2.27e-09
+kH	=	2.336e-05
+sigma_100eV	=	2.348
+Spectrum
+	M18	=	100.0
+	M17	=	21.2221222122
+	M19	=	0.500050005001
+	M16	=	0.900090009001
+	M20	=	0.300030003
+	Title: NIST_16L14
+Hiden	=	('M18', 0.95)
+#extrapolated from rsf on mass M18 16L15
+F_cal	=	[ 12.14496635]
+primary: M18

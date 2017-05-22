@@ -1,0 +1,20 @@
+D	=	2e-09
+kH	=	29.4
+sigma_100eV	=	2.982
+Spectrum
+	M40	=	100.0
+	M38	=	0.0500050005001
+	M20	=	14.6214621462
+	M36	=	0.300030003
+	Title: NIST_16L14
+Hiden	=	('M40', 1.27)
+Hiden	=	('M40', 1.27)
+Hiden	=	('M40', 1.27)
+Hiden	=	('M40', 1.27)
+Hiden	=	('M40', 1.27)
+Hiden	=	('M40', 1.27)
+Hiden	=	('M40', 1.27)
+Hiden	=	('M40', 1.27)
+#extrapolated from rsf on mass M40 16L15
+F_cal	=	[ 16.23590239]
+primary: M40

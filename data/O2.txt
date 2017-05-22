@@ -58,3 +58,11 @@ calibration_16I28_16K17_O2_CP_pulse_3
 	chip: 16I28
 	F_cal	=	8.19445530685
 	analysis date: 16K17
+sigma_100eV	=	2.621
+Spectrum
+	M32	=	100.0
+	M16	=	21.802180218
+	Title: NIST_16L14
+Hiden	=	('M32', 0.86)
+#fit to calibrations on mass M32 16L15
+F_cal	=	8.224187098

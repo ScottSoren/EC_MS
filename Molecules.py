@@ -31,10 +31,6 @@ try:
 except NameError:
     FileNotFoundError = IOError
 
-
-
-
-
 class Molecule:
     '''
     This class will store physical and thermodynamic data about molecules that
@@ -42,14 +38,14 @@ class Molecule:
     results for quantification. Objects of this class will link to data stored 
     in a text file in ./data/
     '''
-    def __init__(self, name, writenew=True):
+    def __init__(self, name, writenew=True, verbose=True):
         self.name = name
         self.cal = {}
         self.__str__ = '<' + name + ', instance of EC_MS class \'Molecule\'>'
         self.M = Chem.Mass(name) #molar mass from chemical formula
         self.primary = None     #the primary mass to measure at
         self.calibrations = []      #will store calibration data
-        self.attr_status = {'D':0,'kH':0,'n_el':0, 'name':2}
+        self.attr_status = {'D':0,'kH':0,'n_el':0}
         # 0 for undefined, 1 for loaded from file, 2 for set by function
         file_name = name + '.txt'
         cwd = os.getcwd()
@@ -60,7 +56,7 @@ class Molecule:
                 if len(self.file_lines) == 0:
                     print('The file for ' + name + ' is empty! Writing new.')
                     raise FileNotFoundError
-            self.reset()
+            self.reset(verbose=verbose)
             self.file_lines = ['name: ' + self.name, 'M\t=\t' + str(self.M)] + self.file_lines
         except FileNotFoundError: # I don't know the name of the error, so I'll have to actually try it first.
             print('no file found for ' + name)  
@@ -78,22 +74,36 @@ class Molecule:
             if callable(a):
                 a(f, *args, **kwargs)
             elif type(a) is str:
+                if a[-1] != '\n':
+                    a += '\n'
                 f.write(a)
+            elif type(a) in (list, dict):
+                if 'key' in kwargs.keys():
+                    lines = structure_to_lines(a, preamble=kwargs['key'])
+                else:
+                    lines = structure_to_lines(a)
+                f.writelines(lines)
+            elif type(a) is tuple:
+                lines = structure_to_lines(a[1], preamble=a[0])
+                f.writelines(lines)
             else:
                 print('Couldn''t write ' + str(a))
         os.chdir(cwd)
         
     
-    def reset(self, verbose=1):
+    def reset(self, verbose=True):
         '''
         Retrives data for new object from lines read from file or resets 
         attribute values to those originally in the file
         '''
-        print('loading attributes for this ' + self.name + ' molecule fresh from original file.')
+        if verbose:
+            print('loading attributes for this ' + self.name + ' molecule fresh from original file.')
         dictionary = lines_to_dictionary(self.file_lines)
         for (key, value) in dictionary.items():
                 if 'calibration' in key:
                     self.add_calibration(value)
+                if 'Spectrum' in key:
+                    self.spectrum = value
                 else:
                     setattr(self, key, value)
          
@@ -112,12 +122,67 @@ class Molecule:
           #  else:
           #      f.write(attr + '\t=\t' + str(self.attr) + '\n') #not necessary...
     
-    def read_spectrum(self, lines):
-        print('the read_spectrum function is not implemented yet')
-        pass
+    def get_RSF(self):
+        '''
+        Requires that a spectrum and total ionization cross section are already 
+        loaded, and preferably also a relative sensitivity factor.
+        Generates dictionaries of ionization-fragmentation cross sections 'IFCS' 
+        and 'RSF' for each mass in the spectrum. Saves the respective value for
+        the stated primary mass also as 'ifcs' and 'rsf'.
+        
+        '''
+        self.IFCS = {}       #this will be a dictionary containing the electron ionization
+                            #portion of the 'relative sensitivity' for each mass,
+                            #i.e. the partial ionization cross-section in Ang^2 at 100keV
+        spec_total = 0
+        for value in self.spectrum.values():
+            if type(value) is not str:
+                spec_total += value
+        RSFit = 'Hiden' in dir(self)
+        if RSFit:
+            self.RSF = {}       #this will be the relative sensivity factor at each
+                    #mass, where N2 at M28 is 1, from Hiden Analytical  
+            mH = self.Hiden[0]
+            vH = self.Hiden[1]
+        else:
+            print('no RSF found for ' + self.name)
+        
+        for (mass, value) in self.spectrum.items():
+            if mass == 'Title':
+                continue
+            self.IFCS[mass] = value / spec_total * self.sigma_100eV
+            if RSFit:
+                self.RSF[mass] = value / self.spectrum[mH] * vH
+        if 'primary' in dir(self):
+            self.ifcs = self.IFCS[self.primary]
+            if RSFit:
+                self.rsf = self.RSF[self.primary]
+                return self.rsf
+            print('returning ionization-fragmentation cross section in Ang^2 \'ifcs\'' +
+                  ' instead of \'rsf\' for ' + self.name)
 
+
+    def plot_spectrum(self, top=100, ax='new'):
+        if ax == 'new':
+            fig1 = plt.figure()
+            ax = fig1.add_subplot(111)
+        x = []
+        y = []
+        for (mass, value) in self.spectrum.items():
+            if mass == 'Title':
+                continue
+            x += [int(mass[1:])]
+            y += [value]
+        y = np.array(y) / max(y) * top
+        x = np.array(x)
+        ax.bar(x - 1/2, y)
+        ax.set_xticks(x)
+        ax.set_xticklabels([str(m) for m in x])
+        ax.set_title('literature QMS spectrum for ' + self.name)
+        
     
-    def add_calibration(self, calibration, useit=True, primary=True, writeit=False):
+    def add_calibration(self, calibration, 
+                        useit=True, primary=True, writeit=False, verbose=False):
         '''
         'calibration' is a dictionary containing the calibration factor 'F_cal', 
         in C/mol; the mass measurement 'mass' for which it applies, as well as
@@ -133,7 +198,8 @@ class Molecule:
         mass = calibration['mass']
         F_cal = calibration['F_cal']
         title = calibration['title']
-        print('added calibration ' + title + ' for ' + self.name)
+        if verbose:
+            print('added calibration ' + title + ' for ' + self.name)
         if useit:       #use this calibration for this mass
             self.cal[mass] = calibration['F_cal']
             attribute_name = 'F_' + mass
@@ -211,7 +277,8 @@ class Molecule:
         print('wrote calibration ' + calibration['title'] + ' for ' + self.name)
             
    
-    def calibration_fit(self, mass='primary', ax1='new', useit=True, primary=True):
+    def calibration_fit(self, mass='primary', ax='new', 
+                        useit=True, primary=True, verbose=True):
         if mass == 'primary':
             mass = self.primary
         title = mass + ' calibrations for ' + self.name
@@ -225,12 +292,14 @@ class Molecule:
         Q_QMS = np.array(Q_QMS)
         N = len(n_mol)
         pf1 = np.polyfit(n_mol, Q_QMS, 1)
-        print('y = ' + str(pf1[0]) + ' x + ' + str(pf1[1]))
+        if verbose:
+            print('y = ' + str(pf1[0]) + ' x + ' + str(pf1[1]))
         F_cal = pf1[0]
         print()
         if useit:       #use this calibration for this mass
             attribute_name = 'F_' + mass
-            print('using a fit value for ' + attribute_name + ' based on ' + str(N) + ' experiments.')
+            if verbose:
+                print('using a fit value for ' + attribute_name + ' based on ' + str(N) + ' experiments.')
             self.cal[mass] = F_cal
             setattr(self, attribute_name, F_cal)
             if primary:
@@ -240,16 +309,17 @@ class Molecule:
         pf_fun = np.poly1d(pf1)
         pf_x = np.array([min(n_mol), max(n_mol)])        
         
-        if ax1 == 'new':
+        if ax == 'new':
             fig1 = plt.figure()
-            ax1 = fig1.add_subplot(111)
-        if ax1 is not None:
+            ax = fig1.add_subplot(111)
+        if ax is not None:
 
-            ax1.set_title(title)
-            ax1.plot(n_mol*1e9, Q_QMS*1e9, 'k.', markersize=15)
-            ax1.plot(pf_x*1e9, pf_fun(pf_x)*1e9, 'r--')
-            ax1.set_xlabel('amount produced / nmol')
-            ax1.set_ylabel('int. signal / nC')
+            ax.set_title(title)
+            ax.plot(n_mol*1e9, Q_QMS*1e9, 'k.', markersize=15)
+            ax.plot(pf_x*1e9, pf_fun(pf_x)*1e9, 'r--')
+            ax.set_xlabel('amount produced / nmol')
+            ax.set_ylabel('int. signal / nC')
+        return F_cal
    
     def set_temperature(self, T):
         self.T = T
@@ -261,13 +331,19 @@ class Molecule:
 
 
 if __name__ == '__main__':
-    os.chdir('/home/soren/Dropbox (Soren Scott Inc)/Sniffer_Experiments/03_Pt_Sputtered/Analysis/16J14_time_response')
-     
-    if os.path.split(os.getcwd())[1] == 'EC_MS':   
-                                #then we're running from inside the package
-        data_directory = os.getcwd() + os.sep + 'data' + os.sep
-    else:
-        data_directory = os.getcwd() + os.sep + 'EC_MS' + os.sep + 'data' + os.sep    
+    plt.close('all')
+    '''
+    mol = Molecule('CO2')  
+    mol.plot_spectrum()
+    mol.calibration_fit()
+    '''
+    mol = Molecule('C2H4')  
+    mol.plot_spectrum()
+    mol = Molecule('C2H6')  
+    mol.plot_spectrum()
     
-    mol = Molecule('H2')    
+    
+    
+    
+    
     

@@ -1,0 +1,18 @@
+
+# RSF's, from Hiden Analytical
+# https://www.hidenanalytical.de/wp-content/uploads/pdf/RS_Measurement_of_Gases_-_Hiden_Analytical_App_Note_282.pdf
+
+
+Ar = (40, 1.27)
+He = (4, 0.39)
+H2 = (2, 0.84)
+CO = (28, 0.98)
+N2 = (28, 1.00)
+O2 = (32, 0.86)
+H2O = (18, 0.95)
+CO2 = (44, 1.17) 
+CH4 = (16, 0.75)
+C2H6 = (28, 1.35)
+C2H4 = (28, 1.02)
+
+

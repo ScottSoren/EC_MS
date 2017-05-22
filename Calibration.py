@@ -210,8 +210,6 @@ def steady_state_cal(CA_and_MS, t_int='half',
     
     return calibration
 
-
-
 def LCA_cal():
     calibration = {'type': 'LCA'}
     return calibration

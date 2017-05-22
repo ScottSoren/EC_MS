@@ -20,7 +20,7 @@ from __future__ import division, print_function
 import os
 import numpy as np
 from matplotlib import pyplot as plt
-from scipy.optimize import minimize, curve_fit
+from scipy.optimize import curve_fit
 from scipy.integrate import odeint
 
 if os.path.split(os.getcwd())[1] == 'EC_MS':      

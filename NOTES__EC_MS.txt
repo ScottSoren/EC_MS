@@ -2,6 +2,13 @@
 EC-MS data processing package by Scott (scott@fysik.dtu.dk)
 Last modified 16K17
 
+-------------------- 16L15 ------------------------------------------
+Put it all together and got serious about quantification. Now we just need more calibrations!
+
+'Quantification' module added with functions for comparing calibration factors generated in 'Calibration' module with literature values and extrapolating calibrating factors for other molecules.
+Expanded molecular database and added QMS spectra from NIST, ionization cross sections at 100eV, RSF's from Hiden, and extrapolated F_cal's for molecules 
+'get_flux', and 'predict_current' functions added to 'Quantification', all using the F_cal for the molecule's primary mass. 
+'plot_flux' added to Plotting, and 'plot_experiment' modified to plot fluxes in nmol/s rather than QMS signal if given parameter 'mols={<molecule1>:<color1>, ...}'.
 
 -------------------- 16K17 ------------------------------------------
 Object_Files module added to facilitate interaction of objects (of i.e. Molecule) with databases. Molecules module adjusted accordingly.
@@ -37,9 +44,7 @@ Implemented a few minor changes suggested 16I23 (see Improvements file)
 Modified 16I23 so that EC_MS performs better as a cross-platform package.
 16I23 modifications make the package compatible with Windows and with python2, in addition to the intended python3 on Linux.
 Most of the modules have an "if __name__=='__main__':" part that demonstrates the usage of some of its functions.
-The modules can be run from within the package, or, as is the main intention, imported with the EC_MS package. This is done with a
-"from EC_MS import ..." statement in a script. In the folder Experiment sketched below, plot_01.py would import functions from EC_MS and 
-use them to operate on the data in MS_data.txt and EC_data.mpt to generate plot_01.png
+The modules can be run from within the package, or, as is the main intention, imported with the EC_MS package. This is done with a "from EC_MS import ..." statement in a script. In the folder Experiment sketched below, plot_01.py would import functions from EC_MS and use them to operate on the data in MS_data.txt and EC_data.mpt to generate plot_01.png
 
 -Experiment
 |- MS_data.txt

@@ -1,0 +1,45 @@
+sigma_100eV # Total ionization cross sections in Ang^2 and at 100 eV incident electron energy
+# From NIST: http://physics.nist.gov/PhysRefData/Ionization/molTable.html
+	H2 = 0.969
+	O2 = 2.621
+	N2 = 2.615
+	CO = 2.616
+	H2O = 2.348
+	CH4 = 3.419
+	C2H4 = 4.974
+	C2H6 = 6.207
+	CO2 = 3.735
+# from Ali and Kim,  http://onlinelibrary.wiley.com/doi/10.1002/sia.2090/pdf 
+	Cl2 = 6.2 
+# From Krichnakumar et al, Ionisation cross sections of rare-gas atoms by electron impact, JPB, 1987
+# http://iopscience.iop.org/article/10.1088/0953-4075/21/6/014/pdf
+	He = 0.370 
+	Ar = 2.982
+
+#From NIST: http://webbook.nist.gov/chemistry/form-ser.html
+Spectra
+	Ar: 20,1462 36,30 38,5 40,9999
+	He: 4,9999 #implied
+	H2: 1,210 2,9999
+	O2: 16,2180 32,9999
+	N2: 14,1379 28,9999 29,74
+	CO: 12,470 16,170 28,9999 29,120
+	CO2: 12,871 16,961 22,190 28,981 29,10 44,9999 45,120 46,40
+	H2O: 16,90 17,2122 18,9999 19,50 20,30
+	CH4: 12,380 13,1069 14,2042 15,8879 16,9999 17,164
+	C2H4: 2,10 12,50 13,90 14,210 15,30 24,230 25,781 26,5295 27,6236 28,9999 29,230 30,10
+	C2H6: 2,20 12,40 13,100 14,300 15,440 16,10 24,50 25,350 26,2322 27,3323 28,9999 29,2152 30,2622 31,50
+	Cl2: 35,8287 37,2642 70,9999 72,6385 74,1020
+	
+
+
+
+
+
+
+
+
+
+
+
+

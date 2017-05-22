@@ -15,24 +15,37 @@ import datetime
 
 float_match = r'\s[-]?\d+[\.]?\d*(e[-]?\d+)?\s'     #matches floats like -3.57e4
 
-def group_lines(lines, indent='\t'):
+def group_lines(lines, indent='\t', removecomments=1):
     '''
     Groups indentation blocks into list elements. The line before the 
     indentation block is included.
     '''        
+    if removecomments:
+        lines = remove_comments(lines)
     nest = 0 #to keep track of how deep we are in the indentation block
     grouped_lines = []
     for (i,line) in enumerate(lines):
+        line = line[:-1] #to get rid of the '\n'
         while line[0:nest] != indent * nest:
             nest -= 1
         group = eval('grouped_lines' + '[-1]' * nest)       #actually works!
         if line[0 : (nest + 1)] == indent * (nest + 1):
             nest += 1
             group[-1] = [group[-1], line[nest:]]
-        else:    
+        elif len(line)>nest: #to drop empty lines
             group += [line[nest:]]                 
     return grouped_lines    
 
+def remove_comments(lines):
+    new_lines = []
+    for line in lines:
+        if '#' in line:
+            line = re.search('^.*\#', line).group()[:-1]
+            if re.search(r'\w', line): #to drop lines that only have comments
+                new_lines += [line]
+        else:
+            new_lines += [line] #I don't want to get rid of empty lines here
+    return new_lines
 
 def structure_to_lines(structure, nest=0, indent='\t', preamble=None, title_key=None):
     '''
@@ -45,7 +58,7 @@ def structure_to_lines(structure, nest=0, indent='\t', preamble=None, title_key=
         intro += preamble
     
     if type(structure) is dict:
-        if intro in structure.keys():
+        if title_key in structure.keys(): #changed 'intro' to 'title_key' 16L14
             intro += indent + '-' + indent + structure[title_key]
         if len(intro) == 0:
             intro += '<Dictionary>'
@@ -62,7 +75,11 @@ def structure_to_lines(structure, nest=0, indent='\t', preamble=None, title_key=
         lines += [nest * indent + intro + ':\n']
         nest += 1
         for value in structure:
-            lines += structure_to_lines(value, nest, indent)
+            if type(value) is tuple and len(value) == 2:
+                lines += structure_to_lines(value[1], nest, indent, preamble=value[0])
+                #added 16L14 to enable writing of lists of (key, value)
+            else:
+                lines += structure_to_lines(value, nest, indent)
                 
     elif type(structure) is str:
         if len(intro) > 0:
@@ -80,12 +97,13 @@ def structure_to_lines(structure, nest=0, indent='\t', preamble=None, title_key=
 def grouped_lines_to_structure(lines, indent='\t'):
     '''
     The exact inverse of write_lines, but works on grouped lines!
+    # as of 16L14, '\n' is removed by group_lines and not here.
     '''
     if type(lines) is str:
         if ':' in lines: #then we've got a key and string value separated by a ': '
             key = re.search(r'^.+:', lines).group()[:-1] #don't want the ':'
             try:
-                value = re.search(r':.+$', lines).group()[2:] #don't want the ': ' or '\n'
+                value = re.search(r':.+$', lines).group()[2:] #don't want the ': '
                             #note: use of '$' means '\n' isn't in group()!
             except AttributeError:
                 value = None
@@ -93,7 +111,7 @@ def grouped_lines_to_structure(lines, indent='\t'):
         elif '=' in lines: #then we've got a key and numerical value separated by a '\t=\t'
             key = re.search(r'^.+=', lines).group()[:-2] #don't want the '\t='
             try:
-                value = re.search(r'=.+$', lines).group()[2:] #don't want the '=\t'' or the '\n'
+                value = re.search(r'=.+$', lines).group()[2:] #don't want the '=\t'
             except AttributeError:
                 value = None
             try:            
@@ -117,10 +135,10 @@ def grouped_lines_to_structure(lines, indent='\t'):
                 key = re.search(r'^.+' + indent + '-', title_line).group()[:-2] 
                                             #don't want the '\t-'
                 title = re.search(r'-' + indent + '.+$', title_line).group()[2:]
-                                            #don't want the '-\t' or the '\n' 
+                                            #don't want the '-\t' 
                 value['title'] = title
             else:
-                key = title_line[:-1] #don't want the '\n'
+                key = title_line
             for line in lines[1:]:
                 item = grouped_lines_to_structure(line) 
                 value[item[0]] = item[1]

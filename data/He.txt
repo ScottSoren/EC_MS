@@ -1,0 +1,10 @@
+D	=	6.28e-09
+kH	=	110
+sigma_100eV	=	0.37
+Spectrum
+	M4	=	100.0
+	Title: NIST_16L14
+Hiden	=	('M4', 0.39)
+#extrapolated from rsf on mass M4 16L15
+F_cal	=	[ 4.98582829]
+primary: M4
