@@ -277,7 +277,7 @@ class Molecule:
         print('wrote calibration ' + calibration['title'] + ' for ' + self.name)
             
    
-    def calibration_fit(self, mass='primary', ax='new', 
+    def calibration_fit(self, mass='primary', ax='new', color='k', plotfactor=1,
                         useit=True, primary=True, verbose=True):
         if mass == 'primary':
             mass = self.primary
@@ -315,8 +315,8 @@ class Molecule:
         if ax is not None:
 
             ax.set_title(title)
-            ax.plot(n_mol*1e9, Q_QMS*1e9, 'k.', markersize=15)
-            ax.plot(pf_x*1e9, pf_fun(pf_x)*1e9, 'r--')
+            ax.plot(n_mol*1e9*plotfactor, Q_QMS*1e9*plotfactor, '.', color=color, markersize=15)
+            ax.plot(pf_x*1e9*plotfactor, pf_fun(pf_x)*1e9*plotfactor, '--', color=color,)
             ax.set_xlabel('amount produced / nmol')
             ax.set_ylabel('int. signal / nC')
         return F_cal
@@ -332,11 +332,17 @@ class Molecule:
 
 if __name__ == '__main__':
     plt.close('all')
-    '''
-    mol = Molecule('CO2')  
-    mol.plot_spectrum()
-    mol.calibration_fit()
-    '''
+    
+    mols = {'CO2':('orange', 10),'H2':('b', 1),'O2':('k', 1)}
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    for (mol, (color, plotfactor)) in mols.items():
+        m = Molecule(mol)
+        m.calibration_fit(ax=ax, color=color, plotfactor=plotfactor)
+    ax.set_title('')
+    plt.savefig('Internal_calibrations.png')
+    
+    
     mol = Molecule('C2H4')  
     mol.plot_spectrum()
     mol = Molecule('C2H6')  

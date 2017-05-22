@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Created on Wed Sep 28 19:07:45 2016
-Most recently edited: 16J27
+Most recently edited: 17B21
 
 @author: scott
 """
@@ -17,19 +17,30 @@ if os.path.split(os.getcwd())[1] == 'EC_MS':
     from Data_Importing import import_folder
     from Combining import synchronize, cut
     from Quantification import get_flux
+    from Object_Files import lines_to_dictionary
+    from Molecules import Molecule
+    with open('./preferences/standard_colors.txt','r') as f:
+        lines = f.readlines()
+        standard_colors = lines_to_dictionary(lines)['standard colors']
+    
 else:                           #then we use relative import
     from .EC import sync_metadata
     from .Data_Importing import import_folder
     from .Combining import synchronize, cut
     from .Quantification import get_flux
+    from .Object_Files import lines_to_dictionary
+    from .Molecules import Molecule
+    with open('./EC_MS/preferences/standard_colors.txt','r') as f:
+        lines = f.readlines()
+        standard_colors = lines_to_dictionary(lines)['standard colors']
 
 
 def plot_vs_potential(CV_and_MS, 
                       colors={'M2':'b','M4':'r','M18':'0.5','M28':'g','M32':'k'},
                       tspan=0, RE_vs_RHE=None, A_el=None, 
-                      ax1='new', ax2='new', ax=None, 
+                      ax1='new', ax2='new', ax=None, spec='k-',
                       overlay=0, logplot = [1,0], leg=1,
-                      verbose=True,
+                      verbose=True, removebackground = None,
                       masses=None, mols=None, unit='nmol/s'):
     '''
     This will plot current and select MS signals vs E_we, as is the 
@@ -37,7 +48,10 @@ def plot_vs_potential(CV_and_MS,
     '''
     if verbose:
         print('\n\nfunction \'plot_vs_potential\' at your service!\n')
-    
+    if type(logplot) is not list:
+        logplot = [logplot, False]
+    if removebackground is None:
+        removebackground = not logplot[0]
     #prepare axes. This is ridiculous, by the way.
     if ax == 'new':
         ax1 = 'new'
@@ -54,10 +68,11 @@ def plot_vs_potential(CV_and_MS,
         if ax2 == 'new':
             ax2 = ax1.twinx()
     else:
-        if ax1 == 'new':
-            ax1 = figure1.add_subplot(211)
-        if ax2 == 'new':
-            ax2 = figure1.add_subplot(212)
+        if ax1=='new':
+            gs = gridspec.GridSpec(3, 1)
+            gs.update(hspace=0.025)
+            ax1 = plt.subplot(gs[0:2, 0])
+            ax2 = plt.subplot(gs[2, 0])
     if type(logplot) is int:
         logplot = [logplot,logplot]
     if logplot[0]:
@@ -77,7 +92,7 @@ def plot_vs_potential(CV_and_MS,
     I_plot = np.array([i for (i,t_i) in enumerate(t) if tspan[0]<t_i and t_i<tspan[1]])
     
     #plot EC-lab data
-    ax2.plot(V[I_plot],J[I_plot],'k-')      
+    ax2.plot(V[I_plot],J[I_plot], spec)      
         #maybe I should use EC.plot_cycles to have different cycles be different colors. Or rewrite that code here.
     ax2.set_xlabel(V_str)
     ax2.set_ylabel(J_str)
@@ -88,7 +103,8 @@ def plot_vs_potential(CV_and_MS,
     if mols is not None:
         colors = mols
         quantified = True
-    elif list(colors.keys())[0][0] == 'M':
+    elif ((type(colors) is dict and list(colors.keys())[0][0] == 'M') or
+          (type(colors) is list and colors[0][0] == 'M' )):
         if masses is None:
             masses = colors
         else:
@@ -97,11 +113,25 @@ def plot_vs_potential(CV_and_MS,
         quantified = True
         mols = colors
     
+    if type(colors) is list:
+        c = colors.copy()
+        colors = {}
+        for m in c:
+            if quantified:
+                mol = Molecule(m, verbose=False)
+                color = standard_colors[mol.primary]
+                colors[mol] = color
+            else:
+                color = standard_colors[m]
+                colors[m] = color                
+    
     #then do it.
     for (key, color) in colors.items():
         if quantified:
             (x,y) = get_flux(CV_and_MS, mol=key, tspan=tspan, removebackground=False, 
             unit=unit, verbose=True)
+            if type(key) is not str:
+                key = str(key) # in case key had been a Molecule object
             Y_str = key + '_' + unit
         else:   
             x_str = key + '-x'
@@ -116,7 +146,8 @@ def plot_vs_potential(CV_and_MS,
         M_str = 'flux / [' + unit + ']'
     else:
         M_str = 'signal / [A]'
-    ax1.set_xlabel(V_str)
+    #ax1.set_xlabel(V_str)
+    ax1.set_xticks([])
     ax1.set_ylabel(M_str)
     if leg:
         ax1.legend()
@@ -226,7 +257,16 @@ def plot_signal(MS_data,
         ax = fig1.add_subplot(111)    
     lines = {}
     if tspan == 0:                  #then use the range of overlap
-        tspan = MS_data['tspan_2']    
+        tspan = MS_data['tspan_2']  
+    elif type(tspan) is str:
+        tspan = MS_data[tspan]  
+    if type(masses) is list:
+        c = masses
+        masses = {}
+        for m in c:
+            color = standard_colors[m]
+            masses[m] = color
+
     for mass, color in masses.items():
         if verbose:
             print('plotting: ' + mass)
@@ -276,7 +316,12 @@ def plot_flux(MS_data, mols={'H2':'b', 'CH4':'r', 'C2H4':'g', 'O2':'k'},
     if type(tspan) is str:
         tspan = MS_data[tspan]
     if type(mols) is list:
-        mols = dict(zip(mols, ['b','r','g','k','c','m','y','0.5']))
+        c = mols
+        mols = {}
+        for m in c:
+            mol = Molecule(m, verbose=False)
+            color = standard_colors[mol.primary]
+            mols[mol] = color
         
     for (mol, color) in mols.items():
         [x,y] = get_flux(MS_data, mol, unit=unit, verbose=verbose, tspan=tspan)
@@ -342,13 +387,14 @@ def plot_experiment(EC_and_MS,
     quantified = False      #added 16L15
     if mols is not None:
         quantified = True
-    elif list(colors.keys())[0][0] == 'M':
+    elif ((type(colors) is dict and list(colors.keys())[0][0] == 'M') or
+          (type(colors) is list and colors[0][0] == 'M' )):
         if masses is None:
             masses = colors
     else:
         quantified = True
         mols = colors
-        
+    
     if quantified:
         plot_flux(EC_and_MS, mols=mols, tspan=tspan, A_el=A_el,
                   ax=ax[0], leg=leg, logplot=logplot[0], unit=unit, 

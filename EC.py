@@ -275,6 +275,7 @@ def sync_metadata(EC_data, RE_vs_RHE=None, A_el=None, verbose=1):
     EC_data['J_str'] = J_str
     EC_data['I_str'] = I_str
     
+    EC_data['data_cols'] = EC_data['data_cols'].copy() #17B02
     for col in [V_str, J_str]:
         if col not in EC_data['data_cols']:
             EC_data['data_cols'] += [col]

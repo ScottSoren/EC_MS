@@ -168,13 +168,14 @@ def RSF_to_F_cal(quantmol = {'H2':'M2', 'He':'M4', 'CH4':'M15', 'H2O':'M18',
         if writeprimary:
             l = ('primary', mass)
             m.write(l)
+        print(mol + ': F_cal = ' + str(F_cal))
             
     ax.set_xlabel('Relative Sensitivity Factor')
     ax.set_ylabel('F_cal / [C/mol]')
     tickmol = ['C2H6', 'C2H4', 'CH4', 'H2', 'CO2']
     ticknr = [0, 1, 1.5]
-    ax.set_xticks(ticknr + [RSF_dict[i] for i in tickmol])
-    ax.set_xticklabels([str(n) for n in ticknr] +tickmol)
+    #ax.set_xticks(ticknr + [RSF_dict[i] for i in tickmol])
+    #ax.set_xticklabels([str(n) for n in ticknr] +tickmol)
     ax.set_ylim([0,20])
 
 
@@ -287,7 +288,9 @@ def predict_current(EC_and_MS, mols, tspan=None, RE_vs_RHE=None, A_el=None,
 if __name__ == '__main__':
     plt.close('all')
     #calibration_compare()
-    RSF_to_F_cal(calmol = {'CO2':'M44'}, writeprimary=True)
+    RSF_to_F_cal(calmol = {'CO2':'M44'}, writeprimary=False)
+    
+    plt.savefig('Fcal_vs_RSF.png')
     
         
     

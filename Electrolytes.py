@@ -417,8 +417,8 @@ def electrolysis_ode(quantities, t, pars):
    
     
 def electrolyze(electrolyte='standard', equilibrium_type='sE', 
-                tj=None, tpulse=60, tspan=None, 
-                j_el=-5, L=100e-6, ax='new'):
+                tj=None, tpulse=60, tspan=None, colors={},
+                j_el=-5, L=100e-6, ax='new', leg=True):
     '''
     calculates pH and acid/base concentrations as a function of time during 
     electrolysis, starting with a given electrolyte state and assuming
@@ -480,20 +480,27 @@ def electrolyze(electrolyte='standard', equilibrium_type='sE',
                 y[species] += [conc]
         pHvec += [electrolyte.pH]
 
-    colors = ['m','b','c','g','y','r','0.5']
+    default_colors = ['m','b','c','g','y','r','0.5']
         
     if ax == 'new':
         fig1 = plt.figure()
         ax1 = fig1.add_subplot(111)
         ax2 = ax1.twinx()
-    for (species, vec), color in zip(y.items(), colors):
+    for species, vec in y.items():
+        if species in colors:
+            color = colors[species]
+        else:
+            color = default_colors.pop()
         print('plotting: ' + species)
         ax1.plot(tvec, vec, color=color, label=species)
     ax2.plot(tvec, pHvec, color='k', label='pH')
-    ax1.legend()
+    if leg:
+        ax1.legend()
     ax1.set_ylabel('concentration / M')
     ax1.set_xlabel('time / s')
-    ax2.set_ylabel('pH')    
+    ax2.set_ylabel('pH')   
+    
+    return [ax1, ax2]
 
   
 

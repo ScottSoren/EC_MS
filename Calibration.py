@@ -32,7 +32,8 @@ else:                           #then we use relative import
 def ML_strip_cal(CV_and_MS, cycles=[1,2], t_int=200,
              mol='CO2', mass='primary', n_el=None, 
              Vspan=[0.5, 1.0], redox=1, 
-             ax='two', title='default', verbose=True):
+             ax='two', title='default', verbose=True,
+             plot_instantaneous=True):
     '''
     Determines F_cal = Q_QMS / n_electrode by integrating a QMS signal over
     tspan, assuming the starting value is background; and
@@ -105,7 +106,8 @@ def ML_strip_cal(CV_and_MS, cycles=[1,2], t_int=200,
         ax2.plot(x,y, 'k-')
         ax2.fill_between(x, background*1e9, y*1e9, where=y>background, 
                          facecolor='g', interpolate=True)
-        ax2.plot(t, y_el*1e9, 'r--')    #Without mass transport     
+        if plot_instantaneous:
+            ax2.plot(t, y_el*1e9, 'r--')    #Without mass transport     
         ax2.set_xlabel('time / s')
         ax2.set_ylabel('signal / nA')
 #        ax2.set_yscale('log')
