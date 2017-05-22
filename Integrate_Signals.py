@@ -31,7 +31,7 @@ else:                           #then we use relative import
 def get_datapoints(dataset, cycles, mols=['H2','C2H4','CH4'], 
                    tspan=[0, 100], t_steady=[50, 60], Vcycle=0, 
                    transient='CH4', colors=None,
-                   plotcycles=False, plottransient=False, 
+                   plotcycles=False, plottransient=False, data_type='CA',
                    verbose=True):
     '''
     Ways to control this function:
@@ -64,14 +64,15 @@ def get_datapoints(dataset, cycles, mols=['H2','C2H4','CH4'],
         for mol in transient:
             if type(colors[mol]) is dict:
                 colors[mol] = colors[mol]['ss'] 
-                #just for plotting cycles with appropriate colors
-        
+                #just for plotting cycles with appropriate colors       
     if Vcycle in ['previous', 'last', 'rest']:
         Vcycle = -1
     elif Vcycle in ['present', 'current', 'same', 'work']:
         Vcycle = 0
     elif Vcycle in ['next']:
         Vcycle = 1
+    V_str = dataset['V_str'] 
+
     #prepare space for results:
     V = [] 
     integrals={}       
@@ -82,22 +83,25 @@ def get_datapoints(dataset, cycles, mols=['H2','C2H4','CH4'],
                 t_steady[mol] = ts
         else:
             integrals[mol] = []
+
     #get results: 
     for cycle in cycles:
-        off_data = select_cycles(dataset, cycles=cycle+Vcycle, t_zero='start', verbose=verbose)
-        on_data = select_cycles(dataset, cycles=[cycle, cycle+1], t_zero='start', verbose=verbose)
+        off_data = select_cycles(dataset, cycles=cycle+Vcycle, t_zero='start', 
+                                 data_type=data_type, verbose=verbose)
+        on_data = select_cycles(dataset, cycles=[cycle, cycle+1], t_zero='start', 
+                                data_type=data_type, verbose=verbose)
        
         t_off = off_data['time/s']
-        V_off = off_data['E vs RHE / [V]']
+        V_off = off_data[V_str]
         V += [np.trapz(V_off, t_off) / (t_off[-1] - t_off[0])]
 
         if plotcycles:
-            title = str(cycle) + ', V = ' + str(V[-1])
+            title = str(cycle) + ', U = ' + str(V[-1])
             plot_experiment(on_data, mols=colors, title=title, 
                             verbose=verbose)    
         
         for mol in integrals.keys():
-            title = mol + ', cycle=' + str(cycle) + ', V=' + str(V[-1])
+            title = mol + ', cycle=' + str(cycle) + ', U=' + str(V[-1])
             if verbose:
                 print('working on: ' + str(mol))
             x, y = get_flux(on_data, tspan=tspan, mol=mol, removebackground=True,

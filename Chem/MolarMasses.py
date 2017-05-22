@@ -23,7 +23,7 @@ Mdict = {'H':1.008,'He':'4.002',
 	'Heavy':1,'Light':-1}
 	#Heavy and light are so that I can have isotopically labled stuff.
 
-def BreakDown(Compound):			#Reads parentheses and breaks down an arbitrary compound into a dictionary, like AxByCz to {'A':x,'B':y,'C':z}
+def BreakDown(Compound, forgiving=True):			#Reads parentheses and breaks down an arbitrary compound into a dictionary, like AxByCz to {'A':x,'B':y,'C':z}
 	import re
 	Parts = {}
 	number = ''
@@ -57,7 +57,8 @@ def BreakDown(Compound):			#Reads parentheses and breaks down an arbitrary compo
 				addit = 1;			
 			elif re.search('\S',char):
 				print('Not quite sure what you\'re talking about, mate, when you say ',char)
-		
+				if not forgiving:
+					raise ValueError        
 		if addit == 1 or i == N:
 			if len(number)>0:
 				n = float(number)
@@ -81,20 +82,22 @@ def BreakDown(Compound):			#Reads parentheses and breaks down an arbitrary compo
 		
 	return Parts
 	
-def Mass(Compound):			#Returns the molar mass of any chemical formula.
+def Mass(Compound, forgiving=True):			#Returns the molar mass of any chemical formula.
 
 	if Compound in Mdict:
 		return(Mdict[Compound])
 	
-	Parts = BreakDown(Compound)
+	Parts = BreakDown(Compound, forgiving)
 	
 	M=0
 	for element in Parts:
 	#	A = input('checking for ' + element + ' in ' + Compound)
 		if element==Compound:
-			print('Dude, man,', Compound, 'just isn\'t a thing.')
+			print('Dude, man,', Compound, 'just isn\'t a thing!')
+			if not forgiving:
+				raise ValueError
 			return 0
-		M += Parts[element]*Mass(element)
+		M += Parts[element]*Mass(element, forgiving=forgiving)
 		
 	return M
 	

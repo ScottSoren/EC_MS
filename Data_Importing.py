@@ -71,7 +71,8 @@ def import_text(full_path_name='current', verbose=1):
 
 
 def text_to_data(file_lines, title='get_from_file',
-                 data_type='EC', N_blank=10, verbose=1):
+                 data_type='EC', N_blank=10, verbose=True,
+                 header_string=None, timestamp=None, ):
     '''
     This method will organize data in the lines of text from an EC or MS file 
     into a dictionary as follows (plus a few more keys)
@@ -88,6 +89,8 @@ def text_to_data(file_lines, title='get_from_file',
         
     DataDict = {}
     commacols = []                   #will catch if data is recorded with commas as decimals.
+    
+    loop = False
     
     for nl, line in enumerate(file_lines):
         
@@ -110,6 +113,16 @@ def text_to_data(file_lines, title='get_from_file',
                     timestamp = timestamp_object.group()
                     if verbose:
                         print('timestamp \'' + timestamp + '\' found in line ' + str(nl))        
+                elif re.search('Number of loops', line): #Then I want to add a loop number variable to data_cols
+                    loop = True
+                    DataDict['loop number'] = []
+                elif re.search('Loop', line):
+                    n = int(re.search(r'^Loop \d+', line).group()[5:])
+                    start = int(re.search(r'number \d+', line).group()[7:])
+                    finish = int(re.search(r'to \d+', line).group()[3:])
+                    N = finish - start + 1
+                    DataDict['loop number'] += N * [n]
+                    
                 header_string = header_string + line
             
             elif data_type == 'MS':
@@ -187,7 +200,8 @@ def text_to_data(file_lines, title='get_from_file',
                             
                 DataDict[col].append(data)
                     
-            
+    if loop:
+        DataDict['data_cols'] += ['loop number']        
     DataDict['title'] = title
     DataDict['header'] = header_string
     DataDict['timestamp'] = timestamp
@@ -213,7 +227,41 @@ def numerize(Data):
                 Data[key] = np.array(Data[key])
     return Data
 
+def get_precision(v):
+    return next(n for n in range(-10,20) if float(np.round(v, n))==v)   
 
+def protect_against(dataset, badvalues=[-1,], verbose=True):
+    '''
+    Interpolates between adjacent values to replace nonsense data
+    '''
+    if verbose:
+        print('\n\nfunction protect_against at your service!\n')
+    if type(badvalues) is not list:
+        badvalues = list(badvalues)
+    badvalues_with_precision = dict((bv, get_precision(bv)) for bv in badvalues)
+    def isbad(v):
+        for bv, precision in badvalues_with_precision.items():
+            if float(np.round(v, precision)) == bv:
+                return True
+        return False
+    for col in dataset['data_cols']:
+        if verbose:
+            print('protecting ' + col)
+        n_bad = 0
+        y = dataset[col]
+        I_bad = [I for (I, y_I) in enumerate(y) if isbad(y_I)]
+        for I in I_bad:
+            n_skip = next(n for n in range(1, len(y)) if I+n not in I_bad)
+            n_bad += n_skip
+            y[I] = (n_skip * y[I - 1] + y[I + 1]) / (n_skip + 1)
+        dataset[col] = y   
+        if n_bad>0:
+            print('replaced ' + str(n_bad) + ' bad values')                     
+    if verbose:
+        print('\nfunction protect_against finished!\n\n')      
+    return dataset
+    
+    
 def import_data(full_path_name='current', title='get_from_file',
                  data_type='EC', N_blank=10, verbose=1):
                  

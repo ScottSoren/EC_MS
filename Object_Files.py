@@ -24,7 +24,13 @@ def group_lines(lines, indent='\t', removecomments=1):
         lines = remove_comments(lines)
     nest = 0 #to keep track of how deep we are in the indentation block
     grouped_lines = []
+    whitespace = re.compile(r'\s+')
     for (i,line) in enumerate(lines):
+        #print(line)
+        if len(re.sub(whitespace, '', line)) == 0: 
+            #print('... skipped!')
+                #fix 17C23 to protect against empty lines
+            continue
         line = line[:-1] #to get rid of the '\n'
         while line[0:nest] != indent * nest:
             nest -= 1
@@ -47,7 +53,8 @@ def remove_comments(lines):
             new_lines += [line] #I don't want to get rid of empty lines here
     return new_lines
 
-def structure_to_lines(structure, nest=0, indent='\t', preamble=None, title_key=None):
+def structure_to_lines(structure, nest=0, indent='\t', toplevel=False,
+                       preamble=None, title_key=None):
     '''
     Formats a dictionary or list, which can have nested dictionaries or lists,
     into a set of properly indented lines to write to file.
@@ -60,20 +67,24 @@ def structure_to_lines(structure, nest=0, indent='\t', preamble=None, title_key=
     if type(structure) is dict:
         if title_key in structure.keys(): #changed 'intro' to 'title_key' 16L14
             intro += indent + '-' + indent + structure[title_key]
-        if len(intro) == 0:
-            intro += '<Dictionary>'
-        lines += [nest * indent + intro + '\n']
-        nest += 1
+        if not toplevel:
+            if len(intro) == 0:
+                intro += '<Dictionary>'
+            lines += [nest * indent + intro + '\n']
+        if not toplevel:
+            nest += 1
         for (key, value) in structure.items():
             if key == title_key:
                 continue
             lines += structure_to_lines(value, nest, indent, preamble=key, 
                                      title_key='title')
     elif type(structure) is list:
-        if len(intro) == 0:
-            intro += '<List>'
-        lines += [nest * indent + intro + ':\n']
-        nest += 1
+        if not toplevel:
+            if len(intro) == 0:
+                intro += '<List>'
+            lines += [nest * indent + intro + ':\n']
+        if not toplevel:
+            nest += 1
         for value in structure:
             if type(value) is tuple and len(value) == 2:
                 lines += structure_to_lines(value[1], nest, indent, preamble=value[0])
@@ -141,7 +152,10 @@ def grouped_lines_to_structure(lines, indent='\t'):
                 key = title_line
             for line in lines[1:]:
                 item = grouped_lines_to_structure(line) 
-                value[item[0]] = item[1]
+                try:
+                    value[item[0]] = item[1]
+                except IndexError:
+                    print('missing something. line = ' + str(line))
         if key is '<list>:' or key is '<dictionary>':
             structure = value
         else:

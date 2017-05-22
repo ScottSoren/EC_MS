@@ -25,24 +25,33 @@ else:                           #then we use relative import
     from .Combining import timestamp_to_seconds, is_time, cut
 
 
-def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True):
+def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True, cycle_str=None, data_type='CV'):
     ''' 
     This function selects one or more cycles from EC_data_0.
     Use this before synchronizing!
     Works for both CA and CV
     #changed 16L22 to work on EC_and_MS data
+    #just set cycle_str to 'loop number' to select loop rather than cycle.
     '''
     if verbose:
         print('\nSelecting cycles ' + str(cycles) + ' from \'' + EC_data_0['title'] + '\'\n')
     
+    good = True    
     EC_data = EC_data_0.copy()
     
-    #it looks like I actually want Ns for CA's
-    if 'Ns' in EC_data['data_cols']:
-        cycle_numbers = EC_data['Ns']
-    else:
-        cycle_numbers = EC_data['cycle number']
-    
+    #it looks like I actually want Ns for CA's and cycle number for CV's.
+    #How to determine which
+    if cycle_str is None:
+        if data_type == 'CV' and 'cycle number' in EC_data['data_cols']:
+            cycle_str = 'cycle number'
+        elif 'Ns' in EC_data['data_cols']:
+            cycle_str = 'Ns'
+        else:
+            print('no cycle numbers detected!')
+
+    cycle_numbers = EC_data[cycle_str]
+
+
     N = len(cycle_numbers)
     if type(cycles)==int:
         cycles = [cycles]
@@ -60,6 +69,7 @@ def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True):
         except IndexError:
             print('trouble selecting cycle ' + str(cycles) + ' of ' + col + '\n' +
                     'type(I_keep) = ' + str(type(I_keep)))
+            good = False
     t0 = timestamp_to_seconds(EC_data['timestamp'])
     tspan_2 = np.array([min(EC_data['time/s']), max(EC_data['time/s'])])
     EC_data['tspan_2'] = tspan_2
@@ -84,7 +94,7 @@ def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True):
                     t_zero = 0
         EC_data['tspan_2'] = tspan_2 - tspan_2[0] - t_zero
         
-    
+    EC_data['good'] = good
     return EC_data
 
 
@@ -269,7 +279,7 @@ def sync_metadata(EC_data, RE_vs_RHE=None, A_el=None, verbose=True):
     if RE_vs_RHE is None:
         V_str = E_str
     elif E_str is not None:
-        V_str = 'E vs RHE / [V]'
+        V_str = 'U vs RHE / [V]' #changed from E to U 17E21
         EC_data[V_str] = EC_data[E_str] + RE_vs_RHE
     
     if A_el is not None:

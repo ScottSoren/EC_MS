@@ -354,7 +354,7 @@ if __name__ == '__main__':
     plt.savefig('Internal_calibrations.png')
     
     
-    mol = Molecule('CO2')  
+    mol = Molecule('C2H4')  
     mol.plot_spectrum()
     mol = Molecule('C2H6')  
     mol.plot_spectrum()

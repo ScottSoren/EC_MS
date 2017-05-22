@@ -80,6 +80,7 @@ class Electrolyte:
                 name = None
         else: 
             electrolyte_type = get_electrolyte_type(cation, anion)
+            name = electrolyte_type
         constants = electrolyte_dict[electrolyte_type]
             
         self.name = name       
@@ -103,15 +104,16 @@ class Electrolyte:
                     setattr(self, key, value)
                 elif getattr(self, key) is None:
                     setattr(self, key, value)
+        
+
         if self.s is None and hasattr(self, 'concentration'):
             self.s = self.concentration
-        elif self.concentration is None and hasattr(self, 's'):
+        elif self.concentration is None:
             self.concentration = self.s
-        
-        if 'buffer' in constants.keys():
-            self.set_buffer()
-            self.equilibrate()
-        
+                 
+        self.set_buffer()
+        self.equilibrate()
+            
         if self.name is None:
             self.name = (str(self.concentration) + ' M ' + 
                 self.electrolyte_type + ', pH = ' + str(self.pH))
@@ -119,34 +121,58 @@ class Electrolyte:
             print('Initialized electolyte: ' + self.name + '\n')
 
     def set_buffer(self):
-        self.pKa = np.array(self.constants['pKa'])
-        self.Ka = np.power(10, -self.pKa)
-        self.ions = self.constants['buffer'] #list of the species participating in the 
-                                            #acid-base equilibrium from most to least protonated
-        self.cation = self.constants['cation'] 
-        self.spectator = self.constants['spectator']
-        self.N_buf = len(self.ions)   
+        
+        self.species = ['H+', 'OH-']
+    
+        for (key, value) in self.constants.items():  
+            if not hasattr(self, key):
+                setattr(self, key, value)
+            elif getattr(self, key) is None:
+                setattr(self, key, value) 
+        
+        if 'buffer' in self.constants:
+            
+            self.pKa = np.array(self.constants['pKa'])
+            self.Ka = np.power(10, -self.pKa)
+            self.ions = self.constants['buffer'] #list of the species participating in the 
+                                                #acid-base equilibrium from most to least protonated
+            #self.cation = self.constants['cation'] 
+            #self.spectator = self.constants['spectator']   
+        else:
+            self.ions = []
+            if self.spectator is None:
+                if 'acid' in self.electrolyte_type:
+                    self.spectator = self.anion
+                else:
+                    self.spectator = self.cation
+
+        self.N_buf = len(self.ions)
         self.z = np.array([read_charge(ion) for ion in self.ions])
-        self.species = ['H+', 'OH-'] + self.ions
+        self.species = ['H+', 'OH-'] + self.ions + [self.spectator]
+        self.charge = dict([(ion, read_charge(ion)) for ion in self.species])
+
         if 'Keq' in self.constants:
             self.dissolved = self.constants['gas'] + '(aq)'
             self.species += [self.dissolved]
         if 'Kh' in self.constants:
             self.gas = self.constants['gas'] + '(g)'
             self.species += [self.gas]            
-
+    
     def equilibrate(self, **kwargs):
         '''
         Updates all other parameters from any two specified parameters.
         Was a bit tricky to code, but I like what I came up with.
         '''
+        if 'buffer' not in self.constants:
+            return self.equilibrate_simple(**kwargs)
+        
         variables = ['s'] # to be in order of decreasing likelihood to be held constant
         if 'Kh' in self.constants:  #then we've got equilibrium with a vapor
             variables += ['p']
         if 'Keq' in self.constants: #then we've got equilibrium with a dissolved species
             variables += ['E']
+
         variables += ['F', 'pH']
-        
         fundict = {('s', 'p', 'pH') : self.pH_sp, 
                    ('s', 'E', 'pH') : self.pH_sE, 
                    ('s', 'F', 'pH') : self.pH_sF,
@@ -155,6 +181,7 @@ class Electrolyte:
                    ('s', 'pH', 'p') : self.p_spH,
                    ('F', 'pH', 's') : self.s_FpH
                    }
+        
         done = []
         if len(kwargs) > 2:
             print('Error, can\'t equilibrate: not enough degrees of freedom!\n' +
@@ -192,8 +219,38 @@ class Electrolyte:
 
 
         if self.verbose:
-            print('Equilibrated successfully!')       
+            print('Equilibrated successfully! pH = ' + str(self.pH))       
     
+    def equilibrate_simple(self, **kwargs):
+        variables = ['s','pH']
+        fundict = {'s' : self.pH_s, 
+                   'pH' : self.s_pH
+                   }
+        if len(kwargs) > 1:
+            print('Error, can\'t equilibrate: not enough degrees of freedom!\n' +
+                        ' got the following: ' + str(kwargs.keys()))
+            return
+        elif len(kwargs) == 1: #then use those two parameters to set the rest:
+            for var, value in kwargs.items():
+                setattr(self, var, value)
+                fun = fundict[var]      
+        else:
+            for var in variables:
+                if getattr(self, var) is not None:
+                    fun = fundict[var]
+                    break 
+            else:
+                print('Error, can\'t equilibrate: Too many degrees of freedom!\n' +
+                        ' simply got nothing.')
+                return
+        fun()
+        
+        if self.verbose:
+            print('Equilibrated successfully! pH = ' + str(self.pH)) 
+        
+            
+            
+            
     def get_concentrations(self, **kwargs):
         if len(kwargs)>0:
             self.equilibrate(**kwargs)
@@ -249,7 +306,32 @@ class Electrolyte:
             pH = brentq(residual, -6, 20)       
         self.pH = pH
         return pH
+    
+    def pH_s(self, s=None):
+        '''
+        sets self.pH using s-F equilibrium, i.e. excluding dissolved gas
+        '''
+        if s is None:
+            s = self.s
         
+        sc = s * self.charge[self.spectator] # spectator charge
+        def residual(pH):
+            return sc + np.power(10, -pH) - Kw*np.power(10, pH)
+        
+        return self.pHsolve(residual)        
+        
+    def s_pH(self, pH=None):
+
+        if pH is None:
+            pH = self.pH
+        
+        x = np.power(10.0, -pH)
+        
+        sc = Kw/x - x # spectator charge
+        s = sc / self.charge[self.spectator] 
+        self.s = s
+        return s
+    
     def buffer_vec(self, pH):
         '''
         Useful concept for acid-base equilibrium with multiple Ka's:
@@ -274,9 +356,10 @@ class Electrolyte:
         def buffer_charge(pH):
             bufvec = self.buffer_vec(pH)
             return p * Keq / Kh * np.dot(self.z, bufvec)
-            
+        
+        sc = s * self.charge[self.spectator] # spectator charge
         def residual(pH):
-            return s + np.power(10, -pH) - Kw*np.power(10, pH) + buffer_charge(pH)
+            return sc + np.power(10, -pH) - Kw*np.power(10, pH) + buffer_charge(pH)
         
         return self.pHsolve(residual)        
         
@@ -300,8 +383,9 @@ class Electrolyte:
             bufvec = self.buffer_vec(pH)
             return E * np.dot(self.z, bufvec)/(1/Keq + np.sum(bufvec))
             
+        sc = s * self.charge[self.spectator] # spectator charge            
         def residual(pH):
-            return s + np.power(10, -pH) - Kw*np.power(10, pH) + buffer_charge(pH)
+            return sc + np.power(10, -pH) - Kw*np.power(10, pH) + buffer_charge(pH)
         
         return self.pHsolve(residual)
     
@@ -318,8 +402,9 @@ class Electrolyte:
             bufvec = self.buffer_vec(pH)
             return F * np.dot(self.z, bufvec)/np.sum(bufvec)
         
+        sc = s * self.charge[self.spectator] # spectator charge
         def residual(pH):
-            return s + np.power(10, -pH) - Kw*np.power(10, pH) + buffer_charge(pH)
+            return sc + np.power(10, -pH) - Kw*np.power(10, pH) + buffer_charge(pH)
         
         return self.pHsolve(residual)
 
@@ -338,7 +423,8 @@ class Electrolyte:
         x = np.power(10.0, -pH) # 10 instead of 10.0 gives error. wtf numpy?
         bufvec = self.buffer_vec(pH)
 #       print('bufvec = ' + str(bufvec) + '\ndot product = ' + str(np.dot(bufvec, self.z)))
-        p = (-s - x + Kw/x) * Kh / (Keq * np.dot(bufvec, self.z))
+        sc = s * self.charge[self.spectator] # spectator charge
+        p = (-sc - x + Kw/x) * Kh / (Keq * np.dot(bufvec, self.z))
         self.p = p
         return p                      
     
@@ -354,7 +440,8 @@ class Electrolyte:
             return self.F_spH(s, pH)
         x = np.power(10.0, -pH)
         bufvec = self.buffer_vec(pH)
-        E = (-s - x + Kw/x) * (sum(bufvec) + 1/Keq) / np.dot(bufvec, self.z)
+        sc = s * self.charge[self.spectator] # spectator charge
+        E = (-sc - x + Kw/x) * (sum(bufvec) + 1/Keq) / np.dot(bufvec, self.z)
         self.E = E
         return E
     
@@ -365,7 +452,8 @@ class Electrolyte:
             pH = self.pH
         x = np.power(10.0, -pH)
         bufvec = self.buffer_vec(pH)
-        F = (-s - x + Kw/x) * sum(bufvec) / np.dot(bufvec, self.z)
+        sc = s * self.charge[self.spectator] # spectator charge
+        F = (-sc - x + Kw/x) * sum(bufvec) / np.dot(bufvec, self.z)
         self.F = F
         return F
     
@@ -377,7 +465,8 @@ class Electrolyte:
         
         x = np.power(10.0, -pH)
         bufvec = self.buffer_vec(pH)
-        s = Kw/x - x - np.dot(bufvec, self.z) / sum(bufvec)
+        sc = Kw/x - x - np.dot(bufvec, self.z) / sum(bufvec) # spectator charge
+        s = sc / self.charge[self.spectator] 
         self.s = s
         return s
 
@@ -404,7 +493,7 @@ def electrolysis_ode(quantities, t, pars):
     ddt['F'] = 0
     for ion, k in kap.items():    
 #        print('ion: ' + ion)
-        if ion == electrolyte.constants['spectator']:
+        if ion == electrolyte.spectator:
             ddt['s'] = k / (read_charge(ion) * kappa) * cq_dot
         elif ion in electrolyte.ions:
             ddt['F'] += k / (read_charge(ion) * kappa) * cq_dot
@@ -413,6 +502,22 @@ def electrolysis_ode(quantities, t, pars):
     dquantitiesdt = np.array([ddt[q] for q in list(equilibrium_type)])
     
     return dquantitiesdt
+
+def electrolysis_simple_ode(s, t, pars):
+    electrolyte = pars[0]
+    cq_dot = pars[1](t)
+    
+    # quantitiesdict is a **kwarg dictionary for inputting the parameters specified
+    # by the equilibrium type.
+    kap = electrolyte.get_conductivities(s=s) 
+    k = kap[electrolyte.spectator]
+    z = electrolyte.charge[electrolyte.spectator]
+    #this will equilibrate the electrolyte. Then I can just read the conductivities
+    kappa = electrolyte.kappa
+
+    dsdt = k / (z * kappa) * cq_dot
+    
+    return dsdt
             
    
     
@@ -450,31 +555,42 @@ def electrolyze(electrolyte='standard', equilibrium_type='sE',
         return - j_fun(t) / (Chem.Far * L) * 1e-2
         #units: mA/cm^2 / (C/mol * m) * (A/m^2/(mA/cm^2)) (M / (mol/m^3)) = M / s
 
+    if type(electrolyte) is str:
+        electrolyte = Electrolyte(electrolyte)
+        
+    
     electrolyte.equilibrate()
     electrolyte.verbose = False #otherwise it really screams.
 
-    pars = (electrolyte, equilibrium_type, cq_dot_fun)    
-    var_0 = equilibrium_type[0]
-    var_1 = equilibrium_type[1]
-    
-    quantities0 = [getattr(electrolyte, var_0), 
-                   getattr(electrolyte, var_1)]
-    solution = odeint(electrolysis_ode, quantities0, tvec, args=(pars,))
     vec = {}
-    vec[var_0] = solution[:,0]
-    vec[var_1] = solution[:,1]
-
+    quantitiesdict = []
+    if 'buffer' in electrolyte.constants:
+        pars = (electrolyte, equilibrium_type, cq_dot_fun)    
+        var_0 = equilibrium_type[0]
+        var_1 = equilibrium_type[1]
+        
+        quantities0 = [getattr(electrolyte, var_0), 
+                       getattr(electrolyte, var_1)]
+        solution = odeint(electrolysis_ode, quantities0, tvec, args=(pars,))
+        vec[var_0] = solution[:,0]
+        vec[var_1] = solution[:,1]
+        for (q0, q1) in zip(vec[var_0], vec[var_1]):
+            quantitiesdict += [{var_0:q0, var_1:q1}]
+    else:
+        s0 = electrolyte.s
+        pars = (electrolyte, cq_dot_fun)
+        solution = odeint(electrolysis_simple_ode, s0, tvec, args=(pars,))
+        vec['s'] = solution
+        quantitiesdict = [{'s':q} for q in vec['s']]
+    
     pHvec = []
     y = {}
     for species in electrolyte.get_concentrations().keys():
         if '(g)' not in species:
             print('preparing space to get: ' + species)
             y[species] = []
-    quantitiesdict = {}
-    for (q0, q1) in zip(vec[var_0], vec[var_1]):
-        quantitiesdict[var_0] = q0
-        quantitiesdict[var_1] = q1
-        for species, conc in electrolyte.get_concentrations(**quantitiesdict).items():
+    for qdict in quantitiesdict:
+        for species, conc in electrolyte.get_concentrations(**qdict).items():
         #    print('geting data for: ' + species)
             if species in y:
                 y[species] += [conc]
@@ -546,12 +662,15 @@ if __name__ == '__main__':
     
     electrolyzeit = True
     if electrolyzeit:
-        el3 = Electrolyte('sulfate', s=1, pH=1)
-        electrolyze(el3, equilibrium_type='sF', tpulse=100, j_el=-1, ax='new')        
+        el3 = Electrolyte('phosphate', F=0.5, s=0.05)
+        electrolyze(el3, equilibrium_type='sF', tpulse=100, j_el=-10, ax='new')        
         
+             
         
-        
-        
-        
+    el4 = Electrolyte('perchloric acid', s=0.1)     
+    
+    el6 = Electrolyte('hydroxide', s=1)
+    
+    electrolyze(el6, tpulse=100, j_el=10, ax='new')
         
     #print(el1.pH_sp(s=0.1, p=400e-6))

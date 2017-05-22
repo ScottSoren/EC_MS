@@ -99,6 +99,7 @@ def synchronize(Dataset_List, t_zero='start', append=1, cutit=0,
     
     #and again to synchronize the data and put it into the combined dictionary
     for Dataset in Dataset_List:
+       # print('cols in ' + Dataset['title'] + ':\n' + str(Dataset['data_cols']))
         nd = Dataset['combining_number']           
         #this way names in Combined_Data match the order the datasets are input with
         t_0 = timestamp_to_seconds(Dataset['timestamp'])
@@ -124,6 +125,8 @@ def synchronize(Dataset_List, t_zero='start', append=1, cutit=0,
                 data = data + offset
             if col in Combined_Data:
                 if append:
+                    if 'OCV' in Dataset['title']:
+                        print(col + ' ' + str(len(data)))
                     Combined_Data[col] = np.append(Combined_Data[col], data)
                     continue                    
                 col = col + '_' + str()

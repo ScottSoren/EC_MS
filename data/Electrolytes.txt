@@ -8,7 +8,7 @@ standard
 
 #electrolyte systems
 carbonate
-	cation: K+
+	cation: K+	#can be overridden later
 	anion: CO3--
 	buffer	=	['H2CO3', 'HCO3-', 'CO3--']
 	spectator: K+
@@ -24,6 +24,13 @@ phosphate
 	spectator: K+
 	pKa	=	[2.15, 7.20, 12.32] 	#from wikipedia
 
+acetate
+	cation: K+
+	anion: CH3COO-
+	buffer = ['CH3OOH','CH3OO-']
+	spectator: K+
+	pKa	=	[4.7]		#from wikipedia
+
 hydroxide
 	cation: K+
 	
@@ -33,6 +40,31 @@ sulfate
 	buffer	=	['H2SO4', 'HSO4-', 'SO4--']
 	spectator: K+
 	pKa	=	[-3, 1.99]	#from wikipedia
+
+borate
+	cation: K+
+	anion: B(OH)4-
+
+perchlorate
+	cation: K+
+	anion: HClO4-
+
+carbonic acid		#no colon! They need to be read as dicts, not lists!
+	anion: CO3--
+
+phosphoric acid
+	anion: PO3---
+
+sulfuric acid
+	anion: H2SO4--
+
+boric acid
+	anion: B(OH)4-
+
+perchloric acid
+	anion: HClO4-
+	
+		
 
 
 #mu0, ion mobilities in limit of infinite dilution, units: (m/s)/(V/m)) = m^2/(V*s)
@@ -50,5 +82,9 @@ mobility
 	PO4---	=	7.1512e-8	#Dow
 	SO4--	=	8.271e-8	#Dow
 	HSO4-	=	5.18e-8		#from http://www.unige.ch/cabe/dynamic/ESTDynamicPartISI.pdf and mu0=D*abs(z)*qe/(kB*T)
+	HClO4-	=	6.974e-8	#from handbook of chemistry and physics, CRC press (CRC) and mu0=D*abs(z)*qe/(kB*T)
+	CH3COO-	=	4.238e-8	#CRC
+	B(OH)4-	=	6.383e-8	#CRC
+
 
 

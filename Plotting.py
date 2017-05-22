@@ -348,7 +348,11 @@ def plot_flux(MS_data, mols={'H2':'b', 'CH4':'r', 'C2H4':'g', 'O2':'k'},
                 y = y - 0.99 * min(y) #0.99 to avoid issues when log plotting.
             except ValueError:
                 print(y)
-        ax.plot(x, y, color, label=mol)
+        if type(mol) is str:
+            l = mol
+        else:
+            l = mol.name
+        ax.plot(x, y, color, label=l)
     if leg:
         if type(leg) is not str:
             leg = 'lower right'
@@ -495,8 +499,8 @@ def plot_folder(folder_name,
     return plot_experiment(Combined_data, colors=colors)
 
 
-def plot_datapoints(integrals, colors, ax='new', label='', V=None, 
-                    logplot=True, Vrange=None):
+def plot_datapoints(integrals, colors, ax='new', label='', X=None, X_str='V',
+                    logplot=True, specs={}, Xrange=None):
     '''
     integrals will most often come from functino 'get_datapoitns' in module
     Integrate_Signals
@@ -504,44 +508,46 @@ def plot_datapoints(integrals, colors, ax='new', label='', V=None,
     if ax == 'new':
         fig1 = plt.figure()
         ax = fig1.add_subplot(111)
-    if V is None:
-        V = integrals['V']
+    if X is None:
+        X = integrals[X_str]
         
     for (quantity, color) in colors.items(): 
         # Here I just assme they've organized the stuff right to start with.
         # I could alternately use the more intricate checks demonstrated in
         # DataPoints.plot_errorbars_y
         value = integrals[quantity]
-        if type(Vrange) is dict:
-            Vrange_val = Vrange[quantity]
+        if type(Xrange) is dict:
+            Xrange_val = Xrange[quantity]
         else:
-            Vrange_val = Vrange 
+            Xrange_val = Xrange 
         if type(color) is dict:
             plot_datapoints(value, color, ax=ax, logplot=logplot,
-                            label=label+quantity+'_', V=V, Vrange=Vrange_val)
+                            label=label+quantity+'_', X=X, Xrange=Xrange_val, specs=specs)
         else:
             if type(color) is tuple: #note a list can be a color in rbg
                 spec = color[0]
                 color = color[1]
-                markersize = 5
+                if 'markersize' not in specs:
+                    specs['markersize'] = 5
             else:
                 spec = '.'
-                markersize = 15
+                if 'markersize' not in specs:
+                    specs['markersize'] = 15
             #print(quantity + '\n\tvalue=' + str(value) + 
             #        '\n\tcolor=' + str(color) + '\n\tV=' + str(V))
             #print(quantity + ' ' + str(color))
-            if Vrange is not None:
-                I_keep = np.array([I for (I, V_I) in enumerate(V) if 
-                          Vrange_val[0] <= float(np.round(V_I,2)) <= Vrange_val[1]])
-                V_plot = np.array(V)[I_keep]
+            if Xrange is not None:
+                I_keep = np.array([I for (I, X_I) in enumerate(X) if 
+                          Xrange_val[0] <= float(np.round(X_I,2)) <= Xrange_val[1]])
+                X_plot = np.array(X)[I_keep]
                 value_plot = np.array(value)[I_keep]
                 #there was a mindnumbing case of linking here.
                 #tried fix it with .copy(), but new variable names needed.
             else:
-                V_plot = V
+                X_plot = X
                 value_plot = value
-            ax.plot(V_plot, value_plot, spec,  markersize=markersize, 
-                    color=color, label=label+quantity)
+            ax.plot(X_plot, value_plot, spec, 
+                    color=color, label=label+quantity, **specs, )
     if logplot:
         ax.set_yscale('log')
     return ax
