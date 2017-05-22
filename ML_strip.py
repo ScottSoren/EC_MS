@@ -16,10 +16,10 @@ import os
 
 if os.path.split(os.getcwd())[1] == 'EC_MS':      
                                 #then we're running from inside the package
-    from Combining import plot_masses
+    from Plotting import plot_masses
     import Chem
 else:                           #then we use relative import
-    from .Combining import plot_masses
+    from .Plotting import plot_masses
     from . import Chem
 
 

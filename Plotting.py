@@ -1,14 +1,26 @@
 # -*- coding: utf-8 -*-
 """
 Created on Wed Sep 28 19:07:45 2016
+Most recently edited: 16J27
 
 @author: scott
 """
 
 from matplotlib import pyplot as plt
 import numpy as np
+import os
 
-def plot_vs_potential(CV_and_MS, colors, tspan=0, A_el=0, RE_vs_RHE=0, ax1='new', ax2='new', overlay=0, logplot = [1,0], leg=1, verbose=1):
+if os.path.split(os.getcwd())[1] == 'EC_MS':      
+                                #then we're running from inside the package
+    from EC import sync_metadata
+else:                           #then we use relative import
+    from .EC import sync_metadata
+
+
+
+def plot_vs_potential(CV_and_MS, colors, tspan=0, RE_vs_RHE=None, A_el=None, 
+                      ax1='new', ax2='new', overlay=0, logplot = [1,0], leg=1,
+                      verbose=1):
     '''
     This will plot current and select MS signals vs E_we, as is the 
     convention for cyclic voltammagrams. added 16I29
@@ -40,22 +52,10 @@ def plot_vs_potential(CV_and_MS, colors, tspan=0, A_el=0, RE_vs_RHE=0, ax1='new'
     if logplot[1]:
         ax2.set_yscale('log')
             
-    # adjust EC data
-    if A_el==0 and 'A_el' in CV_and_MS:
-        A_el = CV_and_MS['A_el']    
-    J_str = '<I>/mA'
-    J = CV_and_MS[J_str]
-    if A_el:
-        J = J/A_el
-        J_str = 'J /[mA/cm^2]'
-    
-    if RE_vs_RHE==0 and 'RE_vs_RHE' in CV_and_MS:
-        RE_vs_RHE = CV_and_MS['RE_vs_RHE']    
-    V_str = 'Ewe/V'
+    # get EC data
+    V_str, J_str = sync_metadata(CV_and_MS, RE_vs_RHE=RE_vs_RHE, A_el=A_el)
     V = CV_and_MS[V_str]
-    if RE_vs_RHE:
-        V = V + RE_vs_RHE
-        V_str = 'V vs RHE /[V]'    
+    J = CV_and_MS[J_str]
 
     #get time variable and plotting indexes
     t = CV_and_MS['time/s']
@@ -68,7 +68,6 @@ def plot_vs_potential(CV_and_MS, colors, tspan=0, A_el=0, RE_vs_RHE=0, ax1='new'
         #maybe I should use EC.plot_cycles to have different cycles be different colors. Or rewrite that code here.
     ax2.set_xlabel(V_str)
     ax2.set_ylabel(J_str)
-
     
     for (mass, color) in colors.items():
         x_str = mass + '-x'
@@ -109,7 +108,7 @@ def plot_vs_time(Dataset, cols_1='input', cols_2='input', verbose=1):
     figure1 = plt.figure()
     axes_1 = figure1.add_subplot(211)
     for pltpair in cols_1:
-        label_object = re.search(r'\A[^-]*-',pltpair[1])
+        label_object = pltpair[1][0:-2]
         if label_object:
             label_string = label_object.group()[:-1]
         else:
@@ -208,7 +207,8 @@ def plot_masses(MS_Data, tspan=0, logplot=1, verbose=1,
 
 def plot_masses_and_I(EC_and_MS, tspan=0, overlay=0, logplot=[1,0], verbose=1, 
                       colors={'M2':'b','M4':'r','M18':'0.5','M28':'g','M32':'k'}, 
-                      plotpotential=1, Ref_vs_RHE=0, saveit=0, title='default', leg=1, A_el=0):
+                      plotpotential=1, RE_vs_RHE=None, A_el=None, 
+                      saveit=0, title='default', leg=1):
     '''
     this plots current and potential on one axis and masses on another
     '''
@@ -224,24 +224,19 @@ def plot_masses_and_I(EC_and_MS, tspan=0, overlay=0, logplot=[1,0], verbose=1,
         ax1 = figure1.add_subplot(211)
         ax2 = figure1.add_subplot(212)
         
-        
     if tspan == 0:                  #then use the whole range of overlap
         tspan = EC_and_MS['tspan_2']    
     plot_masses(EC_and_MS, tspan, logplot[0], verbose=verbose, colors=colors, ax1=ax1, saveit=0, leg=leg)
-    x = EC_and_MS['time/s']
-    if 'I/mA' in EC_and_MS['data_cols']:
-        y = EC_and_MS['I/mA']       #for CA files
-    else:
-        y = EC_and_MS['<I>/mA']     #for CVA files
     
-    if A_el==0 and 'A_el' in EC_and_MS:
-        A_el = EC_and_MS['A_el']    
-    y_string = 'I /[mA]'
-    if A_el:
-        y = y/A_el
-        y_string = 'J /[mA/cm^2]'
-    ax2.plot(x,y,'r')
-    ax2.set_ylabel(y_string)
+    t = EC_and_MS['time/s']
+    
+    V_str, J_str = sync_metadata(EC_and_MS, RE_vs_RHE=RE_vs_RHE, A_el=A_el) #added 16J27
+        
+    V = EC_and_MS[V_str]
+    J = EC_and_MS[J_str]       
+    
+    ax2.plot(t, J, 'r')
+    ax2.set_ylabel(J_str)
     ax2.set_xlabel('time / [s]')
     xlim = ax1.get_xlim()
     ax2.set_xlim(xlim)
@@ -250,17 +245,9 @@ def plot_masses_and_I(EC_and_MS, tspan=0, overlay=0, logplot=[1,0], verbose=1,
     
     if plotpotential:
         ax3 = ax2.twinx()
-        y3 = EC_and_MS['Ewe/V'].copy()
-        
-        y3_string = 'E vs RHE / V'
-        if Ref_vs_RHE:
-            y3 = y3 + Ref_vs_RHE
-        elif 'Ref_vs_RHE' in EC_and_MS:
-            y3 = y3 + EC_and_MS['Ref_vs_RHE']
-        else:
-            y3_string = 'E vs ref / V'
-        ax3.plot(x,y3,'k')
-        ax3.set_ylabel(y3_string)
+
+        ax3.plot(t, V, 'k')
+        ax3.set_ylabel(V_str)
         if len(logplot) >2:
             if logplot[2]:
                 ax3.set_yscale('log')
@@ -286,11 +273,12 @@ if __name__ == '__main__':
     
     plt.close('all')
     
-    importrawdata = 0
+    importrawdata = 1
     if importrawdata:
         default_directory = os.path.abspath(os.path.join(os.getcwd(), os.pardir)) 
-        CV_data_0 = import_data(default_directory + os.sep + '18_CO_dose_and_strip_C01.mpt', data_type='EC')
-        MS_data_0 = import_data(default_directory + os.sep + 'QMS_16I27_18h35m30.txt', data_type='MS')
+        CV_data_0 = import_data(default_directory + os.sep) # + '18_CO_dose_and_strip_C01.mpt', data_type='EC')
+        MS_data_0 = import_data(default_directory + os.sep,# + 'QMS_16I27_18h35m30.txt'
+                                data_type='MS')
     
     CV_data = select_cycles(CV_data_0,[1,2])    
     CV_data = remove_delay(CV_data)

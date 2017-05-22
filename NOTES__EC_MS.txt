@@ -1,7 +1,14 @@
 
 
 EC-MS data processing package by Scott (scott@fysik.dtu.dk)
-Last modified 16I29
+Last modified 16J27
+
+
+-------------------- 16J27 ------------------------------------------
+Time_Response module added to model mass transport in working volume and fit signal shapes
+Molecules module added to interact with a database for quantification
+Several functions added to EC, including CV_difference for e.g. CO stripping, and sync_metadata to deal once and for all with RE and A_el 
+functions in Plotting and Combining updated accordingly
 
 
 -------------------- 16I29 ------------------------------------------

@@ -18,13 +18,13 @@ import os
 
 if os.path.split(os.getcwd())[1] == 'EC_MS':      
                                 #then we're running from inside the package
-    from Combining import plot_masses
+    from Plotting import plot_masses
 else:                           #then we use relative import
-    from .Combining import plot_masses
+    from .Plotting import plot_masses
 
 
 
-def get_cumulative(Data, data_cols,  tspan = 0, verbose = 0, value_type = 'integral'):
+def get_cumulative(Data, data_cols,  tspan=None, verbose=0, value_type='integral'):
     '''gets an value integrated or averaged over tspan for a variable in a dataset'''
     if type(data_cols) == str:
         data_cols = [data_cols]
@@ -40,7 +40,7 @@ def get_cumulative(Data, data_cols,  tspan = 0, verbose = 0, value_type = 'integ
             ycol = data_col
         x0 = Data[xcol]
         y0 = Data[ycol]    
-        if tspan:
+        if tspan is not None:
             if len(tspan)==1: #then it is the length of time to integrate from start
                 tspan = [min(x0), min(x0) + tspan]
             I_keep = np.array([I for I in range(len(x0)) if x0[I]>=tspan[0] if x0[I]<=tspan[1]])

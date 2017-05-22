@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Created on Tue Jul 19 10:40:46 2016
-Most recently edited: 16I23
-
+Most recently edited: 16J27
 @author: Scott
 
 This is the core file of the package. Includes functions for combining EC and MS 
@@ -14,8 +13,9 @@ from __future__ import division
 
 import numpy as np
 import re
-        
-def synchronize(Dataset_List, verbose = 1, cutit = 0, t_zero = 'start'):
+import os    
+
+def synchronize(Dataset_List, verbose=1, cutit=0, t_zero='start'):
     '''
     This will combine array data from multiple dictionaries into a single 
     dictionary with all time variables aligned according to absolute time.
@@ -29,7 +29,8 @@ def synchronize(Dataset_List, verbose = 1, cutit = 0, t_zero = 'start'):
     t_start = 0             #start time of overlap in seconds since midnight
     t_finish = 60*60*24*7     #I'm going to have to change things if experiments cross midnight
     t_first = 60*60*24*7    #earliest timestamp in seconds since midnight
-    Combined_Data = {'data_cols':[]}
+    t_last = 0              #latest timestamp in seconds since midnight
+    Combined_Data = {'data_type':'combined', 'data_cols':[]}
     title_combined = ''
     
     #go through once to generate the title and get the start and end times
@@ -48,23 +49,30 @@ def synchronize(Dataset_List, verbose = 1, cutit = 0, t_zero = 'start'):
                 t_s = min(t_s, t_0 + Dataset[col][0])   #earliest start of time data in dataset
                 t_f = max(t_f, t_0 + Dataset[col][-1])  #latest finish of time data in dataset
                 
-        t_first = min([t_start, t_0])    #earliest timestamp                          
+        t_first = min([t_start, t_0])    #earliest timestamp  
+        t_last = max([t_last, t_0])      #latest timestamp 
         t_start = max([t_start, t_s])    #latest start of time variable overall
         t_finish = min([t_finish, t_f])  #earliest finish of time variable overall
     
     title_combined = title_combined[:-6]
     Combined_Data['title'] = title_combined
     Combined_Data['timestamp'] = seconds_to_timestamp(t_start)
-    Combined_Data['data_type'] = 'combined'
     Combined_Data['tspan'] =    [t_start, t_finish] #overlap start and finish times as seconds since midnight
     Combined_Data['tspan_1'] = [t_start - t_first, t_finish - t_first]    # start and finish times as seconds since earliest start
     if t_zero == 'start':
         t_zero = t_start
+    elif t_zero == 'first':
+        t_zero = t_first
+    elif t_zero == 'last':
+        t_zero = t_last
+    if verbose:
+        print('start: ' + str(t_start) + ', first: ' + str(t_first) + 
+        ', last: ' + str(t_last))
     Combined_Data['tspan_2'] = [t_start - t_zero, t_finish - t_zero]    #start and finish times of overlap as seconds since zero point   
     
     t_span = t_finish - t_start    
     
-    #and again to cut the data and put it into the combined dictionary
+    #and again to synchronize the data and put it into the combined dictionary
     for nd, Dataset in enumerate(Dataset_List):
         t_0 = timestamp_to_seconds(Dataset['timestamp'])
         offset = t_0 - t_zero
@@ -93,19 +101,27 @@ def synchronize(Dataset_List, verbose = 1, cutit = 0, t_zero = 'start'):
             Combined_Data[new_col] = data
             Combined_Data['data_cols'].append(new_col)  
             
+        #keep all of the metadata from the original datasets (added 16J27)
+        for col, value in Dataset.items():
+            if col in Combined_Data.keys():
+                Combined_Data[col + '_' + str(nd)] = value
+            else:
+                Combined_Data[col] = value
+           
     if verbose:
         print('function \'synchronize\' finsihed!\n\n')   
-        
+    
     return Combined_Data        
 
-def time_cut(MS_Data_0,tspan, verbose=1):
+
+def time_cut(MS_Data_0, tspan, verbose=1):
     '''
     cuts a data set, retaining the portion of the data set within a specified
     time interval
     '''
     if verbose:
         print('\n\nfunction \'time_cut\' at your service! \n Time cutting ' + MS_Data_0['title'])
-    MS_Data = MS_Data_0.copy()
+    MS_Data = MS_Data_0.copy() #otherwise I cut the original dataset!
     length = 10**9
     for col in MS_Data['data_cols']:
         if is_time(col):
@@ -147,28 +163,6 @@ def time_cut(MS_Data_0,tspan, verbose=1):
     if verbose:
         print('function \'time_cut\' finished!\n\n')    
     return MS_Data
-
-
-def smooth_pulses(CA_Data_0, verbose=1):
-    '''
-    This function turns the CA data into a square wave by averaging the
-    potential over the duration of a pulse (where it should be constant).
-    Useful when noise makes the figures look ugly dispite otherwise good data.
-    If you have to use this function, though, I would say the results are not 
-    publication-ready.
-    '''
-    if verbose:
-        print('\n\nfunction \'smooth_pulses\' at your service!')
-    CA_Data = CA_Data_0.copy()
-    cycle_numbers = CA_Data['Ns']
-    cycles = np.unique(cycle_numbers)
-    for c in cycles:
-        I_cycle = np.array([i for (i,cycle) in enumerate(cycle_numbers) if cycle==c])
-        V_avg = np.average(CA_Data['Ewe/V'][I_cycle])
-        CA_Data['Ewe/V'][I_cycle] = V_avg
-    if verbose:
-        print('function \'smooth_pulses\' finished!\n\n')
-    return CA_Data
   
     
 def is_time(col, verbose = 0):
@@ -212,182 +206,6 @@ def seconds_to_timestamp(seconds):
     timestamp = '{0:2d}:{1:2d}:{2:2d}'.format(h,m,s)
     timestamp = timestamp.replace(' ','0')
     return timestamp
-
-
-def indeces_from_input(options, prompt):
-    print(prompt + '\n... enter the indeces you\'re interested in, in order,' +
-    'seperated by spaces, for example:\n>>>1 4 3')
-    for nc, option in enumerate(options):
-        print(str(nc) + '\t\t ' + options[nc])
-    choice_string = input('\n')
-    choices = choice_string.split(' ')
-    choices = [int(choice) for choice in choices]
-    return choices
-
-
-def plot_vs_time(Dataset, cols_1='input', cols_2='input', verbose=1):
-    '''
-    Completely replaced by the more convenient plot_masses and plot_masses_and_I
-    '''
-    if verbose:
-        print('\n\nfunction \'plot_vs_time\' at your service!')
-    
-    if cols_1=='input':
-        data_cols = Dataset['data_cols']
-        prompt = ('Choose combinations of time and non-time variables for axis 1, \n' +
-            'with every other choice a time variable.')
-        I_axis_1 = indeces_from_input(data_cols, prompt)
-        cols_1 = [[data_cols[i], data_cols[j]] for i,j in zip(I_axis_1[::2],I_axis_1[1::2])]        
-            
-    figure1 = plt.figure()
-    axes_1 = figure1.add_subplot(211)
-    for pltpair in cols_1:
-        label_object = re.search(r'\A[^-]*-',pltpair[1])
-        if label_object:
-            label_string = label_object.group()[:-1]
-        else:
-            label_string = pltpair[1]
-        x = Dataset[pltpair[0]]
-        y = np.log(Dataset[pltpair[1]])/np.log(10)
-        axes_1.plot(x,y, label = label_string)
-        
-    axes_1.set_xlabel('time / s')
-    axes_1.set_ylabel('log(signal/[a.u.])')
-    axes_1.legend()    
-    
-    if cols_2=='input':
-        
-        data_cols = Dataset['data_cols']
-        prompt = ('Choose combinations of time and non-time variables for axis 2, \n' +
-            'with every other choice a time variable.')
-        I_axis_2 = indeces_from_input(data_cols, prompt)
-        cols_2 = [[data_cols[i], data_cols[j]] for i,j in zip(I_axis_2[::2],I_axis_2[1::2])]
-
-    axes_2 = figure1.add_subplot(212)
-    for pltpair in cols_2:
-        label_string = pltpair[1]
-        x = np.insert(Dataset[pltpair[0]],0,0)
-        y = np.insert(Dataset[pltpair[1]],0,0)
-        axes_2.plot(x,y,'k--',label=label_string)
-    axes_2.set_ylabel('current / mA')
-    axes_2.set_xlabel('time / s')
-    axes_2.legend()
-    #so capacitance doesn't blow it up:
-    I_plt_top = np.where(x>2)[0][0]
-    y_max = np.max(y[I_plt_top:])
-    axes_2.set_ylim(np.min(y),y_max)
-    if verbose:
-        print('function \'plot_vs_time\' finished!\n\n')
-
-
-
-def plot_masses(MS_Data, tspan=0, logplot=1, verbose=1,
-                colors = {'M2':'b','M4':'r','M18':'0.5','M28':'g','M32':'k'}, 
-                ax1='new', saveit=0, leg=1):
-    '''
-    plots selected masses for a selected time range from MS data or EC_MS data
-    '''
-    
-    if verbose:
-        print('\n\nfunction \'plot_masses\' at your service! \n Plotting from: ' + MS_Data['title'])
-
-    if ax1 == 'new':
-        fig1 = plt.figure()
-        ax1 = fig1.add_subplot(111)    
-    lines = {}
-    
-    for mass, color in colors.items():
-        if verbose:
-            print('plotting: ' + mass)
-        x = MS_Data[mass+'-x']
-        y = MS_Data[mass+'-y']
-        if tspan:
-            I_start = np.where(x>tspan[0])[0][0]
-            excess = np.where(x>tspan[1])
-            if np.size(excess)>0:                  #so that I don't get an empty np.where problem
-                I_finish = excess[0][0]
-            else:
-                I_finish = len(x)
-            x = x[I_start:I_finish]
-            y = y[I_start:I_finish]
-        
-        lines[mass] = ax1.plot(x, y, color, label = mass)          
-    if leg:
-        ax1.legend(loc = 'lower right')
-    ax1.set_xlabel('time / [s]')
-    y_string = 'signal / [A]'
-    ax1.set_ylabel(y_string)           
-    if logplot: 
-        ax1.set_yscale('log') 
-    if verbose:
-        print('function \'plot_masses\' finsihed! \n\n')
-    return ax1
-
-def plot_masses_and_I(EC_and_MS, tspan=0, overlay=0, logplot=[1,0], verbose=1, 
-                      colors={'M2':'b','M4':'r','M18':'0.5','M28':'g','M32':'k'}, 
-                      plotpotential=1, Ref_vs_RHE=0, saveit=0, title='default', leg=1, A_el=0):
-    '''
-    this plots current and potential on one axis and masses on another
-    '''
-    
-    if verbose:
-        print('\n\nfunction \'plot_masses_and_I\' at your service!\n Plotting from: ' + EC_and_MS['title'])
-    
-    figure1 = plt.figure()
-    if overlay:
-        ax1 = figure1.add_subplot(111)
-        ax2 = ax1.twinx()
-    else:
-        ax1 = figure1.add_subplot(211)
-        ax2 = figure1.add_subplot(212)
-    plot_masses(EC_and_MS, tspan, logplot[0], verbose=verbose, colors=colors, ax1=ax1, saveit=0, leg=leg)
-    x = EC_and_MS['time/s']
-    if 'I/mA' in EC_and_MS['data_cols']:
-        y = EC_and_MS['I/mA']       #for CA files
-    else:
-        y = EC_and_MS['<I>/mA']     #for CVA files
-    
-    if A_el==0 and 'A_el' in EC_and_MS:
-        A_el = EC_and_MS['A_el']    
-    y_string = 'I /[mA]'
-    if A_el:
-        y = y/A_el
-        y_string = 'J /[mA/cm^2]'
-    ax2.plot(x,y,'r')
-    ax2.set_ylabel(y_string)
-    ax2.set_xlabel('time / [s]')
-    xlim = ax1.get_xlim()
-    ax2.set_xlim(xlim)
-    if logplot[1]: 
-        ax2.set_yscale('log')  
-    
-    if plotpotential:
-        ax3 = ax2.twinx()
-        y3 = EC_and_MS['Ewe/V'].copy()
-        
-        y3_string = 'E vs RHE / V'
-        if Ref_vs_RHE:
-            y3 = y3 + Ref_vs_RHE
-        elif 'Ref_vs_RHE' in EC_and_MS:
-            y3 = y3 + EC_and_MS['Ref_vs_RHE']
-        else:
-            y3_string = 'E vs ref / V'
-        ax3.plot(x,y3,'k')
-        ax3.set_ylabel(y3_string)
-        if len(logplot) >2:
-            if logplot[2]:
-                ax3.set_yscale('log')
-        ax3.set_xlim(xlim)
-    if saveit:
-        if title == 'default':
-            title == EC_and_MS['title'] + '.png'
-        figure1.savefig(title)
-        
-    if verbose:
-        print('function \'plot_masses_and_I\' finished!\n\n')
-    if plotpotential:
-        return ax1, ax2, ax3
-    return ax1, ax2
 
 
 
