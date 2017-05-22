@@ -1,0 +1,45 @@
+#D in m^2/s
+#kH = c(gas)/c(aq) is unitless.
+#
+C2H6
+	D	=	1.2e-09
+	kH	=	2.12
+C2H4
+	D	=	1.9e-09
+	kH	=	8.6
+N2
+	D	=	1.88e-09
+	kH	=	67.0
+O2
+	D	=	2.1e-09
+	kH	=	31.0
+Cl2
+	D	=	1.25e-09
+	kH	=	0.42
+Ar
+	D	=	2e-09
+	kH	=	29.4
+CO2
+	D	=	1.92e-09
+	kH	=	1.205
+CO
+	D	=	1.92e-09
+	kH	=	43.5
+H2
+	D	=	4.5e-09
+	kH	=	52.0
+CH4
+	D	=	1.49e-09
+	kH	=	28.8
+H2O
+	D	=	2.27e-09
+	kH	=	2.336e-05
+He
+	D	=	6.28e-09
+	kH	=	110
+CH3COOH	
+	D	=	1.29e-9		#from Auinger et al, "Near-surface ion distribution..." PCCP, 2011 (Auinger2011)
+H3PO4
+	D	=	9.59e-10	#from Auinger2011
+H3BO3
+	D	=	7.67e-10	#from Auinger2011

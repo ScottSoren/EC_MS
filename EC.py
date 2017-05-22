@@ -71,11 +71,19 @@ def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True):
             y_col = col[:-2] + '-y'
             EC_data[col], EC_data[y_col] = cut(EC_data[col], EC_data[y_col], tspan_2)       
 
-    if t_zero is 'start':
+    if t_zero is 'start' or type(t_zero) in [int, float]:
+        if verbose:
+            print('\'select_cycles\' is resetting t_zero')
+            print('t_zero = ' + str(t_zero))
         for col in EC_data['data_cols']:
             if is_time(col):
-                EC_data[col] = EC_data[col] - tspan_2[0]
-        EC_data['tspan_2'] = tspan_2 - tspan_2[0]
+                if type(t_zero) in [int, float]:
+                    EC_data[col] = EC_data[col] - tspan_2[0] - t_zero
+                else:
+                    EC_data[col] = EC_data[col] - tspan_2[0]
+                    t_zero = 0
+        EC_data['tspan_2'] = tspan_2 - tspan_2[0] - t_zero
+        
     
     return EC_data
 
@@ -97,7 +105,7 @@ def remove_delay(CV_data):
         
 
 def CV_difference(cycles_data, redox=1, Vspan=[0.5, 1.0], 
-                  ax=None, color='g', verbose=1):
+                  ax=None, color='g', verbose=True):
     '''
     This will calculate the difference in area between two cycles in a CV, 
     written for CO stripping 16J26. If ax is given, the difference will be
@@ -121,7 +129,8 @@ def CV_difference(cycles_data, redox=1, Vspan=[0.5, 1.0],
     JV = []
     ts = []
     for cycle_data in cycles_data:
-        V_str, J_str = sync_metadata(cycle_data)
+        #print(type(cycles_data))
+        V_str, J_str = sync_metadata(cycle_data, verbose=verbose)
         V = cycle_data[V_str]
         J = cycle_data[J_str]
         t = cycle_data['time/s']
@@ -134,6 +143,7 @@ def CV_difference(cycles_data, redox=1, Vspan=[0.5, 1.0],
         V = V[I_keep]        
         J = J[I_keep]
         t = t[I_keep]
+        print('V_range starts at t = ' + str(t[0]))
         
         Vs += [V]
         Js += [J]
@@ -235,7 +245,7 @@ def plot_vs_time(EC_data, axes='new', y_strings='default', colors=None,
     return axes
 
 
-def sync_metadata(EC_data, RE_vs_RHE=None, A_el=None, verbose=1):
+def sync_metadata(EC_data, RE_vs_RHE=None, A_el=None, verbose=True):
     '''
     Deal with all the annoying RE and J vs I vs <I> stuff once and for all here.
     After this has been called, all plotting methods need only to utilize
@@ -250,12 +260,17 @@ def sync_metadata(EC_data, RE_vs_RHE=None, A_el=None, verbose=1):
         RE_vs_RHE = EC_data['RE_vs_RHE']
     else:
         EC_data['RE_vs_RHE'] = None
-    
+    try:
+        E_str = [s for s in ['Ewe/V', '<Ewe>/V', '|Ewe|/V'] if s in EC_data['data_cols']][0] 
+    except IndexError:
+        print('data doesn\'t include Ewe!')  
+        E_str = None
+        V_str = None
     if RE_vs_RHE is None:
-        V_str = 'Ewe/V'
-    else:
+        V_str = E_str
+    elif E_str is not None:
         V_str = 'E vs RHE / [V]'
-        EC_data[V_str] = EC_data['Ewe/V'] + RE_vs_RHE
+        EC_data[V_str] = EC_data[E_str] + RE_vs_RHE
     
     if A_el is not None:
         EC_data['A_el'] = A_el
@@ -263,21 +278,27 @@ def sync_metadata(EC_data, RE_vs_RHE=None, A_el=None, verbose=1):
         A_el = EC_data['A_el']
     else:
         EC_data['A_el'] = None
-        
-    I_str = [s for s in ['I/mA', '<I>/mA'] if s in EC_data['data_cols']][0]     
+
+    try:
+        I_str = [s for s in ['I/mA', '<I>/mA', '|EI|/mA'] if s in EC_data['data_cols']][0] 
+    except IndexError:
+        print('data doesn\'t include I!')
+        I_str = None
+        J_str = None
     if A_el is None:
         J_str = I_str
-    else:
+    elif I_str is not None:
         J_str = 'J /[mA/cm^2]'
         EC_data[J_str] = EC_data[I_str] / A_el
- 
+
+    EC_data['E_str'] = E_str 
     EC_data['V_str'] = V_str   
     EC_data['J_str'] = J_str
     EC_data['I_str'] = I_str
     
     EC_data['data_cols'] = EC_data['data_cols'].copy() #17B02
     for col in [V_str, J_str]:
-        if col not in EC_data['data_cols']:
+        if col not in EC_data['data_cols'] and col is not None:
             EC_data['data_cols'] += [col]
             if verbose:
                 print('added ' + col + ' to data_cols')
@@ -305,7 +326,7 @@ def plot_CV_cycles(CV_data, cycles=[0], RE_vs_RHE=None, A_el=None, ax='new',
     data_to_return = [] 
     for n, cycle in enumerate(cycles):
 
-        cycle_data = select_cycles(CV_data, cycle, verbose)
+        cycle_data = select_cycles(CV_data, cycles=cycle, verbose=verbose)
         data_to_return += [cycle_data]  #added 16J25
 
         if ax is not None:
@@ -330,9 +351,7 @@ def plot_CV_cycles(CV_data, cycles=[0], RE_vs_RHE=None, A_el=None, ax='new',
     if verbose:
         print('\nfunction \'plot_CV_cycles\' finished!\n\n')  
     
-    if ax is not None:
-        return data_to_return, ax
-    return data_to_return
+    return data_to_return, ax
 
 
 if __name__ == '__main__':

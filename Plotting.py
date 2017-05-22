@@ -35,13 +35,14 @@ else:                           #then we use relative import
         standard_colors = lines_to_dictionary(lines)['standard colors']
 
 
-def plot_vs_potential(CV_and_MS, 
+def plot_vs_potential(CV_and_MS_0, 
                       colors={'M2':'b','M4':'r','M18':'0.5','M28':'g','M32':'k'},
                       tspan=0, RE_vs_RHE=None, A_el=None, 
                       ax1='new', ax2='new', ax=None, spec='k-',
                       overlay=0, logplot = [1,0], leg=1,
                       verbose=True, removebackground = None,
-                      masses=None, mols=None, unit='nmol/s'):
+                      masses=None, mols=None, unit='nmol/s',
+                      fig=None):
     '''
     This will plot current and select MS signals vs E_we, as is the 
     convention for cyclic voltammagrams. added 16I29
@@ -53,6 +54,8 @@ def plot_vs_potential(CV_and_MS,
     if removebackground is None:
         removebackground = not logplot[0]
     #prepare axes. This is ridiculous, by the way.
+    CV_and_MS = CV_and_MS_0.copy() #17C01
+
     if ax == 'new':
         ax1 = 'new'
         ax2 = 'new'
@@ -61,7 +64,10 @@ def plot_vs_potential(CV_and_MS,
     elif ax2 != 'new':
         figure1 = ax2.figure
     else:
-        figure1 = plt.figure()
+        if fig is None:
+            figure1 = plt.figure()
+        else:
+            figure1 = fig
     if overlay:
         if ax1 == 'new':
             ax1 = figure1.add_subplot(111)
@@ -91,72 +97,78 @@ def plot_vs_potential(CV_and_MS,
         tspan = CV_and_MS['tspan_2']
     I_plot = np.array([i for (i,t_i) in enumerate(t) if tspan[0]<t_i and t_i<tspan[1]])
     
-    #plot EC-lab data
-    ax2.plot(V[I_plot],J[I_plot], spec)      
-        #maybe I should use EC.plot_cycles to have different cycles be different colors. Or rewrite that code here.
-    ax2.set_xlabel(V_str)
-    ax2.set_ylabel(J_str)
+    if ax2 is not None:
+        #plot EC-lab data
+        ax2.plot(V[I_plot],J[I_plot], spec)      
+            #maybe I should use EC.plot_cycles to have different cycles be different colors. Or rewrite that code here.
+        ax2.set_xlabel(V_str)
+        ax2.set_ylabel(J_str)
     
-    
-    #check if we're going to plot signals or fluxes:
-    quantified = False      #added 17A07
-    if mols is not None:
-        colors = mols
-        quantified = True
-    elif ((type(colors) is dict and list(colors.keys())[0][0] == 'M') or
-          (type(colors) is list and colors[0][0] == 'M' )):
-        if masses is None:
-            masses = colors
-        else:
-            colors = masses
-    else:
-        quantified = True
-        mols = colors
-    
-    if type(colors) is list:
-        c = colors.copy()
-        colors = {}
-        for m in c:
-            if quantified:
-                mol = Molecule(m, verbose=False)
-                color = standard_colors[mol.primary]
-                colors[mol] = color
+    if ax1 is not None: #option of skipping an axis added 17C01
+        #check if we're going to plot signals or fluxes:
+        quantified = False      #added 17A07
+        if mols is not None:
+            colors = mols
+            quantified = True
+        elif ((type(colors) is dict and list(colors.keys())[0][0] == 'M') or
+              (type(colors) is list and colors[0][0] == 'M' )):
+            if masses is None:
+                masses = colors
             else:
-                color = standard_colors[m]
-                colors[m] = color                
+                colors = masses
+        else:
+            quantified = True
+            mols = colors
+        
+        if type(colors) is list:
+            c = colors.copy()
+            colors = {}
+            for m in c:
+                if quantified:
+                    mol = Molecule(m, verbose=False)
+                    color = standard_colors[mol.primary]
+                    colors[mol] = color
+                else:
+                    color = standard_colors[m]
+                    colors[m] = color                
     
     #then do it.
-    for (key, color) in colors.items():
+
+        for (key, color) in colors.items():
+            if quantified:
+                (x,y) = get_flux(CV_and_MS, mol=key, tspan=tspan, removebackground=removebackground, 
+                unit=unit, verbose=True)
+                if type(key) is not str:
+                    key = str(key) # in case key had been a Molecule object
+                Y_str = key + '_' + unit
+            else:   
+                x_str = key + '-x'
+                y_str = key + '-y'
+                Y_str = key + '-Y'     #-Y will be a QMS signal interpreted to the EC-lab time variable.
+                x = CV_and_MS[x_str]
+                y = CV_and_MS[y_str]
+            try:
+                Y = np.interp(t, x, y)  #obs! np.interp has a has a different argument order than Matlab's interp1
+            except ValueError:
+                print('x ' + str(x) + '\ny ' + str(y) + '\nt ' + str(t))
+            CV_and_MS[Y_str] = Y    #add the interpolated value to the dictionary for future use 
+                                        #17C01: but not outside of this function.
+            ax1.plot(V[I_plot], Y[I_plot], color, label=Y_str)
         if quantified:
-            (x,y) = get_flux(CV_and_MS, mol=key, tspan=tspan, removebackground=False, 
-            unit=unit, verbose=True)
-            if type(key) is not str:
-                key = str(key) # in case key had been a Molecule object
-            Y_str = key + '_' + unit
-        else:   
-            x_str = key + '-x'
-            y_str = key + '-y'
-            Y_str = key + '-Y'     #-Y will be a QMS signal interpreted to the EC-lab time variable.
-            x = CV_and_MS[x_str]
-            y = CV_and_MS[y_str]
-        Y = np.interp(t, x, y)  #obs! np.interp has a has a different argument order than Matlab's interp1
-        CV_and_MS[Y_str] = Y    #add the interpolated value to the dictionary for future use
-        ax1.plot(V[I_plot], Y[I_plot], color, label=Y_str)
-    if quantified:
-        M_str = 'flux / [' + unit + ']'
-    else:
-        M_str = 'signal / [A]'
-    #ax1.set_xlabel(V_str)
-    ax1.set_xticks([])
-    ax1.set_ylabel(M_str)
-    if leg:
-        ax1.legend()
+            M_str = 'flux / [' + unit + ']'
+        else:
+            M_str = 'signal / [A]'
+        #ax1.set_xlabel(V_str)
+        ax1.set_xticks([])
+        ax1.set_ylabel(M_str)
+        if leg:
+            ax1.legend()
     
     if verbose:
         print('\nfunction \'plot_vs_potential\' finished!\n\n')
         
         #parameter order of np.interp is different than Matlab's interp1
-    return ax1, ax2, CV_and_MS    
+    return [ax1, ax2]    
 
 
 def plot_vs_time(Dataset, cols_1='input', cols_2='input', verbose=1):
@@ -332,7 +344,10 @@ def plot_flux(MS_data, mols={'H2':'b', 'CH4':'r', 'C2H4':'g', 'O2':'k'},
             x,y = cut(x, y, tspan)
         '''
         if removebackground:
-            y = y - 0.99 * min(y) #0.99 to avoid issues when log plotting.
+            try:
+                y = y - 0.99 * min(y) #0.99 to avoid issues when log plotting.
+            except ValueError:
+                print(y)
         ax.plot(x, y, color, label=mol)
     if leg:
         if type(leg) is not str:
@@ -353,28 +368,37 @@ def plot_flux(MS_data, mols={'H2':'b', 'CH4':'r', 'C2H4':'g', 'O2':'k'},
 def plot_experiment(EC_and_MS,
                     colors={'M2':'b','M4':'r','M18':'0.5','M28':'g','M32':'k'},
                     tspan=None, overlay=False, logplot=[True,False], verbose=True,   
-                    plotpotential=True, plotcurrent=True,
+                    plotpotential=True, plotcurrent=True, ax='new',
                     RE_vs_RHE=None, A_el=None, removebackground=True,
                     saveit=False, title=None, leg=False, unit='nmol/s',
-                    masses=None, mols=None): #mols will overide masses will overide colors
+                    masses=None, mols=None, #mols will overide masses will overide colors
+                    potentialcolor='k', currentcolor='r', 
+                    potentiallabel=None, currentlabel=None,
+                    fig=None,
+                    ): 
     '''
     this plots signals or fluxes on one axis and current and potential on other axesaxis
     '''
     
     if verbose:
         print('\n\nfunction \'plot_experiment\' at your service!\n Plotting from: ' + EC_and_MS['title'])
-    
-    figure1 = plt.figure()
-    if overlay:
-        ax = [figure1.add_subplot(111)]
-        ax += [ax[0].twinx()]                     
-    else:
-        gs = gridspec.GridSpec(3, 1)
-        gs.update(hspace=0.025)
-        ax = [plt.subplot(gs[0:2, 0])]
-        ax += [plt.subplot(gs[2, 0])]
-        if plotcurrent and plotpotential:
-            ax += [ax[1].twinx()]
+    if ax == 'new':
+        if fig is None:
+            figure1 = plt.figure()
+        else:
+            figure1 = fig
+            plt.figure(figure1.number)
+            print('plot_expeiriment using ' + str(fig))
+        if overlay:
+            ax = [figure1.add_subplot(111)]
+            ax += [ax[0].twinx()]                     
+        else:
+            gs = gridspec.GridSpec(3, 1)
+            gs.update(hspace=0.025)
+            ax = [plt.subplot(gs[0:2, 0])]
+            ax += [plt.subplot(gs[2, 0])]
+            if plotcurrent and plotpotential:
+                ax += [ax[1].twinx()]
         
     if tspan is None:                  #then use the whole range of overlap
         tspan = EC_and_MS['tspan_2']
@@ -422,7 +446,7 @@ def plot_experiment(EC_and_MS,
 
     i_ax = 1
     if plotpotential:
-        ax[i_ax].plot(t, V, 'k')
+        ax[i_ax].plot(t, V, color=potentialcolor, label=potentiallabel)
         ax[i_ax].set_ylabel(V_str)
         if len(logplot) >2:
             if logplot[2]:
@@ -432,14 +456,15 @@ def plot_experiment(EC_and_MS,
         i_ax += 1
         
     if plotcurrent:
-        ax[i_ax].plot(t, J, 'r')
+        ax[i_ax].plot(t, J, currentcolor, label=currentlabel)
         ax[i_ax].set_ylabel(J_str)
         ax[i_ax].set_xlabel('time / [s]')
         xlim = ax[i_ax-1].get_xlim()
         ax[i_ax].set_xlim(xlim)
         if logplot[1]: 
             ax[i_ax].set_yscale('log')
-    ax[1].set_xlabel('time / [s]')
+    if plotcurrent or plotpotential:
+        ax[1].set_xlabel('time / [s]')
     
     if saveit:
         if title == 'default':
@@ -470,30 +495,55 @@ def plot_folder(folder_name,
     return plot_experiment(Combined_data, colors=colors)
 
 
-def plot_datapoints(integrals, colors, ax='new', label='', V=None, logplot=True):
+def plot_datapoints(integrals, colors, ax='new', label='', V=None, 
+                    logplot=True, Vrange=None):
     '''
     integrals will most often come from functino 'get_datapoitns' in module
     Integrate_Signals
     '''
-    print(logplot)
     if ax == 'new':
         fig1 = plt.figure()
         ax = fig1.add_subplot(111)
     if V is None:
         V = integrals['V']
         
-    for (quantity, color) in colors.items():
+    for (quantity, color) in colors.items(): 
+        # Here I just assme they've organized the stuff right to start with.
+        # I could alternately use the more intricate checks demonstrated in
+        # DataPoints.plot_errorbars_y
         value = integrals[quantity]
+        if type(Vrange) is dict:
+            Vrange_val = Vrange[quantity]
+        else:
+            Vrange_val = Vrange 
         if type(color) is dict:
             plot_datapoints(value, color, ax=ax, logplot=logplot,
-                            label=label+quantity+'_', V=V)
+                            label=label+quantity+'_', V=V, Vrange=Vrange_val)
         else:
-           # print(quantity + '\n\tvalue=' + str(value) + 
-           #         '\n\tcolor=' + str(color) + '\n\tV=' + str(V))
-            ax.plot(V, value, '.', markersize=15, color=color, label=label+quantity)
+            if type(color) is tuple: #note a list can be a color in rbg
+                spec = color[0]
+                color = color[1]
+                markersize = 5
+            else:
+                spec = '.'
+                markersize = 15
+            #print(quantity + '\n\tvalue=' + str(value) + 
+            #        '\n\tcolor=' + str(color) + '\n\tV=' + str(V))
+            #print(quantity + ' ' + str(color))
+            if Vrange is not None:
+                I_keep = np.array([I for (I, V_I) in enumerate(V) if 
+                          Vrange_val[0] <= float(np.round(V_I,2)) <= Vrange_val[1]])
+                V_plot = np.array(V)[I_keep]
+                value_plot = np.array(value)[I_keep]
+                #there was a mindnumbing case of linking here.
+                #tried fix it with .copy(), but new variable names needed.
+            else:
+                V_plot = V
+                value_plot = value
+            ax.plot(V_plot, value_plot, spec,  markersize=markersize, 
+                    color=color, label=label+quantity)
     if logplot:
         ax.set_yscale('log')
-        print('making logscale')
     return ax
 
     

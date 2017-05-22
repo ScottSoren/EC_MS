@@ -33,7 +33,7 @@ def ML_strip_cal(CV_and_MS, cycles=[1,2], t_int=200,
              mol='CO2', mass='primary', n_el=None, 
              Vspan=[0.5, 1.0], redox=1, 
              ax='two', title='default', verbose=True,
-             plot_instantaneous=True):
+             plot_instantaneous=False):
     '''
     Determines F_cal = Q_QMS / n_electrode by integrating a QMS signal over
     tspan, assuming the starting value is background; and
@@ -67,18 +67,27 @@ def ML_strip_cal(CV_and_MS, cycles=[1,2], t_int=200,
     if mass == 'primary':
         mass = mol.primary
     if np.size(t_int) == 1:
-        t_int = CV_and_MS['tspan_2'][0] + np.array([0, t_int])
+        #t_int = CV_and_MS['tspan_2'][0] + np.array([0, t_int]) #assumes I've cut stuff. Not necessarily true.
+        #better solution below (17C22)
+        pass
     if title == 'default':
         title = name + '_' + mass
     
+#    print(type(CV_and_MS)) #was having a problem due to multiple outputs.
     cycles_data, ax1 = plot_CV_cycles(CV_and_MS, cycles, ax=ax1, title=title)
+#    print(type(cycles_data))
     Q_diff, diff = CV_difference(cycles_data, Vspan=Vspan, redox=redox, ax=ax1)
-    ax1.set_title(title)    
+    if ax1 is not None:
+        ax1.set_title(title)    
     
     n_mol = Q_diff / (Chem.Far * n_el)   
     t = diff[0][0]
     J_diff = diff[2]
     A_el = CV_and_MS['A_el']    
+    
+    if np.size(t_int) == 1: #17C22
+        t_int = t[0] + np.array([0, t_int]) 
+        #now it starts at the same time as EC data in the vrange starts
     
     #Q_diff seemed to be having a problem, but turned out to just be because 
      #I forgot to remove_delay(). 
@@ -124,12 +133,11 @@ def ML_strip_cal(CV_and_MS, cycles=[1,2], t_int=200,
     calibration['Q_el'] = Q_diff
     calibration['Q_QMS'] = Q_QMS    
     calibration['F_cal'] = F_cal
+    calibration['title'] = title
     
     if verbose:
         print('\ncalibration function \'ML_strip_cal\' finished!\n\n')    
 
-    if ax is None:
-        return calibration
     if ax2 is None:
         ax = ax1
     else:
@@ -160,6 +168,8 @@ def steady_state_cal(CA_and_MS, t_int='half',
         #by default integrate for time t_int up to end of interval         
     if title == 'default':
         title = name + '_' + mass
+        
+        
     x = CA_and_MS[mass + '-x']
     y = CA_and_MS[mass + '-y']
     if background == 'min':

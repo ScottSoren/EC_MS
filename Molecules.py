@@ -100,12 +100,23 @@ class Molecule:
             print('loading attributes for this ' + self.name + ' molecule fresh from original file.')
         dictionary = lines_to_dictionary(self.file_lines)
         for (key, value) in dictionary.items():
-                if 'calibration' in key:
-                    self.add_calibration(value)
-                if 'Spectrum' in key:
-                    self.spectrum = value
-                else:
-                    setattr(self, key, value)
+            if 'calibration' in key:
+                self.add_calibration(value)
+            if 'Spectrum' in key:
+                self.spectrum = value
+            else:
+                setattr(self, key, value)
+        
+        if 'F_cal' not in dir(self) and 'primary' in dir(self):
+            self.F_cal =  self.calibration_fit(mass='primary', ax=None,
+                                               useit=True, primary=True, verbose=True)
+        elif type(self.F_cal) is list and len(self.F_cal) == 1:
+            self.F_cal = self.F_cal[0]
+            #print('F_cal was list of length 1. Now, F_cal = ' + str(self.F_cal))
+        else:
+            #print('F_cal was as it should be')
+            pass
+                
          
     def write_new(self, f):
         for (attr, status) in self.attr_status.items():
@@ -333,7 +344,7 @@ class Molecule:
 if __name__ == '__main__':
     plt.close('all')
     
-    mols = {'CO2':('orange', 10),'H2':('b', 1),'O2':('k', 1)}
+    mols = {'CO2':('brown', 10),'H2':('b', 1),'O2':('k', 1)}
     fig = plt.figure()
     ax = fig.add_subplot(111)
     for (mol, (color, plotfactor)) in mols.items():
@@ -343,7 +354,7 @@ if __name__ == '__main__':
     plt.savefig('Internal_calibrations.png')
     
     
-    mol = Molecule('C2H4')  
+    mol = Molecule('CO2')  
     mol.plot_spectrum()
     mol = Molecule('C2H6')  
     mol.plot_spectrum()

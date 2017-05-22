@@ -1,10 +1,15 @@
 
 EC-MS data processing package by Scott (scott@fysik.dtu.dk)
-Last modified 17B21
+Last modified 17C23
+
+-------------------- 17C23 ------------------------------------------
+Lots of small improvements and additions that came with writing paper, grading surface science, etc
+
 
 -------------------- 17B21 ------------------------------------------
 Upgrade to plot_vs_potential
 Standard color scheme implemented, mols and masses can be lists rather than dicts in plotting functions
+sync_metadata protected
 
 
 -------------------- 17A28 ------------------------------------------

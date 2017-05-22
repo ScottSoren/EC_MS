@@ -84,8 +84,8 @@ def get_datapoints(dataset, cycles, mols=['H2','C2H4','CH4'],
             integrals[mol] = []
     #get results: 
     for cycle in cycles:
-        off_data = select_cycles(dataset, cycles=cycle+Vcycle, t_zero='start')
-        on_data = select_cycles(dataset, cycles=[cycle, cycle+1], t_zero='start')
+        off_data = select_cycles(dataset, cycles=cycle+Vcycle, t_zero='start', verbose=verbose)
+        on_data = select_cycles(dataset, cycles=[cycle, cycle+1], t_zero='start', verbose=verbose)
        
         t_off = off_data['time/s']
         V_off = off_data['E vs RHE / [V]']
@@ -102,6 +102,7 @@ def get_datapoints(dataset, cycles, mols=['H2','C2H4','CH4'],
                 print('working on: ' + str(mol))
             x, y = get_flux(on_data, tspan=tspan, mol=mol, removebackground=True,
                             unit='nmol/s', verbose=verbose)
+                
             if type(integrals[mol]) is dict:
                 ts = t_steady[mol]
                 if plottransient:
@@ -109,7 +110,7 @@ def get_datapoints(dataset, cycles, mols=['H2','C2H4','CH4'],
                 else:
                     ax=None
                 ss, dyn = integrate_transient(x, y, tspan=tspan, t_steady=ts, 
-                                              ax=ax, title=title)
+                                              ax=ax, title=title, verbose=verbose)
                 integrals[mol]['ss'] += [ss]
                 integrals[mol]['dyn'] += [dyn]
             else:

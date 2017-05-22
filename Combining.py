@@ -13,7 +13,7 @@ from __future__ import division
 
 import numpy as np
 import re
-import os, sys    
+import os #, sys    
 
 def synchronize(Dataset_List, t_zero='start', append=1, cutit=0, 
                 override=False, verbose=1):
@@ -105,19 +105,21 @@ def synchronize(Dataset_List, t_zero='start', append=1, cutit=0,
         offset = t_0 - t_zero
         
         #first figure out where I need to cut, by getting the indeces striclty corresponding to times lying within the overlap
-            #a kind of ugly way to get the number of rows in dataset:
-        I_keep = [I for (I, v) in enumerate(Dataset[Dataset['data_cols'][0]])]     
+            
+        I_keep = {}    
             #figure out what to keep:
-        for col in Dataset['data_cols']:
+        for col in Dataset['data_cols']:        
+                #fixed up a bit 17C22, but this whole function should just be rewritten.
             if is_time(col):
                 t = Dataset[col] + t_0 #absolute time
-                I_keep = [I for I in I_keep if t_start < t[I] < t_finish]
+                I_keep[col] = [I for (I, t_I) in enumerate(t) if t_start < t_I < t_finish]
         
         #then cut, and put it in the new data set
         for col in Dataset['data_cols']:
             data = Dataset[col] 
             if cutit:           #cut data to only return where it overlaps
-                data = data[I_keep] 
+                data = data[I_keep[get_time_col(col, verbose=verbose)]] 
+                    #fixed up a bit 17C22, but this whole function should just be rewritten. 
             if is_time(col):
                 data = data + offset
             if col in Combined_Data:
@@ -214,7 +216,7 @@ def time_cut(MS_Data_0, tspan, verbose=1):
     return MS_Data
   
     
-def is_time(col, verbose = 0):
+def is_time(col, verbose=0):
     '''
     determines if a column header is a time variable, 1 for yes 0 for no
     '''
@@ -232,6 +234,35 @@ def is_time(col, verbose = 0):
     if verbose:
         print('...not time')
     return 0
+
+def is_MS_data(col, verbose=False):
+    if re.search(r'^M[0-9]', col):
+        return True
+    return False
+
+def is_EC_data(col, verbose=False):
+    return not is_MS_data(col)
+    
+def get_type(col, verbose=False):
+    if is_MS_data(col, verbose):
+        return 'MS'
+    if is_EC_data(col, verbose):
+        return 'EC'
+    return None
+
+def get_time_col(col, verbose=False):
+    if is_time(col):
+        time_col = col
+    elif is_MS_data(col):
+        time_col = col.replace('-y','-x')
+    elif is_EC_data(col): 
+        time_col = 'time/s'
+    else:
+        print('don\'t know what ' + col + ' is or what it\'s time col is.')
+        time_col = None
+    if verbose:
+        print('\'' + col + '\' should correspond to time col \'' + str(time_col) +'\'')
+    return time_col
 
 def timestamp_to_seconds(timestamp):
     '''
@@ -257,6 +288,63 @@ def seconds_to_timestamp(seconds):
     return timestamp
 
 
+
+def sort_time(dataset_0, data_type='EC', verbose=True):
+        dataset = {}
+        if verbose:
+            print('\nfunction \'sort_time\' at your service!\n\n')
+            
+        for key, value in dataset_0.items():
+            if key not in dataset_0['data_cols']:
+                if type(value) in [list, dict]:
+                    dataset[key] = value.copy() #avoid linking
+                else:
+                    dataset[key] = value #'str' has no 'copy'
+        dataset['data_cols'] = []
+        
+        if 'NOTES' in dataset.keys():
+            dataset['NOTES'] += '\nTime-Sorted\n'
+        else: 
+            dataset['NOTES'] = 'Time-Sorted\n'
+        
+        if data_type == 'all':
+            data_type = ['EC','MS']
+        elif type(data_type) is str:
+            data_type = [data_type]
+
+        sort_indeces = {} #will store sort indeces of the time variables
+
+        for col in dataset_0['data_cols']:
+            if verbose:
+                print('working on ' + col)
+            data = dataset_0[col].copy()
+            if get_type(col) in data_type:
+                time_col = get_time_col(col, verbose)
+                if time_col in sort_indeces.keys():
+                    indeces = sort_indeces[time_col]
+                else:
+                    print('getting indeces to sort ' + time_col)
+                    indeces = np.argsort(dataset_0[time_col])
+                    sort_indeces[time_col] = indeces
+                if len(data) != len(indeces):
+                    if verbose:
+                        print(col + ' is not the same length as its time variable!\n' +
+                              col + ' will not be included in the time-sorted dataset.')
+                else:
+                    dataset[col] = data[indeces]
+                    dataset['data_cols'] += [col]
+                    print('sorted ' + col + '!')
+            else: #just keep it without sorting.
+                dataset['data_cols'] += [col]
+                dataset[col] = data
+                
+
+        if verbose:
+            print('\nfunction \'sort_time\' finished!\n\n')    
+        
+        return dataset, sort_indeces
+    
+    
 
 if __name__ == '__main__':
     

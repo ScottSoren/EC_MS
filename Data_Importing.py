@@ -165,6 +165,8 @@ def text_to_data(file_lines, title='get_from_file',
                     try:
                         data = float(data)
                     except ValueError:
+                        if data == '':
+                            continue        #added 17C22 to deal with data acquisition crashes.
                         try:
                             if verbose and not col in commacols:
                                 print('ValueError on value ' + data + ' in column ' + col + ' line ' + str(nl) + 

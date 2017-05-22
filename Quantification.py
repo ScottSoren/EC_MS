@@ -14,12 +14,14 @@ from scipy.optimize import curve_fit
 if os.path.split(os.getcwd())[1] == 'EC_MS':   
                                 #then we're running from inside the package
     from Molecules import Molecule
+    from Combining import cut
     from Object_Files import lines_to_dictionary, date_scott
     from EC import sync_metadata
     import Chem
     data_directory = os.getcwd() + os.sep + 'data' + os.sep
 else:
     from .Molecules import Molecule
+    from .Combining import cut
     from .Object_Files import lines_to_dictionary, date_scott
     from .EC import sync_metadata
     from . import Chem
@@ -208,16 +210,14 @@ def get_flux(MS_data, mol, tspan='tspan_2', removebackground=False,
     if type(tspan) is str:
         tspan = MS_data[tspan]
     if tspan is not None:
-        I_keep = [I for (I, x_I) in enumerate(x) if tspan[0]<x_I<tspan[-1]]
-        x = x[I_keep]
-        y = y[I_keep]  #I should just put this in a function (x,y) = cut(x,y,tspan) 
+        x, y = cut(x,y,tspan) 
     
     if removebackground:
         if type(removebackground) is float:
             background = removebackground * min(y)
         else:
             background = min(y)
-        y = y - background + 1e-5
+        y = y - 0.99*background
     return [x,y]    
             
 def predict_current(EC_and_MS, mols, tspan=None, RE_vs_RHE=None, A_el=None,
