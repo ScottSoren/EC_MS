@@ -18,7 +18,7 @@ from Data_Importing import import_data #honestly, I would just have everything i
 def plot_vs_time(Dataset, cols_1='input', cols_2='input', verbose=1):
     
     if verbose:
-        print('\n\nfunction \'plot_vs_time\' at your command!')
+        print('\n\nfunction \'plot_vs_time\' at your service!')
     
     if cols_1=='input':
         data_cols = Dataset['data_cols']
@@ -64,16 +64,20 @@ def plot_vs_time(Dataset, cols_1='input', cols_2='input', verbose=1):
     I_plt_top = np.where(x>2)[0][0]
     y_max = np.max(y[I_plt_top:])
     axes_2.set_ylim(np.min(y),y_max)
-    
-def synchronize(Dataset_List, verbose = 1, cutit = 0):
+    if verbose:
+        print('function \'plot_vs_time\' finished!\n\n')
+        
+        
+def synchronize(Dataset_List, verbose = 1, cutit = 0, t_zero = 'start'):
     '''
     This will combine array data from multiple dictionaries into a single 
     dictionary with all time variables aligned according to absolute time.
     Data will be retained where the time spans overlap, unless cutit = 0, in 
-    which case all data will be retained, but with t=0 at the start of the overlap
+    which case all data will be retained, but with t=0 at the start of the overlap.
+    if t_zero is specified, however, t=0 will be set to t_zero seconds after midnight
     '''
     if verbose:
-        print('\n\nfunction \'synchronize\' at your command!')
+        print('\n\nfunction \'synchronize\' at your service!')
     
     t_start = 0             #start time of overlap in seconds since midnight
     t_finish = 60*60*24*7     #I'm going to have to change things if experiments cross midnight
@@ -107,14 +111,16 @@ def synchronize(Dataset_List, verbose = 1, cutit = 0):
     Combined_Data['data_type'] = 'combined'
     Combined_Data['tspan'] =    [t_start, t_finish] #overlap start and finish times as seconds since midnight
     Combined_Data['tspan_1'] = [t_start - t_first, t_finish - t_first]    # start and finish times as seconds since earliest start
-    Combined_Data['tspan_2'] = [0, t_finish - t_start]    #start and finish times of overlap as seconds since start of overlap
+    if t_zero == 'start':
+        t_zero = t_start
+    Combined_Data['tspan_2'] = [t_start - t_zero, t_finish - t_zero]    #start and finish times of overlap as seconds since zero point   
     
     t_span = t_finish - t_start    
     
     #and again to cut the data and put it into the combined dictionary
     for nd, Dataset in enumerate(Dataset_List):
         t_0 = timestamp_to_seconds(Dataset['timestamp'])
-        offset = t_0 - t_start
+        offset = t_0 - t_zero
         #first figure out where I need to cut
         I_min = 0
         I_max = 10**9       #I'm never going to have more than a billion data points.
@@ -138,13 +144,20 @@ def synchronize(Dataset_List, verbose = 1, cutit = 0):
             if new_col in Combined_Data:
                 new_col = new_col + '_' + str(nd)
             Combined_Data[new_col] = data
-            Combined_Data['data_cols'].append(new_col)        
+            Combined_Data['data_cols'].append(new_col)  
+            
+    if verbose:
+        print('function \'synchronize\' finsihed!\n\n')   
         
     return Combined_Data        
 
 def time_cut(MS_Data_0,tspan, verbose=1):
+    '''
+    cuts a data set, retaining the portion of the data set within a specified
+    time interval
+    '''
     if verbose:
-        print('\n\nfunction \'time_cut\' at your command! \n Time cutting ' + MS_Data_0['title'])
+        print('\n\nfunction \'time_cut\' at your service! \n Time cutting ' + MS_Data_0['title'])
     MS_Data = MS_Data_0.copy()
     length = 10**9
     for col in MS_Data['data_cols']:
@@ -184,9 +197,44 @@ def time_cut(MS_Data_0,tspan, verbose=1):
     for col in MS_Data['data_cols']:
         if col[-2:] == '-x' or col[-2:] == '-y':
             MS_Data[col] = MS_Data[col][:length]
-    
+    if verbose:
+        print('function \'time_cut\' finished!\n\n')    
     return MS_Data
+
+
+def select_cycles(EC_Data_0, cycles = 1, verbose = 1 ):
+    ''' 
+    This function selects one or more cycles from EC_Data.
+    Use this before synchronizing!
+    Works for both CA and CV
+    '''
+    if verbose:
+        print('\nSelecting cycles ' + str(cycles) + ' from \'' + EC_Data_0['title'] + '\'\n')
+    
+    EC_Data = EC_Data_0.copy()
+    
+    #it looks like I actually want Ns for CA's
+    if 'Ns' in EC_Data['data_cols']:
+        cycle_numbers = EC_Data['Ns']
+    else:
+        cycle_numbers = EC_Data['cycle number']
+    
+    N = len(cycle_numbers)
+    if type(cycles)==int:
+        cycles = [cycles]
+    I_keep = np.array([I for I in range(N) if cycle_numbers[I] in cycles])
+    #list comprehension is awesome.
+
+    for col in EC_Data['data_cols']:
+        EC_Data[col] = EC_Data[col][I_keep]
         
+    t0 = timestamp_to_seconds(EC_Data['timestamp'])
+    EC_Data['tspan'] = [min(EC_Data['time/s']) + t0, max(EC_Data['time/s']) + t0]
+    EC_Data['data_type'] += ' selected'   
+    
+    return EC_Data
+
+    
 def is_time(col, verbose = 0):
     '''
     determines if a column header is a time variable, 1 for yes 0 for no
@@ -258,7 +306,7 @@ def plot_masses(MS_Data, tspan = 0, logplot = 1, verbose = 1,
     '''
     
     if verbose:
-        print('\n\nfunction \'plot_masses\' at your command! \n Plotting from: ' + MS_Data['title'])
+        print('\n\nfunction \'plot_masses\' at your service! \n Plotting from: ' + MS_Data['title'])
 
     if ax1 == 'new':
         fig1 = plt.figure()
@@ -270,8 +318,6 @@ def plot_masses(MS_Data, tspan = 0, logplot = 1, verbose = 1,
             print('plotting: ' + mass)
         x = MS_Data[mass+'-x']
         y = MS_Data[mass+'-y']
-        if logplot:
-            y = np.log(y)/np.log(10)
         if tspan:
             I_start = np.where(x>tspan[0])[0][0]
             excess = np.where(x>tspan[1])
@@ -287,16 +333,20 @@ def plot_masses(MS_Data, tspan = 0, logplot = 1, verbose = 1,
     ax1.legend(loc = 'lower right')
     ax1.set_xlabel('time / [s]')
     y_string = 'signal / [A]'
-    if logplot: 
-        y_string = 'log(' + y_string + ')'  
     ax1.set_ylabel(y_string)           
+    if logplot: 
+        ax1.set_yscale('log') 
+    if verbose:
+        print('function \'plot_masses\' finsihed! \n\n')
+    return ax1
 
 def plot_masses_and_I(EC_and_MS, tspan = 0, overlay = 0, logplot = [1,0], verbose = 1, 
-                      Colors = {'M2':'b','M4':'r','M18':'0.5','M28':'g','M32':'k'}):
+                      Colors = {'M2':'b','M4':'r','M18':'0.5','M28':'g','M32':'k'}, 
+                      plotpotential = 0, Ref_vs_RHE = 0):
     '''this plots current on one axis and masses on another'''
     
     if verbose:
-        print('\n\nfunction \'plot_masses_and_I\' at your command!\n Plotting from: ' + EC_and_MS['title'])
+        print('\n\nfunction \'plot_masses_and_I\' at your service!\n Plotting from: ' + EC_and_MS['title'])
     
     figure1 = plt.figure()
     if overlay:
@@ -312,29 +362,51 @@ def plot_masses_and_I(EC_and_MS, tspan = 0, overlay = 0, logplot = [1,0], verbos
     else:
         y = EC_and_MS['<I>/mA']     #for CVA files
     
-    ax2.plot(x,y,'k')
+    ax2.plot(x,y,'r')
     y_string = 'I / [mA]'
-    if logplot[1]: 
-        y_string = 'log(' + y_string + ')'  
     ax2.set_ylabel(y_string)
     ax2.set_xlabel('time / [s]')
     xlim = ax1.get_xlim()
     ax2.set_xlim(xlim)
-
+    if logplot[1]: 
+        ax2.set_yscale('log')  
+    
+    if plotpotential:
+        ax3 = ax2.twinx()
+        y3 = EC_and_MS['Ewe/V'].copy()
+        
+        y3_string = 'E vs RHE / V'
+        if 'Ref_vs_RHE':
+            y3 = y3 + Ref_vs_RHE
+        elif 'Ref_vs_RHE' in EC_and_MS:
+            y3 = y3 + EC_and_MS['Ref_vs_RHE']
+        else:
+            y3_string = 'E vs ref / V'
+        ax3.plot(x,y3,'k')
+        ax3.set_ylabel(y3_string)
+        if len(logplot) >2:
+            if logplot[2]:
+                ax3.set_yscale('log')
+        ax3.set_xlim(xlim)
+    if verbose:
+        print('function \'plot_masses_and_I\' finished!\n\n')
+    if plotpotential:
+        return ax1, ax2, ax3
+    return ax1, ax2
 
 if __name__ == '__main__':
     
     default_directory = '/home/soren/Desktop/Sniffer_Experiments/O18_NiNPs/00_python/test_files/'    
     
-#   CA_file = default_directory + '04_O18_to_O16_10_CA_C01.mpt'
+    CA_file = default_directory + '04_O18_to_O16_10_CA_C01.mpt'
     CV_file = default_directory + '02_O16_to_O18_06_CVA_C01.mpt'
     MS_file = default_directory + 'QMS_data.txt'
 #    
-    #CA_Data = import_data(CA_file)
-    #CV_Data = import_data(CV_file)
-    #MS_Data = import_data(MS_file,data_type = 'MS')
+    CA_Data = import_data(CA_file)
+    CV_Data = import_data(CV_file)
+    MS_Data = import_data(MS_file,data_type = 'MS')
     
-    CA_and_MS = synchronize([CA_Data,MS_Data])
+    CA_and_MS = synchronize([CA_Data,MS_Data], cutit = 1)
     
     
     

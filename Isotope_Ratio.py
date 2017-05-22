@@ -11,7 +11,16 @@ import numpy as np
 from matplotlib import pyplot as plt
 from copy import deepcopy
 
-def predict_M34(MS_Data, subtract_background = 1):
+def predict_M34(MS_Data, subtract_background = 1, verbose = 1):
+    '''
+    predicts the M34 signal expected based on M32 and M36 signals using the 
+    statitistics of oxidation evolution from isotopically mixed water.
+    Appends the predicted M34 signal to the dataset
+    '''    
+    
+    if verbose:
+        print('\n\npredicting M34 for ' + MS_Data['title'] + '\n\n')
+        
     x_34 = 1/2 * (MS_Data['M32-x'] + MS_Data['M36-x'])
     
     y_32 = MS_Data['M32-y']

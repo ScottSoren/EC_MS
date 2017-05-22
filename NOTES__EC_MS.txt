@@ -1,5 +1,5 @@
-Last seriously edited 16H05.
-Now antiquated!
+Last modified 16H07
 
-This is the first iteration of EC_MS, used to make figures for Daniel's poster for the 2016 CINF summer school.
-Long before it was made into a nice package.
+This is an antiquated set of EC_MS scripts, one of the earliest iterations, 
+used to make figures for Scott's poster at the 2016 CINF summer school.
+Before it was made into a python package.

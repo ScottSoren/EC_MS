@@ -23,7 +23,7 @@ def import_text(full_path_name='default', verbose=1):
     list of lines
     '''    
     if verbose:
-        print('\n\nfunction \'import_text\' at your command!')
+        print('\n\nfunction \'import_text\' at your service!')
     
     if full_path_name == 'input':
         full_path_name = input('Enter full path for the file name as \'directory/file.extension\'')
@@ -65,6 +65,8 @@ def import_text(full_path_name='default', verbose=1):
         print('couldn\'t read ' + file_name + '\n ... may by due to an encoding issue')
         
     os.chdir(original_directory)
+    if verbose:
+        print('function \'import_text\' finished!\n\n')
     return file_lines
 
 
@@ -78,7 +80,7 @@ def text_to_data(file_lines, title='get_from_file',
     {'title':title, 'header':header, 'colheader1':[data1], 'colheader2':[data2]...}
     '''    
     if verbose:
-        print('\n\nfunction \'text_to_data\' at your command!')
+        print('\n\nfunction \'text_to_data\' at your service!')
     
     #disect header
     N_lines = len(file_lines)        #number of header lines
@@ -176,7 +178,9 @@ def text_to_data(file_lines, title='get_from_file',
     DataDict['header'] = header_string
     DataDict['timestamp'] = timestamp
     DataDict['data_type'] = data_type
-    
+
+    if verbose:
+        print('function \'text_to_data\' finished!\n\n')    
     return DataDict
 
 
