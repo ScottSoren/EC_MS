@@ -13,9 +13,10 @@ from __future__ import division
 
 import numpy as np
 import re
-import os    
+import os, sys    
 
-def synchronize(Dataset_List, t_zero='start', append=1, cutit=0, verbose=1):
+def synchronize(Dataset_List, t_zero='start', append=1, cutit=0, 
+                override=False, verbose=1):
     '''
     This will combine array data from multiple dictionaries into a single 
     dictionary with all time variables aligned according to absolute time.
@@ -84,7 +85,10 @@ def synchronize(Dataset_List, t_zero='start', append=1, cutit=0, verbose=1):
         print('first: ' + str(t_first) + ', last: ' + str(t_last) + 
         ', start: ' + str(t_start) + ', finish: ' + str(t_finish))
     Combined_Data['tspan_2'] = [t_start - t_zero, t_finish - t_zero]    #start and finish times of overlap as seconds since zero point   
-     
+    
+    if t_start > t_finish and not override:
+        print('No overlap. Check your files.\n')
+        offerquit()
     
     I_sort = np.argsort(recstarts)
     Dataset_List = [Dataset_List[I] for I in I_sort]       
@@ -136,7 +140,28 @@ def synchronize(Dataset_List, t_zero='start', append=1, cutit=0, verbose=1):
     
     return Combined_Data        
 
+    
+def cut(x, y, tspan):
+    if tspan is None:
+        return x, y
+    I_keep = [I for (I, x_I) in enumerate(x) if tspan[0]<x_I<tspan[-1]]
+    x = x.copy()[I_keep]
+    y = y.copy()[I_keep]
+    if np.size(x) == 0:
+        print('\nfunction \'cut\' received an empty input\n')
+        offerquit()
+    elif np.size(I_keep) == 0:
+        print ('\nWarning! cutting like this leaves an empty dataset!\n' +
+               'x goes from ' + str(x[0]) + ' to ' + str(x[-1]) + 
+                ' and tspan = ' + str(tspan) + '\n')
+        offerquit()
+    return x, y
 
+def offerquit():
+    yn = input('continue? y/n\n')
+    if yn == 'n':
+        raise SystemExit
+    
 def time_cut(MS_Data_0, tspan, verbose=1):
     '''
     cuts an MS data set, retaining the portion of the data set within a specified

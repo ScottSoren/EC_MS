@@ -178,7 +178,8 @@ def RSF_to_F_cal(quantmol = {'H2':'M2', 'He':'M4', 'CH4':'M15', 'H2O':'M18',
     ax.set_ylim([0,20])
 
 
-def get_flux(MS_data, mol, removebackground=False, verbose=True):
+def get_flux(MS_data, mol, tspan=None, removebackground=False, 
+             unit='nmol/s', verbose=True):
     '''
     returns [x, y] where x is the t corresponding to the primary mass of the
     molecule in 'mol' and y is the molecular flux in nmol/s, calculated from 
@@ -195,9 +196,27 @@ def get_flux(MS_data, mol, removebackground=False, verbose=True):
     mass = m.primary
     F_cal = m.F_cal
     x = MS_data[mass + '-x']
-    y = MS_data[mass + '-y'] * 1e9 / F_cal # units: [A]*[nA/A]/[C/mol]=[nmol/s]
+    y = MS_data[mass + '-y'] / F_cal # units: [A]/[C/mol]=[mol/s]
+    if 'nmol' in unit:
+        y = y * 1e9
+    elif 'pmol' in unit:
+        y = y * 1e12
+    if 'cm^2' in unit:
+        y = y / MS_data['A_el']
+    
+    if type(tspan) is str:
+        tspan = MS_data[tspan]
+    if tspan is not None:
+        I_keep = [I for (I, x_I) in enumerate(x) if tspan[0]<x_I<tspan[-1]]
+        x = x[I_keep]
+        y = y[I_keep]  #I should just put this in a function (x,y) = cut(x,y,tspan) 
+    
     if removebackground:
-        y = y - min(y) + 1e-5
+        if type(removebackground) is float:
+            background = removebackground*min(y)
+        else:
+            background = min(y)
+        y = y - background + 1e-5
     return [x,y]    
             
 def predict_current(EC_and_MS, mols, tspan=None, RE_vs_RHE=None, A_el=None,
@@ -268,7 +287,7 @@ def predict_current(EC_and_MS, mols, tspan=None, RE_vs_RHE=None, A_el=None,
 if __name__ == '__main__':
     plt.close('all')
     #calibration_compare()
-    RSF_to_F_cal(calmol = {'CO2':'M44'})
+    RSF_to_F_cal(calmol = {'H2':'M2','O2':'M32','CO2':'M44'}, writeprimary=False)
     
         
     

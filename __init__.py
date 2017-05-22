@@ -17,7 +17,5 @@ from EC_MS.Object_Files import *
 from EC_MS.Integrate_Signals import *
 from EC_MS.Time_Response import *
 from EC_MS.Calibration import *
-import EC_MS.Isotope_Ratio
-import EC_MS.ML_strip
 import EC_MS.Chem as Chem
 

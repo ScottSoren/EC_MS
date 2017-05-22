@@ -20,16 +20,17 @@ import os
 
 if os.path.split(os.getcwd())[1] == 'EC_MS':      
                                 #then we're running from inside the package
-    from Combining import timestamp_to_seconds
+    from Combining import timestamp_to_seconds, is_time, cut
 else:                           #then we use relative import
-    from .Combining import timestamp_to_seconds
+    from .Combining import timestamp_to_seconds, is_time, cut
 
 
-def select_cycles(EC_data_0, cycles=1, verbose=1, tzero=None):
+def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True):
     ''' 
     This function selects one or more cycles from EC_data_0.
     Use this before synchronizing!
     Works for both CA and CV
+    #changed 16L22 to work on EC_and_MS data
     '''
     if verbose:
         print('\nSelecting cycles ' + str(cycles) + ' from \'' + EC_data_0['title'] + '\'\n')
@@ -50,16 +51,31 @@ def select_cycles(EC_data_0, cycles=1, verbose=1, tzero=None):
 
     for col in EC_data['data_cols']:
         try:
-            EC_data[col] = EC_data[col][I_keep]
+            if not (col[0] == 'M' and col[-2:] in ['-x', '-y']):  
+                #then we're dealing with EC data
+                try:
+                    EC_data[col] = EC_data[col].copy()[I_keep]
+                except KeyError:
+                    print('hm... \'' + col + '\' in EC_data[data_cols] but not in EC_data')
         except IndexError:
             print('trouble selecting cycle ' + str(cycles) + ' of ' + col + '\n' +
                     'type(I_keep) = ' + str(type(I_keep)))
     t0 = timestamp_to_seconds(EC_data['timestamp'])
-    EC_data['tspan'] = [min(EC_data['time/s']) + t0, max(EC_data['time/s']) + t0]
+    tspan_2 = np.array([min(EC_data['time/s']), max(EC_data['time/s'])])
+    EC_data['tspan_2'] = tspan_2
+    EC_data['tspan'] = tspan_2 + t0
     EC_data['data_type'] += ' selected'   
     
-    if tzero is 'start':
-        EC_data['time/s'] = EC_data['time/s'] - EC_data['time/s'][0]
+    for col in EC_data['data_cols']:
+        if col[1] == 'M' and col[-2:] == '-x': #then we've got a QMS time variable
+            y_col = col[:-2] + '-y'
+            EC_data[col], EC_data[y_col] = cut(EC_data[col], EC_data[y_col], tspan_2)       
+
+    if t_zero is 'start':
+        for col in EC_data['data_cols']:
+            if is_time(col):
+                EC_data[col] = EC_data[col] - tspan_2[0]
+                EC_data['tspan_2'] = tspan_2 - tspan_2[0]
     
     return EC_data
 
@@ -227,22 +243,27 @@ def sync_metadata(EC_data, RE_vs_RHE=None, A_el=None, verbose=1):
     '''    
     if verbose:
         print('\nsyncing metadata for ' + EC_data['title'] + '\n')
+        
     if RE_vs_RHE is not None:
         EC_data['RE_vs_RHE'] = RE_vs_RHE
     elif 'RE_vs_RHE' in EC_data:
         RE_vs_RHE = EC_data['RE_vs_RHE']
+    else:
+        EC_data['RE_vs_RHE'] = None
     
     if RE_vs_RHE is None:
         V_str = 'Ewe/V'
     else:
-        V_str = 'V vs RHE'
+        V_str = 'E vs RHE / [V]'
         EC_data[V_str] = EC_data['Ewe/V'] + RE_vs_RHE
     
     if A_el is not None:
         EC_data['A_el'] = A_el
     elif 'A_el' in EC_data:
         A_el = EC_data['A_el']
-
+    else:
+        EC_data['A_el'] = None
+        
     I_str = [s for s in ['I/mA', '<I>/mA'] if s in EC_data['data_cols']][0]     
     if A_el is None:
         J_str = I_str

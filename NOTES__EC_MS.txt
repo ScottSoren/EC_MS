@@ -1,6 +1,10 @@
 
 EC-MS data processing package by Scott (scott@fysik.dtu.dk)
-Last modified 16K17
+Last modified 17A12
+
+-------------------- 17A12 ------------------------------------------
+Lots of small improvements and additions, mostly in the area of better integrating quantification in all of the older scripts.
+
 
 -------------------- 16L15 ------------------------------------------
 Put it all together and got serious about quantification. Now we just need more calibrations!
@@ -8,7 +12,9 @@ Put it all together and got serious about quantification. Now we just need more 
 'Quantification' module added with functions for comparing calibration factors generated in 'Calibration' module with literature values and extrapolating calibrating factors for other molecules.
 Expanded molecular database and added QMS spectra from NIST, ionization cross sections at 100eV, RSF's from Hiden, and extrapolated F_cal's for molecules 
 'get_flux', and 'predict_current' functions added to 'Quantification', all using the F_cal for the molecule's primary mass. 
-'plot_flux' added to Plotting, and 'plot_experiment' modified to plot fluxes in nmol/s rather than QMS signal if given parameter 'mols={<molecule1>:<color1>, ...}'.
+'plot_flux' added to Plotting. 'plot_masses' renamed 'plot_signal'.
+'plot_experiment' modified to plot fluxes in nmol/s rather than QMS signal if given parameter 'mols={<molecule1>:<color1>, ...}'.
+Integration of transient fixed 
 
 -------------------- 16K17 ------------------------------------------
 Object_Files module added to facilitate interaction of objects (of i.e. Molecule) with databases. Molecules module adjusted accordingly.

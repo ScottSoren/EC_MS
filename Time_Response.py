@@ -128,10 +128,10 @@ def stagnant_diffusion_ode(C, T, pars):  #Note that C comes before T here!
     dCdT = d2CdX2       #Fick's second law
     return dCdT    
 
-def solve_stagnant(pars, Tspan, C0=0, N=30, flux=1, verbose=1):
+def solve_stagnant(pars, Tspan, startstate, N=30, flux=1, verbose=1):
     '''solves the stagnant sniffer partial differential equations. 
-    pars[0] is alpha = h*L/D is the system parameter.
-    pars[1] is J_fun. Returns the flux from the electrode as a unction of T. 
+    pars[0][0] is alpha = h*L/D is the system parameter.
+    pars[0][1] is J_fun. Returns the flux from the electrode as a unction of T. 
     Tspan is [Tstart, Tfinish] on the diffusion timescale t0 = L²/D
     C0 = C0(X) is start concentration profile. If size(C0) = 1, assumes a 
     uniform concentration.
@@ -142,10 +142,17 @@ def solve_stagnant(pars, Tspan, C0=0, N=30, flux=1, verbose=1):
     if verbose:
         print('\n\nfunction \'solve_stagnant\' at your service!\n')
     
-    if np.size(C0) == 1:
+    if startstate == 'zero':
+        C0 = np.zeros([N])
+    elif startstate == 'steady':
+        alpha = pars[0][0] #for some reason pars is doubly packed.
+        C0 = 1/alpha + np.linspace(0,N)/(N+1) #Scott's MSc thesis, p. 53
+    elif np.size(startstate) == 1:
         C0 = np.ones([N]) * C0
     else:
-        N = np.size(C0)   
+        C0 = startstate
+        N = np.size()   
+        
     if np.size(Tspan) == 2:
         Tspan = np.linspace(Tspan[0], Tspan[1], 100)
     CC = odeint(stagnant_diffusion_ode, C0, Tspan, args=pars)    
@@ -163,10 +170,10 @@ def solve_stagnant(pars, Tspan, C0=0, N=30, flux=1, verbose=1):
           
         
 def stagnant_pulse(tj=None, tpulse=10, tspan=[-10,20], j_el = -5,
-                   L=100e-6, A=0.2e-4, q0=1e15/Chem.NA, p_m=1e5,
-                   species='H2', 
-                   D=0, kH=0, n_el=0, Temp=298.15, 
-                   verbose=1, plot_type='flux'):
+                   L=100e-6, A=0.196e-4, q0=1e15/Chem.NA, p_m=1e5,
+                   mol='H2', normalize=False,
+                   D=None, kH=None, n_el=None, Temp=None, 
+                   verbose=1, plot_type='flux', startstate='zero'):
     '''                   
     Models a pulse of current towards a specified product in our EC-MS setup.
     Theory in chapter 2 of Scott's masters thesis.
@@ -175,18 +182,19 @@ def stagnant_pulse(tj=None, tpulse=10, tspan=[-10,20], j_el = -5,
     or as a measured current (tj[1]) as a function of time (tj[0])
     '''    
     if verbose:
-        print('\n\nfunction \'stagnant_pulse\' at your service!\n')              
-    mol = Molecule(species)
-    if Temp>0:
+        print('\n\nfunction \'stagnant_pulse\' at your service!\n') 
+    if type(mol) is str:            
+        mol = Molecule(mol)
+    if Temp is not None:
         mol.set_temperature(Temp)
     else:
         Temp = 298.15       #standard temperature in K
-    if D == 0:
+    if D is None:
         D = mol.D
-    if kH == 0:
+    if kH is None:
         kH = mol.kH
-    if n_el == 0:
-        ne = mol.n_el                 
+    if n_el is None and not normalize:
+        n_el = mol.n_el                 
 
     h = kH*Chem.R*Temp*q0/(p_m*A)  #mass transfer coefficeint
 
@@ -195,11 +203,17 @@ def stagnant_pulse(tj=None, tpulse=10, tspan=[-10,20], j_el = -5,
     #non-dimensional scales:
     t0 = L**2/D
     if tj is None:
-        j0 = j_el / (ne * Chem.Far)
+        if normalize:
+            j0 = 1
+        else:
+            j0 = j_el / (n_el * Chem.Far)
     else:
         t = tj[0]
         j = tj[1]
-        j0 = max(np.abs(j / (ne * Chem.Far))) 
+        if normalize:
+            j0 = 1
+        else:
+            j0 = max(np.abs(j / (n_el * Chem.Far))) 
     c0 = j0*L/D
     tau = L**2/(2*D) + L/h       
     #from the approximate analytical solution, Scott's thesis appendix D
@@ -225,33 +239,30 @@ def stagnant_pulse(tj=None, tpulse=10, tspan=[-10,20], j_el = -5,
                 return np.interp(T, T_in, J_in) 
             return 0
             
-    pars = ([alpha, J_fun],) #odeint needs the tuple.
+    pars = ([alpha, J_fun],) #odeint needs the tuple. 17A12: Why ?!
     
-    [T, CC] = solve_stagnant(pars, Tspan, flux=0)   
+    [T, CC] = solve_stagnant(pars, Tspan, startstate, flux=0)   
     cc = CC*c0
     t = T*t0
     j = h * cc[:,0]        #mass transport at the membrane
     #j1 = D * (cc[:,1] - cc[:,0])        
-        #fick's first law at the membrane gives the same j :)         
-    N = np.shape(cc)[1]
-    x = np.arange(N)/(N-1)*L          
-        #this will only be used for heatmap, so it's okay if dx isn't quite right.
-    
-    
+        #fick's first law at the membrane gives the same j :)
     if verbose:
         print('q0 = ' + str(q0) + ' mol/s, h = ' + str(h) + ' m/s, alpha = ' + str(alpha) + 
             ', j0 = ' + str(j0) + ' mol/(m^2*s), max(j)/j0 = ' + str(max(j)/j0) + 
             ',  t0 = ' + str(t0) + ' s, c0 = ' + str(c0) + ' mol/m^3' + 
-            ', tau (analytical) = ' + str(tau) + ' s')  
-        print('\nfunction \'stagnant_pulse\' finished (just have to plot)!\n\n') 
-    
+            ', tau (analytical) = ' + str(tau) + ' s')         
+    N = np.shape(cc)[1]
+    x = np.arange(N)/(N-1)*L          
+        #this will only be used for heatmap, so it's okay if dx isn't quite right.
+    axes = None
     if plot_type == 'flux':    
         fig1 = plt.figure()
         ax1 = fig1.add_subplot(111)
         ax1.plot(t, j*1e6, label='simulated flux')
         ax1.set_xlabel('time / s')
         ax1.set_ylabel('flux / [umol/(m^2*s)]')
-        return t, j, ax1
+        axes = ax1
         
     elif plot_type == 'heat' or plot_type == 'both':
         
@@ -285,12 +296,57 @@ def stagnant_pulse(tj=None, tpulse=10, tspan=[-10,20], j_el = -5,
             cbar = plt.colorbar(img, cax=ax3)
             cbar.set_label('concentration / mM')
             ax1.set_xlim(tspan)
-            return t, j, ax1, ax2, ax3
-        return t, j, ax1, cbar
-
+            axes = [ax1, ax2, ax3]
+        axes = [ax1, cbar]
+        
+    if normalize:
+        s_int = np.trapz(j,t)
+        if verbose:
+            print('normalizing from area = ' + str(s_int))
+        j = j / s_int
+    
+    if verbose:  
+        print('\nfunction \'stagnant_pulse\' finished!\n\n')  
+    
+    if axes is not None:
+        return (t, j, axes)
     return (t, j)
    
-   
+
+def delta_response(L=100e-6, q0=1e15/Chem.NA, 
+                   mol='H2', D=None, kH=None, n_el=None, 
+                   A=0.196e-4, p_m=1e5, Temp=298.15,
+                   verbose=True, tspan='auto', N_t=1000):
+    '''
+    Returns the normalized response of a delta-function input as (t, j).
+    There's probably a much smarter way to do it, but for now I'll just do
+    a millisecond pulse
+    '''
+    if D is None or kH is None:
+        if type(mol) is str:
+            mol = Molecule(mol)
+        if D is None:
+            D = mol.D
+        if kH is None:
+            kH = mol.kH
+    if verbose:
+        print('calculating a delta function response.')
+    h = kH*Chem.R*Temp*q0/(p_m*A)  #mass transfer coefficeint
+    tau = L/h + L**2/(2*D)
+    if tspan=='auto':
+        tspan = [0, 4*tau]
+    
+    t = np.linspace(tspan[0], tspan[1], N_t)
+    j = np.append(np.array([1]), np.zeros(N_t-1))
+    tj = [t,j]
+    
+    return stagnant_pulse(tj=tj, normalize=True, tspan=tspan,
+                   L=L, A=A, q0=q0, p_m=p_m,
+                   D=D, kH=kH, n_el=n_el, Temp=Temp, 
+                   verbose=True, plot_type=None)
+    
+    
+                   
    
 if __name__ == '__main__':
 
@@ -309,7 +365,7 @@ if __name__ == '__main__':
     
     t, j, *ax = stagnant_pulse(tpulse=tpulse, tspan=[0, tpulse*2], j_el=5, 
                           plot_type='both',
-                          species='O2')        
+                          mol='O2')        
     ax2 = ax[1]
     pars1 = fit_step(t, j*1e6, tpulse=tpulse, ax=ax2, step='rise')
     pars2 = fit_step(t, j*1e6, tpulse=tpulse, ax=ax2, step='fall')

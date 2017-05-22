@@ -7,6 +7,7 @@ Most recently edited: 16J27
 """
 
 from matplotlib import pyplot as plt
+from matplotlib import gridspec
 import numpy as np
 import os
 
@@ -14,18 +15,22 @@ if os.path.split(os.getcwd())[1] == 'EC_MS':
                                 #then we're running from inside the package
     from EC import sync_metadata
     from Data_Importing import import_folder
-    from Combining import synchronize
+    from Combining import synchronize, cut
     from Quantification import get_flux
 else:                           #then we use relative import
     from .EC import sync_metadata
     from .Data_Importing import import_folder
-    from .Combining import synchronize
+    from .Combining import synchronize, cut
     from .Quantification import get_flux
 
 
-def plot_vs_potential(CV_and_MS, colors, tspan=0, RE_vs_RHE=None, A_el=None, 
-                      ax1='new', ax2='new', overlay=0, logplot = [1,0], leg=1,
-                      verbose=1):
+def plot_vs_potential(CV_and_MS, 
+                      colors={'M2':'b','M4':'r','M18':'0.5','M28':'g','M32':'k'},
+                      tspan=0, RE_vs_RHE=None, A_el=None, 
+                      ax1='new', ax2='new', ax=None, 
+                      overlay=0, logplot = [1,0], leg=1,
+                      verbose=True,
+                      masses=None, mols=None, unit='nmol/s'):
     '''
     This will plot current and select MS signals vs E_we, as is the 
     convention for cyclic voltammagrams. added 16I29
@@ -33,7 +38,10 @@ def plot_vs_potential(CV_and_MS, colors, tspan=0, RE_vs_RHE=None, A_el=None,
     if verbose:
         print('\n\nfunction \'plot_vs_potential\' at your service!\n')
     
-    #prepare axes
+    #prepare axes. This is ridiculous, by the way.
+    if ax == 'new':
+        ax1 = 'new'
+        ax2 = 'new'
     if ax1 != 'new':
         figure1 = ax1.figure
     elif ax2 != 'new':
@@ -74,16 +82,40 @@ def plot_vs_potential(CV_and_MS, colors, tspan=0, RE_vs_RHE=None, A_el=None,
     ax2.set_xlabel(V_str)
     ax2.set_ylabel(J_str)
     
-    for (mass, color) in colors.items():
-        x_str = mass + '-x'
-        y_str = mass + '-y'
-        Y_str = mass + '-Y'     #-Y will be a QMS signal interpreted to the EC-lab time variable.
-        x = CV_and_MS[x_str]
-        y = CV_and_MS[y_str]
+    
+    #check if we're going to plot signals or fluxes:
+    quantified = False      #added 17A07
+    if mols is not None:
+        colors = mols
+        quantified = True
+    elif list(colors.keys())[0][0] == 'M':
+        if masses is None:
+            masses = colors
+        else:
+            colors = masses
+    else:
+        quantified = True
+        mols = colors
+    
+    #then do it.
+    for (key, color) in colors.items():
+        if quantified:
+            (x,y) = get_flux(CV_and_MS, mol=key, tspan=tspan, removebackground=False, 
+            unit=unit, verbose=True)
+            Y_str = key + '_' + unit
+        else:   
+            x_str = key + '-x'
+            y_str = key + '-y'
+            Y_str = key + '-Y'     #-Y will be a QMS signal interpreted to the EC-lab time variable.
+            x = CV_and_MS[x_str]
+            y = CV_and_MS[y_str]
         Y = np.interp(t, x, y)  #obs! np.interp has a has a different argument order than Matlab's interp1
         CV_and_MS[Y_str] = Y    #add the interpolated value to the dictionary for future use
-        ax1.plot(V[I_plot], Y[I_plot], color, label=mass)
-    M_str = 'signal / [A]'
+        ax1.plot(V[I_plot], Y[I_plot], color, label=Y_str)
+    if quantified:
+        M_str = 'flux / [' + unit + ']'
+    else:
+        M_str = 'signal / [A]'
     ax1.set_xlabel(V_str)
     ax1.set_ylabel(M_str)
     if leg:
@@ -162,11 +194,24 @@ def indeces_from_input(options, prompt):
     choices = [int(choice) for choice in choices]
     return choices
     
-    
+
+def smooth_data(data_0, points=3, cols=None):
+    '''
+    Does a moving-average smoothing of data. I don't like it, but
+    '''
+    data = data_0.copy()
+    if cols is None:
+        cols = data['data_cols']
+    for col in cols:
+        x = data[col]
+        c = np.array([1] * points) / points
+        data[col] = np.convolve(x, c, mode='same')
+    return data
+        
 
 def plot_signal(MS_data,
                 masses = {'M2':'b','M4':'r','M18':'0.5','M28':'g','M32':'k'},
-                tspan=0, ax1='new', 
+                tspan=0, ax='new', 
                 logplot=True, saveit=False, leg=False, verbose=True):
     '''
     plots selected masses for a selected time range from MS data or EC_MS data
@@ -176,9 +221,9 @@ def plot_signal(MS_data,
         print('\n\nfunction \'plot_masses\' at your service! \n Plotting from: ' + 
               MS_data['title'])
 
-    if ax1 == 'new':
+    if ax == 'new':
         fig1 = plt.figure()
-        ax1 = fig1.add_subplot(111)    
+        ax = fig1.add_subplot(111)    
     lines = {}
     if tspan == 0:                  #then use the range of overlap
         tspan = MS_data['tspan_2']    
@@ -197,25 +242,27 @@ def plot_signal(MS_data,
         except IndexError:
             print('your tspan is probably fucked.\n x for ' + mass + ' goes from ' + str(x[0]) + ' to ' + str(x[-1]) +
                 '\nand yet you ask for a tspan of ' + str(tspan[0]) + ' to ' + str(tspan[-1]))
-        lines[mass] = ax1.plot(x, y, color, label = mass) 
+        lines[mass] = ax.plot(x, y, color, label = mass) 
         #as it is, lines is not actually used for anything         
     if leg:
-        ax1.legend(loc='lower right')
-    ax1.set_xlabel('time / [s]')
-    ax1.set_ylabel('signal / [A]')           
+        if type(leg) is not str:
+            leg = 'lower right'
+        ax1.legend(loc=leg)
+    ax.set_xlabel('time / [s]')
+    ax.set_ylabel('signal / [A]')           
     if logplot: 
-        ax1.set_yscale('log') 
+        ax.set_yscale('log') 
     if verbose:
         print('function \'plot_masses\' finsihed! \n\n')
-    return ax1
+    return ax
 
 def plot_masses(*args, **kwargs):
     print('plot_masses renamed plot_signal. Remember that next time!')
     return plot_signal(*args, **kwargs)
     
 def plot_flux(MS_data, mols={'H2':'b', 'CH4':'r', 'C2H4':'g', 'O2':'k'},
-            tspan=None, ax='new', removebackground=True,
-            logplot=True, leg=False, verbose=True):
+            tspan='tspan_2', ax='new', removebackground=True, A_el=None,
+            logplot=True, leg=False, unit='nmol/s', verbose=True):
     '''
     Plots the molecular flux to QMS in nmol/s for each of the molecules in
     'fluxes.keys()', using the primary mass and the F_cal value read from
@@ -230,18 +277,20 @@ def plot_flux(MS_data, mols={'H2':'b', 'CH4':'r', 'C2H4':'g', 'O2':'k'},
         tspan = MS_data[tspan]
         
     for (mol, color) in mols.items():
-        [x,y] = get_flux(MS_data, mol, verbose=verbose)   
+        [x,y] = get_flux(MS_data, mol, unit=unit, verbose=verbose)   
         if tspan is not None:
-            I_keep = [I for (I, x_I) in enumerate(x) if tspan[0]<x_I and x_I<tspan[-1]]
-            x = x[I_keep]
-            y = y[I_keep]
-            if removebackground:
-                y = y - min(y) + 1e-5
+            x,y = cut(x, y, tspan)
+        if removebackground:
+            y = y - 0.99 * min(y) #0.99 to avoid issues when log plotting.
         ax.plot(x, y, color, label=mol)
     if leg:
-        ax.legend(loc='lower right')
+        if type(leg) is not str:
+            leg = 'lower right'
+        ax.legend(loc=leg)
     ax.set_xlabel('time / [s]')
-    ax.set_ylabel('flux / [nmol/s]')
+    ylabel = 'flux / [' + unit + ']'
+
+    ax.set_ylabel(ylabel)
     if logplot:
         ax.set_yscale('log')
     
@@ -252,79 +301,103 @@ def plot_flux(MS_data, mols={'H2':'b', 'CH4':'r', 'C2H4':'g', 'O2':'k'},
     
 def plot_experiment(EC_and_MS,
                     colors={'M2':'b','M4':'r','M18':'0.5','M28':'g','M32':'k'},
-                    tspan=0, overlay=0, logplot=[1,0], verbose=1,   
-                    plotpotential=1, RE_vs_RHE=None, A_el=None, 
-                    saveit=0, title='default', leg=1,
+                    tspan=None, overlay=False, logplot=[True,False], verbose=True,   
+                    plotpotential=True, plotcurrent=True,
+                    RE_vs_RHE=None, A_el=None, removebackground=True,
+                    saveit=False, title=None, leg=False, unit='nmol/s',
                     masses=None, mols=None): #mols will overide masses will overide colors
     '''
-    this plots signals or fluxes on one axis and current and potential on one axis
+    this plots signals or fluxes on one axis and current and potential on other axesaxis
     '''
     
     if verbose:
-        print('\n\nfunction \'plot_masses_and_I\' at your service!\n Plotting from: ' + EC_and_MS['title'])
+        print('\n\nfunction \'plot_experiment\' at your service!\n Plotting from: ' + EC_and_MS['title'])
     
     figure1 = plt.figure()
     if overlay:
-        ax1 = figure1.add_subplot(111)
-        ax2 = ax1.twinx()
+        ax = [figure1.add_subplot(111)]
+        ax += [ax[0].twinx()]                     
     else:
-        ax1 = figure1.add_subplot(211)
-        ax2 = figure1.add_subplot(212)
+        gs = gridspec.GridSpec(3, 1)
+        gs.update(hspace=0.025)
+        ax = [plt.subplot(gs[0:2, 0])]
+        ax += [plt.subplot(gs[2, 0])]
+        if plotcurrent and plotpotential:
+            ax += [ax[1].twinx()]
         
-    if tspan == 0:                  #then use the whole range of overlap
-        tspan = EC_and_MS['tspan_2']    
+    if tspan is None:                  #then use the whole range of overlap
+        tspan = EC_and_MS['tspan_2']
+    if type(logplot) is not list:
+        logplot = [logplot, False]
+
+    V_str, J_str = sync_metadata(EC_and_MS, RE_vs_RHE=RE_vs_RHE, A_el=A_el) #added 16J27
+    A_el = EC_and_MS['A_el']
 
     quantified = False      #added 16L15
     if mols is not None:
         quantified = True
-    elif colors.keys()[0][0] == 'M':
-        if masses is not None:
+    elif list(colors.keys())[0][0] == 'M':
+        if masses is None:
             masses = colors
     else:
         quantified = True
         mols = colors
         
     if quantified:
-        plot_flux(EC_and_MS, mols=mols, tspan=tspan,
-                  ax=ax1, leg=leg, logplot=logplot[0], verbose=verbose)
+        plot_flux(EC_and_MS, mols=mols, tspan=tspan, A_el=A_el,
+                  ax=ax[0], leg=leg, logplot=logplot[0], unit=unit, 
+                  removebackground=removebackground, verbose=verbose)
     else:
         plot_signal(EC_and_MS, masses=masses, tspan=tspan,
-                    ax1=ax1, leg=leg, logplot=logplot[0], verbose=verbose)
+                    ax=ax[0], leg=leg, logplot=logplot[0], verbose=verbose)
+    if not overlay:
+        ax[0].set_xlabel('')
+        ax[0].xaxis.tick_top()  
+    
+    if title is not None:
+            plt.title(title)
     
     t = EC_and_MS['time/s']
-    
-    V_str, J_str = sync_metadata(EC_and_MS, RE_vs_RHE=RE_vs_RHE, A_el=A_el) #added 16J27
         
     V = EC_and_MS[V_str]
-    J = EC_and_MS[J_str]       
+    J = EC_and_MS[J_str]      
     
-    ax2.plot(t, J, 'r')
-    ax2.set_ylabel(J_str)
-    ax2.set_xlabel('time / [s]')
-    xlim = ax1.get_xlim()
-    ax2.set_xlim(xlim)
-    if logplot[1]: 
-        ax2.set_yscale('log')  
-    
-    if plotpotential:
-        ax3 = ax2.twinx()
+    if tspan is not None:
+        I_keep = [I for (I, t_I) in enumerate(t) if tspan[0]<t_I and t_I<tspan[1]]
+        t = t[I_keep]
+        V = V[I_keep]
+        J = J[I_keep]
 
-        ax3.plot(t, V, 'k')
-        ax3.set_ylabel(V_str)
+    i_ax = 1
+    if plotpotential:
+        ax[i_ax].plot(t, V, 'k')
+        ax[i_ax].set_ylabel(V_str)
         if len(logplot) >2:
             if logplot[2]:
-                ax3.set_yscale('log')
-        ax3.set_xlim(xlim)
+                ax[i_ax].set_yscale('log')
+        xlim = ax[i_ax-1].get_xlim()
+        ax[i_ax].set_xlim(xlim)
+        i_ax += 1
+        
+    if plotcurrent:
+        ax[i_ax].plot(t, J, 'r')
+        ax[i_ax].set_ylabel(J_str)
+        ax[i_ax].set_xlabel('time / [s]')
+        xlim = ax[i_ax-1].get_xlim()
+        ax[i_ax].set_xlim(xlim)
+        if logplot[1]: 
+            ax[i_ax].set_yscale('log')
+    ax[1].set_xlabel('time / [s]')
+    
     if saveit:
         if title == 'default':
             title == EC_and_MS['title'] + '.png'
         figure1.savefig(title)
         
     if verbose:
-        print('function \'plot_masses_and_I\' finished!\n\n')
-    if plotpotential:
-        return ax1, ax2, ax3
-    return ax1, ax2
+        print('function \'plot_experiment\' finished!\n\n')
+    
+    return ax
     
 def plot_masses_and_I(*args, **kwargs):
     print('plot_masses_and_I renamed plot_experiment. Remember that next time!')
