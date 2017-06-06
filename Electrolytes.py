@@ -17,13 +17,12 @@ from matplotlib import pyplot as plt
 
 if os.path.split(os.getcwd())[1] == 'EC_MS': #Then we're running from inside the package
     from Object_Files import lines_to_dictionary
-    data_directory = os.getcwd() + os.sep + 'data' + os.sep
     import Chem
 else:
     from .Object_Files import lines_to_dictionary
-    data_directory = os.getcwd() + os.sep + 'EC_MS' + os.sep + 'data' + os.sep
     from . import Chem
 
+data_directory = os.path.dirname(os.path.realpath(__file__)) + os.sep + 'data'
 with open(data_directory + os.sep + 'Electrolytes.txt') as f:
     electrolyte_lines = f.readlines()
     electrolyte_dict = lines_to_dictionary(electrolyte_lines)

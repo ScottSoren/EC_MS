@@ -19,12 +19,11 @@ if os.path.split(os.getcwd())[1] == 'EC_MS':
                                 #then we're running from inside the package
     import Chem
     from Object_Files import structure_to_lines, lines_to_dictionary, lines_to_structure, date_scott
-    data_directory = os.getcwd() + os.sep + 'data' + os.sep
 else:
     from . import Chem
     from .Object_Files import structure_to_lines, lines_to_dictionary, lines_to_structure, date_scott
-    data_directory = os.getcwd() + os.sep + 'EC_MS' + os.sep + 'data' + os.sep
 
+data_directory = os.path.dirname(os.path.realpath(__file__)) + os.sep + 'data'
 #for python2:
 try:
     FileNotFoundError

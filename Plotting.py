@@ -15,24 +15,24 @@ if os.path.split(os.getcwd())[1] == 'EC_MS':
                                 #then we're running from inside the package
     from EC import sync_metadata
     from Data_Importing import import_folder
-    from Combining import synchronize, cut
+    from Combining import synchronize
     from Quantification import get_flux
     from Object_Files import lines_to_dictionary
     from Molecules import Molecule
-    with open('./preferences/standard_colors.txt','r') as f:
-        lines = f.readlines()
-        standard_colors = lines_to_dictionary(lines)['standard colors']
+
     
 else:                           #then we use relative import
     from .EC import sync_metadata
     from .Data_Importing import import_folder
-    from .Combining import synchronize, cut
+    from .Combining import synchronize
     from .Quantification import get_flux
     from .Object_Files import lines_to_dictionary
     from .Molecules import Molecule
-    with open('./EC_MS/preferences/standard_colors.txt','r') as f:
-        lines = f.readlines()
-        standard_colors = lines_to_dictionary(lines)['standard colors']
+    
+preferencedir = os.path.dirname(os.path.realpath(__file__)) + os.sep + 'preferences' 
+with open(preferencedir + os.sep + 'standard_colors.txt','r') as f:
+    lines = f.readlines()
+    standard_colors = lines_to_dictionary(lines)['standard colors']
 
 
 def plot_vs_potential(CV_and_MS_0, 
