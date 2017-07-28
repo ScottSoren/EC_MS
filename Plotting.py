@@ -13,19 +13,19 @@ import os
 
 if os.path.split(os.getcwd())[1] == 'EC_MS':      
                                 #then we're running from inside the package
-    from EC import sync_metadata
+    from EC import sync_metadata, select_cycles
     from Data_Importing import import_folder
     from Combining import synchronize
-    from Quantification import get_flux
+    from Quantification import get_flux, get_signal
     from Object_Files import lines_to_dictionary
     from Molecules import Molecule
 
     
 else:                           #then we use relative import
-    from .EC import sync_metadata
+    from .EC import sync_metadata, select_cycles
     from .Data_Importing import import_folder
     from .Combining import synchronize
-    from .Quantification import get_flux
+    from .Quantification import get_flux, get_signal
     from .Object_Files import lines_to_dictionary
     from .Molecules import Molecule
     
@@ -37,12 +37,12 @@ with open(preferencedir + os.sep + 'standard_colors.txt','r') as f:
 
 def plot_vs_potential(CV_and_MS_0, 
                       colors={'M2':'b','M4':'r','M18':'0.5','M28':'g','M32':'k'},
-                      tspan=0, RE_vs_RHE=None, A_el=None, 
-                      ax1='new', ax2='new', ax=None, spec='k-',
+                      tspan=0, RE_vs_RHE=None, A_el=None, cycles='all',
+                      ax1='new', ax2='new', ax=None, #spec='k-',
                       overlay=0, logplot = [1,0], leg=1,
                       verbose=True, removebackground = None,
-                      masses=None, mols=None, unit='nmol/s',
-                      fig=None):
+                      masses=None, mols=None, unit=None,
+                      fig=None, spec={}):
     '''
     This will plot current and select MS signals vs E_we, as is the 
     convention for cyclic voltammagrams. added 16I29
@@ -55,10 +55,15 @@ def plot_vs_potential(CV_and_MS_0,
         removebackground = not logplot[0]
     #prepare axes. This is ridiculous, by the way.
     CV_and_MS = CV_and_MS_0.copy() #17C01
+    if not cycles == 'all':
+        CV_and_MS = select_cycles(CV_and_MS, cycles, verbose=verbose)
 
     if ax == 'new':
         ax1 = 'new'
         ax2 = 'new'
+    elif ax is not None:
+        ax1 = ax[0]
+        ax2 = ax[1]
     if ax1 != 'new':
         figure1 = ax1.figure
     elif ax2 != 'new':
@@ -99,7 +104,10 @@ def plot_vs_potential(CV_and_MS_0,
     
     if ax2 is not None:
         #plot EC-lab data
-        ax2.plot(V[I_plot],J[I_plot], spec)      
+        ec_spec = spec.copy()
+        if 'color' not in ec_spec.keys():
+            ec_spec['color'] = 'k'
+        ax2.plot(V[I_plot],J[I_plot], **ec_spec)      
             #maybe I should use EC.plot_cycles to have different cycles be different colors. Or rewrite that code here.
         ax2.set_xlabel(V_str)
         ax2.set_ylabel(J_str)
@@ -120,6 +128,12 @@ def plot_vs_potential(CV_and_MS_0,
             quantified = True
             mols = colors
         
+        if unit is None:
+            if quantified:
+                unit = 'nmol/s'
+            else:
+                unit = 'nA'
+                
         if type(colors) is list:
             c = colors.copy()
             colors = {}
@@ -136,30 +150,32 @@ def plot_vs_potential(CV_and_MS_0,
 
         for (key, color) in colors.items():
             if quantified:
-                (x,y) = get_flux(CV_and_MS, mol=key, tspan=tspan, removebackground=removebackground, 
-                unit=unit, verbose=True)
+                (x,y) = get_flux(CV_and_MS, mol=key, tspan=tspan, 
+                removebackground=removebackground, unit=unit, verbose=True)
                 if type(key) is not str:
                     key = str(key) # in case key had been a Molecule object
                 Y_str = key + '_' + unit
             else:   
-                x_str = key + '-x'
-                y_str = key + '-y'
-                Y_str = key + '-Y'     #-Y will be a QMS signal interpreted to the EC-lab time variable.
-                x = CV_and_MS[x_str]
-                y = CV_and_MS[y_str]
+
+                Y_str = key + '_' + unit    #        
+                x, y = get_signal(CV_and_MS, mass=key, tspan=tspan, unit=unit)
+
             try:
                 Y = np.interp(t, x, y)  #obs! np.interp has a has a different argument order than Matlab's interp1
             except ValueError:
                 print('x ' + str(x) + '\ny ' + str(y) + '\nt ' + str(t))
             CV_and_MS[Y_str] = Y    #add the interpolated value to the dictionary for future use 
                                         #17C01: but not outside of this function.
-            ax1.plot(V[I_plot], Y[I_plot], color, label=Y_str)
+            ms_spec = spec.copy()
+            if 'color' not in ms_spec.keys():
+                ms_spec['color'] = color
+            ax1.plot(V[I_plot], Y[I_plot], label=Y_str, **ms_spec)
         if quantified:
             M_str = 'flux / [' + unit + ']'
         else:
-            M_str = 'signal / [A]'
+            M_str = 'signal / [' + unit + ']'
         #ax1.set_xlabel(V_str)
-        ax1.set_xticks([])
+        ax1.xaxis.tick_top()
         ax1.set_ylabel(M_str)
         if leg:
             ax1.legend()
@@ -238,23 +254,32 @@ def indeces_from_input(options, prompt):
     return choices
     
 
-def smooth_data(data_0, points=3, cols=None):
+def smooth_data(data_0, points=3, cols=None, verbose=True):
     '''
     Does a moving-average smoothing of data. I don't like it, but
+    experencing problems 17G26
     '''
     data = data_0.copy()
     if cols is None:
         cols = data['data_cols']
     for col in cols:
+        if verbose:
+            print('smoothening \'' + col + '\' with a ' + str(points) + '-point moving average')
         x = data[col]
         c = np.array([1] * points) / points
+        #print(str(len(c)))
+        #data[col] = 0 #somehow this doesn't come through, 17G25
         data[col] = np.convolve(x, c, mode='same')
-    return data
-        
+        #print('len = ' + str(len(x)))
+        #x = None
+
+    data['test'] = None #This does make it through. 
+    #data['U vs RHE / [V]'] = None #this doesn't make it through either.
+    return data    
 
 def plot_signal(MS_data,
                 masses = {'M2':'b','M4':'r','M18':'0.5','M28':'g','M32':'k'},
-                tspan=0, ax='new', 
+                tspan=0, ax='new', unit='nA',
                 logplot=True, saveit=False, leg=False, verbose=True):
     '''
     plots selected masses for a selected time range from MS data or EC_MS data
@@ -270,7 +295,7 @@ def plot_signal(MS_data,
     lines = {}
     if tspan == 0:                  #then use the range of overlap
         tspan = MS_data['tspan_2']  
-    elif type(tspan) is str:
+    elif type(tspan) is str and not tspan == 'all':
         tspan = MS_data[tspan]  
     if type(masses) is list:
         c = masses
@@ -282,18 +307,7 @@ def plot_signal(MS_data,
     for mass, color in masses.items():
         if verbose:
             print('plotting: ' + mass)
-        x = MS_data[mass+'-x']
-        y = MS_data[mass+'-y']
-        try:
-            #np.where() keeps giving me headaches, so I'll try with list comprehension.
-            index_list = np.array([i for (i,x_i) in enumerate(x) if tspan[0]<x_i and x_i<tspan[1]])     
-            I_start = index_list[0]
-            I_finish = index_list[-1]
-            x = x[I_start:I_finish]
-            y = y[I_start:I_finish]
-        except IndexError:
-            print('your tspan is probably fucked.\n x for ' + mass + ' goes from ' + str(x[0]) + ' to ' + str(x[-1]) +
-                '\nand yet you ask for a tspan of ' + str(tspan[0]) + ' to ' + str(tspan[-1]))
+        x, y = get_signal(MS_data, mass, unit=unit, verbose=verbose, tspan=tspan)
         lines[mass] = ax.plot(x, y, color, label = mass) 
         #as it is, lines is not actually used for anything         
     if leg:
@@ -301,7 +315,7 @@ def plot_signal(MS_data,
             leg = 'lower right'
         ax1.legend(loc=leg)
     ax.set_xlabel('time / [s]')
-    ax.set_ylabel('signal / [A]')           
+    ax.set_ylabel('signal / [' + unit + ']')           
     if logplot: 
         ax.set_yscale('log') 
     if verbose:
@@ -409,7 +423,7 @@ def plot_experiment(EC_and_MS,
     if type(logplot) is not list:
         logplot = [logplot, False]
 
-    V_str, J_str = sync_metadata(EC_and_MS, RE_vs_RHE=RE_vs_RHE, A_el=A_el) #added 16J27
+    V_str, J_str = sync_metadata(EC_and_MS, RE_vs_RHE=RE_vs_RHE, A_el=A_el) #added 16J27... problem caught 17G26, fixed in sync_metadata
     A_el = EC_and_MS['A_el']
 
     quantified = False      #added 16L15
@@ -437,12 +451,15 @@ def plot_experiment(EC_and_MS,
     if title is not None:
             plt.title(title)
     
-    t = EC_and_MS['time/s']
-        
+    t = EC_and_MS['time/s']        
     V = EC_and_MS[V_str]
     J = EC_and_MS[J_str]      
+
+    print('len(t) = ' + str(len(t)) + 
+          '\nlen(V) = ' + str(len(V)) + 
+          '\nlen(J) = ' + str(len(J)))
     
-    if tspan is not None:
+    if tspan is not 'all':
         I_keep = [I for (I, t_I) in enumerate(t) if tspan[0]<t_I and t_I<tspan[1]]
         t = t[I_keep]
         V = V[I_keep]

@@ -12,7 +12,12 @@ In the future also from SQL
 from __future__ import print_function
 from __future__ import division
 
-import os
+import os, sys
+
+if sys.platform == 'linux':
+    import MySQLdb
+
+
 import re
 import codecs
 from copy  import deepcopy #necessary?
@@ -68,7 +73,57 @@ def import_text(full_path_name='current', verbose=1):
     return file_lines
 
 
-
+def download_data(IDs='today', 
+                  timestamps=None,
+                  data_type='fullscan',
+                  timestamp_interval=None,
+                  comment=None,
+                  connect={},
+                  verbose=True, 
+                  ):
+        '''
+        Returns data columns matching a certain set of ID's.
+        So far
+        '''
+        
+        connect_0 = dict(host='servcinf-sql',  # your host, usually localhost, servcinf would also work, but is slower (IPv6)
+                               #    port=9995,  # your forwording port
+                                   user='cinf_reader',  # your username
+                                   passwd='cinf_reader',  # your password
+                                   db='cinfdata')  # name of the data base
+        
+        for key, val in connect_0.items():
+            if key not in connect:
+                connect[key] = val
+        
+        if data_type == 'fullscan':
+            data_string_template = 'SELECT x,y FROM xy_values_sniffer where measurement = {0} order by id'
+            
+        
+ #       try:
+        print('Connecting to CINF database...')
+        cnxn =  MySQLdb.connect(**connect)
+        cursor = cnxn.cursor()
+        print('Connection successful!')
+  #      except:
+   #         print('Connection failed!')
+        
+        if type(IDs) is int:
+            IDs = [IDs]
+        
+        datasets = {}
+        for ID in IDs:
+            data_string = data_string_template.format(str(ID))
+            cursor.execute(data_string)
+            raw_data = cursor.fetchall()
+            list_data = np.array(raw_data)
+            xy_data = np.swapaxes(list_data, 0, 1)
+            datasets[ID] = xy_data
+        
+        return datasets
+        
+            
+            
 
 def text_to_data(file_lines, title='get_from_file',
                  data_type='EC', N_blank=10, verbose=True,

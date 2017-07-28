@@ -75,10 +75,12 @@ def ML_strip_cal(CV_and_MS, cycles=[1,2], t_int=200,
     
 #    print(type(CV_and_MS)) #was having a problem due to multiple outputs.
     cycles_data, ax1 = plot_CV_cycles(CV_and_MS, cycles, ax=ax1, title=title)
+    ax1.xaxis.tick_top()
+    ax1.xaxis.set_label_position('top')
 #    print(type(cycles_data))
     Q_diff, diff = CV_difference(cycles_data, Vspan=Vspan, redox=redox, ax=ax1)
-    if ax1 is not None:
-        ax1.set_title(title)    
+    #if ax1 is not None:
+    #    ax1.set_title(title)    
     
     n_mol = Q_diff / (Chem.Far * n_el)   
     t = diff[0][0]
@@ -112,7 +114,8 @@ def ML_strip_cal(CV_and_MS, cycles=[1,2], t_int=200,
         #factor 1e-3 converts mA to A
     
     if ax2 is not None:
-        ax2.plot(x,y, 'k-')
+        ax2.plot(x,y*1e9, 'k-')
+        #ax2.plot(x, [background*1e9]*len(x), 'k-')
         ax2.fill_between(x, background*1e9, y*1e9, where=y>background, 
                          facecolor='g', interpolate=True)
         if plot_instantaneous:

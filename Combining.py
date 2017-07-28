@@ -48,6 +48,7 @@ def synchronize(Dataset_List, t_zero='start', append=1, cutit=0,
     title_combined = ''
     
     #go through once to generate the title and get the start and end times
+    emptyfiles = []
     for nd, Dataset in enumerate(Dataset_List):
         Dataset['combining_number'] = nd
         title_combined += Dataset['title'] + '__as_' + str(nd) + '__and___'
@@ -60,9 +61,14 @@ def synchronize(Dataset_List, t_zero='start', append=1, cutit=0,
         
         for col in Dataset['data_cols']:
             if is_time(col):
-                t_s = min(t_s, t_0 + Dataset[col][0])   #earliest start of time data in dataset
-                t_f = max(t_f, t_0 + Dataset[col][-1])  #latest finish of time data in dataset
-        
+                try:
+                    t_s = min(t_s, t_0 + Dataset[col][0])   #earliest start of time data in dataset
+                    t_f = max(t_f, t_0 + Dataset[col][-1])  #latest finish of time data in dataset
+                except IndexError:
+                    print(Dataset['title'] + ' may be an empty file.')
+                    emptyfiles += [nd]
+        if nd in emptyfiles:
+            continue
         recstarts += [t_s]               #first recorded time
     
         t_first = min([t_first, t_0])    #earliest timestamp  
@@ -99,8 +105,10 @@ def synchronize(Dataset_List, t_zero='start', append=1, cutit=0,
     
     #and again to synchronize the data and put it into the combined dictionary
     for Dataset in Dataset_List:
-       # print('cols in ' + Dataset['title'] + ':\n' + str(Dataset['data_cols']))
-        nd = Dataset['combining_number']           
+        print('cols in ' + Dataset['title'] + ':\n' + str(Dataset['data_cols']))
+        nd = Dataset['combining_number']
+        if nd in emptyfiles:
+            continue
         #this way names in Combined_Data match the order the datasets are input with
         t_0 = timestamp_to_seconds(Dataset['timestamp'])
         offset = t_0 - t_zero
@@ -116,23 +124,47 @@ def synchronize(Dataset_List, t_zero='start', append=1, cutit=0,
                 I_keep[col] = [I for (I, t_I) in enumerate(t) if t_start < t_I < t_finish]
         
         #then cut, and put it in the new data set
+        #first, get the present length of 'time/s' to see how much fill I need in the case of appending EC data from different methods.
+        if 'time/s' in Combined_Data:
+            l1 = len(Combined_Data['time/s'])
+        else:
+            l1 = 0
         for col in Dataset['data_cols']:
+            #print(col)
             data = Dataset[col] 
             if cutit:           #cut data to only return where it overlaps
                 data = data[I_keep[get_time_col(col, verbose=verbose)]] 
                     #fixed up a bit 17C22, but this whole function should just be rewritten. 
             if is_time(col):
                 data = data + offset
-            if col in Combined_Data:
-                if append:
-                    if 'OCV' in Dataset['title']:
-                        print(col + ' ' + str(len(data)))
-                    Combined_Data[col] = np.append(Combined_Data[col], data)
-                    continue                    
-                col = col + '_' + str()
-            Combined_Data[col] = data
-            Combined_Data['data_cols'].append(col)  
             
+            if append:
+                if col in Combined_Data:
+                    data_0 = Combined_Data[col]
+                else:
+                    data_0 = np.array([])
+                
+                if get_time_col(col) == 'time/s': #rewritten 17G26 for fig3 of sniffer paper
+                    #I got l1 before entering the present loop.
+                    l2 = len(data_0)
+                    if l1>l2:
+                        fill = np.array([0]*(l1-l2))
+                        print('filling ' + col + ' with ' + str(len(fill)) + ' zeros')
+                        data_0 = np.append(data_0, fill)
+                
+                #print('len(data_0) = ' + str(len(data_0)) + ', len(data) = ' + str(len(data)))
+                data = np.append(data_0, data)
+                #print('len(data_0) = ' + str(len(data_0)) + ', len(data) = ' + str(len(data)))
+                    
+            else:
+                if col in Combined_Data:
+                    col = col + '_' + str(nd)                        
+                    
+            Combined_Data[col] = data
+            if col not in Combined_Data['data_cols']:
+                Combined_Data['data_cols'].append(col)  
+        #offerquit()          
+        
         #keep all of the metadata from the original datasets (added 16J27)
         for col, value in Dataset.items():
             if col not in Dataset['data_cols'] and col not in ['combining_number', 'data_cols']:     #fixed 16J29
@@ -140,7 +172,19 @@ def synchronize(Dataset_List, t_zero='start', append=1, cutit=0,
                     Combined_Data[col + '_' + str(nd)] = value
                 else:
                     Combined_Data[col] = value
-           
+                    
+    #17G28: There's still a problem if the last dataset is missing columns! Fixing now.  
+    if 'time/s' in Combined_Data:
+        l1 = len(Combined_Data['time/s'])
+        for col in Combined_Data['data_cols']:   
+            if get_time_col(col) == 'time/s': #rewritten 17G26 for fig3 of sniffer paper
+                l2 = len(Combined_Data[col])
+                if l1>l2:
+                    fill = np.array([0]*(l1-l2))
+                    print('filling ' + col + ' with ' + str(len(fill)) + ' zeros')
+                    Combined_Data[col] = np.append(Combined_Data[col], fill)
+        
+        
     if verbose:
         print('function \'synchronize\' finsihed!\n\n')   
     

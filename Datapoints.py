@@ -15,7 +15,9 @@ import numpy as np
 #one could argue that the following two scripts should be in this module, but instead:
 #   get_datapoints is in Integrate_Signals.py
 #   plot_datapoints is in Plottying.py
-   
+
+#import sys
+#sys.exit()
 
 
 def fill_with(quantitydict, value):
@@ -193,13 +195,22 @@ def get_mlu(stat, logmean=False): # mlu stands for for: mean, [lower, upper]
     return mean, [lower, upper]
 
 
-def plot_errorbar(xstat, ystat, ax=plt.gca(), logmean=False,
+def plot_errorbar(xstat, ystat,
+                  #ax=plt.gca(),  
+                  #This was generating the blank figure!!! 
+                  #Don't put plt.gca() in a function default! 
+                  ax='current', #do it the normal way instead :)
+                  logmean=False,
                   spec='.', color='k', markersize=None):
     if markersize is None:
         if spec == '.':
             markersize = 15
         else:
             markersize = 5
+    if ax == 'current':
+        ax = plt.gca()
+    elif ax == 'new':
+        ax = plt.figure().add_subplot(111)
     x, x_lu = get_mlu(xstat, logmean)
     y, y_lu = get_mlu(ystat, logmean)   
     ax.plot(x, y, spec, markersize=markersize, color=color)
@@ -368,8 +379,4 @@ def plot_datalist_fit(datalist, colors, X_str='V', Xrange='all', keys=None,
         print('\nfunction \'plot_datalist_fit\' finished!\n\n')
     
     return results, ax 
-
-
-
-
 

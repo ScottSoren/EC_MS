@@ -263,7 +263,13 @@ def sync_metadata(EC_data, RE_vs_RHE=None, A_el=None, verbose=True):
     '''    
     if verbose:
         print('\nsyncing metadata for ' + EC_data['title'] + '\n')
-        
+    
+    if RE_vs_RHE is None and A_el is None and 'J_str' in EC_data.keys() and 'V_str' in EC_data.keys():
+        #added 17G26 so that plot_experiment would stop rewriting data[V_str] and data[J_str]
+        if verbose:
+            print('... already sync\'d! \n\n')
+        return EC_data['V_str'], EC_data['J_str'] 
+    
     if RE_vs_RHE is not None:
         EC_data['RE_vs_RHE'] = RE_vs_RHE
     elif 'RE_vs_RHE' in EC_data:

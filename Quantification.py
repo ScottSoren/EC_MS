@@ -181,6 +181,41 @@ def RSF_to_F_cal(quantmol = {'H2':'M2', 'He':'M4', 'CH4':'M15', 'H2O':'M18',
     ax.set_ylim([0,20])
 
 
+
+def get_signal(MS_data, mass, tspan='tspan_2', removebackground=False, 
+             unit='nA', verbose=True):
+    '''
+    Returns [x, y] where x is the time and y is QMS signal.
+    A bit trivial, but I like having this function to work in parrallel 
+    to get_flux.
+    '''    
+
+    if verbose:
+        print('geting signal for ' + mass)
+    
+    x = MS_data[mass + '-x']
+    y = MS_data[mass + '-y']
+
+    if unit[-1] == 'A':
+        if unit[:-1] == 'n' or unit[:-1] == 'nano':
+            y = y*1e9
+        elif unit[:-1] == 'u' or unit[:-1] == 'micro':
+            y = y*1e6
+    
+    if type(tspan) is str and not tspan == 'all':
+        tspan = MS_data[tspan]
+    if tspan is not None and not tspan == 'all':
+        x, y = cut(x,y,tspan) 
+    
+    if removebackground:
+        if type(removebackground) is float:
+            background = removebackground * min(y)
+        else:
+            background = min(y)
+        y = y - 0.99*background #Removing the entire background would fuck with log scales.
+    return [x, y]
+
+
 def get_flux(MS_data, mol, tspan='tspan_2', removebackground=False, 
              unit='pmol/s', verbose=True):
     '''

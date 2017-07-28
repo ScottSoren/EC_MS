@@ -19,5 +19,6 @@ from EC_MS.Time_Response import *
 from EC_MS.Calibration import *
 from EC_MS.Electrolytes import *
 from EC_MS.Datapoints import *
+from EC_MS.Potentiostat import *
 import EC_MS.Chem as Chem
 
