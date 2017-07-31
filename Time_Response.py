@@ -19,7 +19,6 @@ from __future__ import division, print_function
 
 import os
 import numpy as np
-from matplotlib import pyplot as plt
 from scipy.optimize import curve_fit
 from scipy.integrate import odeint
 
@@ -27,9 +26,11 @@ if os.path.split(os.getcwd())[1] == 'EC_MS':
                                 #then we're running from inside the package
     import Chem
     from Molecules import Molecule
+    from Plotting import plot_operation
 else:                           #then we use relative import
     from . import Chem
     from .Molecules import Molecule
+    from .Plotting import plot_operation
 
 
 def fit_exponential(t,y):
@@ -91,7 +92,7 @@ def fit_step(t, y, tpulse=0, step='fall',
         t_fit = t_fit + t0          #put time axis back
         if step =='fall':
             t_fit = t_fit + tpulse
-        plot1 = ax.plot(t_fit, y_fit, spec, label=label)
+        ax.plot(t_fit, y_fit, spec, label=label)
         if label:
             if label == 'tau':
                 label = 'tau = {0:5.2f} s'.format(tau)
@@ -105,11 +106,15 @@ def fit_step(t, y, tpulse=0, step='fall',
         print('tau = ' + str(pars[0]) + ' s')
         print('\nfunction \'fit_step\' finished!\n\n')
     return pars
-    
+
+
 
     
 def stagnant_diffusion_ode(C, T, pars):  #Note that C comes before T here!
     '''
+    
+    Scott's master p. 52 and appendix C.  Z is the new X.
+
     returns rate of change dC/dT of concentration profile for 
     non-dimensionalized stagnant sniffer diffusion problem.
     C = C(X) where X goes from 0 (membrane) to 1 (electrode)
@@ -120,21 +125,24 @@ def stagnant_diffusion_ode(C, T, pars):  #Note that C comes before T here!
     scale J0 is used to define the concentration scale, C0 = J0*L/D
     
     #modified 17B02 to enable carrier gas introduction of element using Cg
+    
+    # pars as a list rather than a dict is slightly faster (see fig06.out),
+    # but I like the dict so that I can remember what's what.
     '''
-    alpha = pars[0]
-    J_fun = pars[1]
-    Cg = pars[2]
-    N = np.size(C)
-    dX = 1 / N    #N+1? N-1? I can never remember what's most 'correct'
-    C_N = C[-1] + J_fun(T) * dX      # boundary condition dC/dX = J(T) at electrode
-    C_ = C[0] - alpha * (C[0] - Cg) *dX       # boundary condition dC/dX = -alpha*(C-Cg) at membrane
+    dZ = pars['dZ'] #assigning this here replaces two lookups with one.
+    
+    C_N = C[-1] + pars['J_fun'](T) * dZ    # boundary condition dC/dZ = J(T) at electrode
+    C_ = C[0] - pars['alpha'] * (C[0] - pars['Cg']) * dZ       # boundary condition dC/dZ = -alpha*(C-Cg) at membrane
     C_up = np.append(C[1:], C_N)
     C_down = np.append(C_, C[:-1])
-    d2CdX2 = (C_up - 2*C + C_down)/(dX*dX)  #second derivative of C wrt X
-    dCdT = d2CdX2       #Fick's second law
+    d2CdZ2 = (C_up - 2*C + C_down) * pars['1/dZ**2'] #second derivative of C wrt Z
+    dCdT = d2CdZ2       #Fick's second law
+    
     return dCdT    
 
-def solve_stagnant(pars, Tspan, startstate, N=30, flux=1, verbose=1):
+
+def solve_stagnant(alpha=1, J_fun=None, Cg=1, Tspan=[0, 10], 
+                   startstate='zero', N=30, flux=1, verbose=1):
     '''solves the stagnant sniffer partial differential equations. 
     pars[0][0] is alpha = h*L/D is the system parameter.
     pars[0][1] is J_fun. Returns the flux from the electrode as a unction of T. 
@@ -151,10 +159,8 @@ def solve_stagnant(pars, Tspan, startstate, N=30, flux=1, verbose=1):
     if startstate == 'zero':
         C0 = np.zeros([N])
     elif startstate == 'steady':
-        alpha = pars[0][0] #for some reason pars is doubly packed.
         C0 = 1/alpha + np.linspace(0,N)/(N+1) #Scott's MSc thesis, p. 53
     elif startstate == 'saturated':
-        Cg = pars[0][2]
         C0 = np.ones([N]) * Cg
     elif np.size(startstate) == 1:
         C0 = np.ones([N]) * startstate
@@ -164,10 +170,16 @@ def solve_stagnant(pars, Tspan, startstate, N=30, flux=1, verbose=1):
         
     if np.size(Tspan) == 2:
         Tspan = np.linspace(Tspan[0], Tspan[1], 100)
-    CC = odeint(stagnant_diffusion_ode, C0, Tspan, args=pars)    
+    
+    dZ = 1/N #N+1? N-1? I can never remember what's most 'correct'
+    
+    pars = {'alpha':alpha, 'J_fun':J_fun, 'Cg':Cg, 'dZ':dZ, '1/dZ**2':1/dZ**2}
+    
+    CC = odeint(stagnant_diffusion_ode, C0, Tspan, args=(pars,))    
     #16J18_02h10: this crashes the kernel, I don't know why... 18h56 found it! c before t!
     
-    J = (CC[:,1] - CC[:,0]) * N  # (positive) J = dC/dX with dC = C0 - C_ and dX = 1 / N 
+    J = (CC[:,1] - CC[:,0]) * N  # (positive) J = dC/dX with dC = C0 - C_ and dZ = 1 / N 
+    #J is a function of T
      
     if verbose:
         print('solution shape: ' + str(np.shape(CC)))
@@ -176,14 +188,20 @@ def solve_stagnant(pars, Tspan, startstate, N=30, flux=1, verbose=1):
         return Tspan, J
     else:
         return Tspan, CC
+
           
-        
-def stagnant_pulse(tj=None, tpulse=10, tspan=None, j_el = -5,
-                   L=100e-6, A=0.196e-4, q0=1e15/Chem.NA, p_m=1e5,
+def stagnant_pulse(*args, **kwargs):
+    print('\n\n\'stagnant_pulse\' has been renamed \'stagnant_operator\'. Remember that next time!')
+    return stagnant_operator(*args, **kwargs)
+    
+def stagnant_operator(tj=None, tpulse=10, tspan=None, j_el=-1,
+                   L=100e-6, A=0.196e-4, q0=1.5e15/Chem.NA, p_m=1e5,
                    mol='H2', p_gas=0, normalize=False, 
                    D=None, kH=None, n_el=None, Temp=None, 
-                   unit = 'umol / (m^2*s)', flux_direction='out',
-                   verbose=1, plot_type='flux', startstate='zero'):
+                   unit = 'pmol/s', flux_direction='out',
+                   verbose=True, ax=None, plot_type=None, 
+                   startstate='zero', 
+                   colormap='plasma', aspect='auto'):
     '''                   
     Models a pulse of current towards a specified product in our EC-MS setup.
     Theory in chapter 2 of Scott's masters thesis.
@@ -191,11 +209,13 @@ def stagnant_pulse(tj=None, tpulse=10, tspan=None, j_el = -5,
     as a steady-state square pulse of electrical current (tpulse, j_el, n_el), 
     or as a measured current (tj[1]) as a function of time (tj[0])
     
+    #tj[1] should have units A/m^2. 1 mA/cm^2 is 10 A/m^2
+    
     #17B02: p_gas is the partial pressure of the analyte in the carrier gas.
     # this enables, e.g., CO depletion modelling.
     '''    
     if verbose:
-        print('\n\nfunction \'stagnant_pulse\' at your service!\n') 
+        print('\n\nfunction \'stagnant_operator\' at your service!\n') 
     if type(mol) is str:            
         mol = Molecule(mol)
     if Temp is not None:
@@ -238,7 +258,7 @@ def stagnant_pulse(tj=None, tpulse=10, tspan=None, j_el = -5,
     #from the approximate analytical solution, Scott's thesis appendix D
     
     Tpulse = tpulse/t0
-    Tspan = np.linspace(tspan[0],tspan[1],1000)/t0
+    Tspan = np.linspace(tspan[0],tspan[1],1000)/t0  #why do I give so many time points?
     
     if tj is None: 
         def J_fun(T):
@@ -250,7 +270,7 @@ def stagnant_pulse(tj=None, tpulse=10, tspan=None, j_el = -5,
     else:
         T_in = t / t0
         J_in = j / max(np.abs(j))
-        print('max(J_in) = ' + str(max(J_in)))
+        #print('max(J_in) = ' + str(max(J_in)))
         def J_fun(T):
             if T < T_in[0]:       #assume no current outside of the input tj data
                 return 0
@@ -262,9 +282,8 @@ def stagnant_pulse(tj=None, tpulse=10, tspan=None, j_el = -5,
     cg = c_gas / kH  #concentration analyte in equilibrium with carrier gas, 17B02
     Cg = cg / c0 #non-dimensionalized concentration analyte at equilibrium with carrier gas, 17B02
     
-    pars = ([alpha, J_fun, Cg],) #odeint needs the tuple. 17A12: Why ?!
-    
-    [T, CC] = solve_stagnant(pars, Tspan, startstate, flux=False)   
+    #pars = ([alpha, J_fun, Cg],) #odeint needs the tuple. 17A12: Why ?!
+    [T, CC] = solve_stagnant(alpha=alpha, J_fun=J_fun, Cg=Cg, Tspan=Tspan, startstate=startstate, flux=False)   
     cc = CC*c0
     t = T*t0
     j = h * (cc[:,0] - cg)       #mass transport at the membrane
@@ -278,7 +297,7 @@ def stagnant_pulse(tj=None, tpulse=10, tspan=None, j_el = -5,
         
     # get ready to plot:
     N = np.shape(cc)[1]
-    x = np.arange(N)/(N-1)*L          
+    z = np.arange(N)/(N-1)*L          
         #this will only be used for heatmap, so it's okay if dx isn't quite right.
     if 'cm^2' not in unit:
         j = j*A
@@ -290,67 +309,186 @@ def stagnant_pulse(tj=None, tpulse=10, tspan=None, j_el = -5,
         j = j*1e12
     if flux_direction=='in':
         j = -j
-    axes = None
-    
-    # and plot! 
-    if plot_type == 'flux':    
-        fig1 = plt.figure()
-        ax1 = fig1.add_subplot(111)
-        ax1.plot(t, j, label='simulated flux')
-        ax1.set_xlabel('time / s')
-        ax1.set_ylabel('flux / [' + unit + ']')
-        axes = ax1
-        
-    elif plot_type == 'heat' or plot_type == 'both':
-        
-        fig1 = plt.figure()
-        ax1 = fig1.add_subplot(111)
-        
-        #t_mesh, x_mesh = np.meshgrid(t,x)
-        #img = ax1.contourf(t_mesh, x_mesh*1e6, np.transpose(cc,[1,0]), cmap='Spectral', 
-        #                   levels=np.linspace(np.min(cc),np.max(cc),100))
-        
-        # imshow objects seem more versatile than contourf for some reason.
-        
-        xrange = [min(t), max(t)]
-        yrange = [min(x*1e6), max(x*1e6)]
-        img = ax1.imshow(np.transpose(cc,[1,0]), 
-                         extent=xrange[:] + yrange[:],  #have to be lists here!
-                        aspect='auto', origin='lower',
-                         cmap = 'Spectral')        
-        
-        cbar = plt.colorbar(img, ax=ax1)
-        cbar.set_label('concentration / mM')
-        ax1.set_xlabel('time / s')
-        ax1.set_ylabel('position  / um')
-        
-#        print('plot_type = ' + plot_type)
-        if plot_type == 'both':
-            ax2 = ax1.twinx()
-            ax2.set_ylabel('flux / [' + unit + ']')
-            ax2.plot(t, j, 'k-')
-            cbar.remove()
-            ax3 = img.figure.add_axes([0.85, 0.1, 0.03, 0.8])
-            cbar = plt.colorbar(img, cax=ax3)
-            cbar.set_label('concentration / mM')
-            ax1.set_xlim(tspan)
-            print('returning three axes!')
-            axes = [ax1, ax2, ax3]
-        else:
-            axes = [ax1, cbar]
         
     if normalize:
         s_int = np.trapz(j,t)
         if verbose:
             print('normalizing from area = ' + str(s_int))
-        j = j / s_int
+        j = j / s_int    
+     
+        
+        #plotting was moved on 17G30 some legacy code here:
+    if plot_type is not None and ax is not None:
+        print('We recommend you plot seperately, using the function \'operator plots\'.' )
+        axes = plot_operation(cc=cc, t=t, z=z, j=j, ax=ax, 
+                             plot_type=plot_type, colormap=colormap, aspect=aspect,
+                             verbose=verbose)
+        if verbose:  
+            print('\nfunction \'stagnant_operator\' finished!\n\n')
+        return t, j, axes
     
-    if verbose:  
-        print('\nfunction \'stagnant_pulse\' finished!\n\n')  
     
-    if axes is not None:
-        return (t, j, axes)
-    return (t, j)
+    results = {'t':t, 'z':z, 'j':j, 'cc':cc,
+               'dimensions':'tz'}
+    
+    return results
+        
+
+
+
+
+
+
+def flow_diffusion_ode(C, X, pars):
+    '''
+    Scott's master, p. 60. X is the new Y and Z is the new X.
+    '''
+    C_N = C[-1]
+    C_ = C[0] - pars['alpha'] * (C[0] - pars['Cg']) * pars['dZ'] 
+    C_up = np.append(C[1:], C_N)
+    C_down = np.append(C_, C[:-1])
+    d2CdZ2 = (C_up - 2*C + C_down) * pars['1/dZ**2']
+    #I assume multiplication to be faster than division
+    dCdX = d2CdZ2 * pars['1/beta']
+    return dCdX
+    
+
+def solve_flow(alpha=1, beta=1, Cg=0, N=30, flux=False, 
+               verbose=True, Xspan=[0,1], C0='uniform'):
+    '''
+    This solves the flow ODE and returns either flux through membrane as a 
+    function of position (Xspan and J), 
+    or the concentration profile (Xspan and CC)
+    
+    It assumes steady state. I think I can use this and then convolute if I
+    need time dependence.
+    '''
+    
+    if verbose:
+        print('\n\nfunction \'solve_flow\' at your service!\n') 
+        
+    if C0 == 'uniform':
+        C0 = np.array([1] * N)
+        #nothing else really makes sense, since c0 defines a scale.
+    
+    
+    if np.size(Xspan) == 2:
+        Xspan = np.linspace(Xspan[0], Xspan[1], 100)
+        
+        
+    dZ = 1/N #N+1? N-1? I can never remember what's most 'correct'
+    
+    pars = {'alpha':alpha, '1/beta':1/beta, 'Cg':Cg, 'dZ':dZ, '1/dZ**2':1/dZ**2}
+    
+    CC = odeint(flow_diffusion_ode, C0, Xspan, args=(pars,))    
+    #16J18_02h10: this crashes the kernel, I don't know why... 18h56 found it! c before t!
+    
+    J = (CC[:,1] - CC[:,0]) * N  # (positive) J = dC/dZ with dC = C0 - C_ and dX = 1 / N 
+    #J is a function of X.
+     
+    if verbose:
+        print('solution shape: ' + str(np.shape(CC)))
+        print('\nfunction \'solve_flow\' finished!\n\n')    
+    if flux:
+        return Xspan, J
+    else:
+        return Xspan, CC    
+    pass
+
+
+def flow_operator(mode='steady',  #in steady mode it's not really an operator.
+                  system='chip', #
+                  A=0.196e-4, q0=1.5e15/Chem.NA, Temp=None,  #universal pars
+                  L=100e-6,  w=5e-3, w2=5e-3, F=1e-9, #geometry pars
+                  c0=None, j0=None, j_el=-1, #inlet flow pars
+                  p_m=1e5, #chip pars
+                  phi=0.5, dp=20e-9, Lp=100e-6,#DEMS pars
+                  mol='H2', D=None, kH=None, n_el=None, M=None, #mol pars
+                  p_gas=0, normalize=False, 
+                  unit = 'pmol/s', flux_direction='out',
+                  N=100, #solver pars
+                  verbose=True):
+    '''
+    Follows the recipe in Scott's MSc, page 61, for calculating collection
+    efficiency in a flow system by solving a differential equation. This
+    can be used to compare different types of EC-MS
+    '''
+    if verbose:
+        print('\n\nfunction \'flow_operator\' at your service!\n') 
+    if type(mol) is str:            
+        mol = Molecule(mol)
+    if Temp is not None:
+        mol.set_temperature(Temp)
+    else:
+        Temp = 298.15       #standard temperature in K
+    if D is None:
+        D = mol.D           #diffusion constant in electrolyte / [m^2/s]
+    if kH is None:
+        kH = mol.kH     #dimensionless henry's law constant
+    if M is None:
+        M = Chem.Mass(mol.name) * 1e-3 # molar mass / [kg/mol]
+    if n_el is None and not normalize:
+        n_el = mol.n_el 
+    if c0 is None:
+        if j0 is None:
+            j0 = j_el*A/(n_el*Chem.Far)
+        c0 = j0/F 
+        #concentration is production rate over flow rate: [mol/s] / [m^3/s)] = [mol/m^3] )
+    
+    
+    if system == 'chip':
+        h = kH * Chem.R * Temp * q0 / (p_m * A) #Scott's MSc, page 50
+    elif system == 'DEMS':
+        h = kH * phi * dp / (3 * Lp) * np.sqrt(8/np.pi * Chem.R*Temp / M) #Scott's MSc, page 49
+    
+    v0 = F/(L*w2)
+    alpha = h*L/D
+    beta = v0*L**2/(D*w)  #There is a mistake in Scott's MSc page60! 
+        # There I got the non-dimensionalization wrong, and wrote beta = v0*w**2/(D*L)
+        # in fact, beta = v0*L**2/(D*w)
+    
+    Xspan = np.linspace(0, 1, 1000)
+    X, CC = solve_flow(alpha=alpha, beta=beta, Xspan=Xspan, N=N, verbose=verbose)
+    
+    x = X*w
+    cc = CC*c0
+    j = cc[:,0] * h  # mol/m^3 * m/s = mol/(m^2*s)
+    Z = np.linspace(0, 1, N)
+    z = Z * L
+    
+    eta_m = 1 - np.trapz(CC[-1,:], Z) #Scott's MSc, page 61
+    eta_m_check = w2 * np.trapz(j, x) / (c0 * F)  # m*mol/(m^2*s)*m / ((mol/m^3)*m^3/s) = 1
+    if verbose:
+        print('portion not escaped = ' + str(eta_m))
+        print('portion collected = ' + str(eta_m_check) + '\n\n')
+    if system == 'chip':
+        eta_v = 1
+    elif system == 'DEMS':
+        p_w = Chem.p_vap(mol='H2O',T=Temp, unit='Pa')
+        M_w = Chem.Mass('H2O') * 1e-3
+        j_w = A*p_w / (Chem.R*Temp) * phi * dp / (3 * Lp) * np.sqrt(8/np.pi * Chem.R*Temp / M_w)
+        eta_v = q0 / j_w
+    
+    eta = eta_m*eta_v
+
+    if verbose:
+        print('q0 = ' + str(q0) + ' mol/s, h = ' + str(h) + ' m/s, alpha = ' + str(alpha) + 
+            ', j0 = ' + str(j0) + ' mol/s, max(c)/c0 = ' + str(np.max(np.max(cc))/c0) + 
+            ',  kH = ' + str(kH) + ', eta = ' + str(eta) + ', mol = ' + str(mol.name) + 
+            ', system = ' + str(system) + '' + ', beta = ' + str(beta) + '' +
+            ', v0 = ' + str(v0)
+            )  
+
+    
+    if verbose:
+        print('\n\nfunction \'flow_operator\' at your service!\n')  
+        
+    results = {'x':x, 'z':z, 'j':j, 'cc':cc, 'eta_m':eta_m, 'eta_v':eta_v, 'eta':eta,
+               'dimensions':'xz'}
+    return results
+
+
+
    
 
 def delta_response(L=100e-6, q0=1e15/Chem.NA, 
@@ -358,9 +496,9 @@ def delta_response(L=100e-6, q0=1e15/Chem.NA,
                    A=0.196e-4, p_m=1e5, Temp=298.15,
                    verbose=True, tspan='auto', N_t=1000):
     '''
-    Returns the normalized response of a delta-function input as (t, j).
+    Returns the output when a stagnant_operator operates on a delta function.
     There's probably a much smarter way to do it, but for now I'll just do
-    a millisecond pulse
+    triangle pulse of width tau/250
     '''
     if D is None or kH is None:
         if type(mol) is str:
@@ -391,24 +529,7 @@ def delta_response(L=100e-6, q0=1e15/Chem.NA,
 if __name__ == '__main__':
 
     
-    from Data_Importing import import_data
-    from Combining import synchronize
-    from EC import select_cycles, plot_CV_cycles, plot_vs_time
-    from Plotting import plot_masses_and_I
-  
-
-    plt.close('all')  
-    
-    ## Test and fit the numerical modelling of pulse
-
-    tpulse = 10
-    
-    t, j, *ax = stagnant_pulse(tpulse=tpulse, tspan=[0, tpulse*2], j_el=5, 
-                          plot_type='both',
-                          mol='O2')        
-    ax2 = ax[1]
-    pars1 = fit_step(t, j*1e6, tpulse=tpulse, ax=ax2, step='rise')
-    pars2 = fit_step(t, j*1e6, tpulse=tpulse, ax=ax2, step='fall')
+    pass
 
 
 

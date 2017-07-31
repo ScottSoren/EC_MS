@@ -72,8 +72,9 @@ def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True, cycle_str=None
             good = False
     t0 = timestamp_to_seconds(EC_data['timestamp'])
     tspan_2 = np.array([min(EC_data['time/s']), max(EC_data['time/s'])])
+    EC_data['tspan'] = tspan_2
     EC_data['tspan_2'] = tspan_2
-    EC_data['tspan'] = tspan_2 + t0
+    EC_data['tspan_0'] = tspan_2 + t0
     EC_data['data_type'] += ' selected'   
     
     for col in EC_data['data_cols']:
@@ -81,18 +82,28 @@ def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True, cycle_str=None
             y_col = col[:-2] + '-y'
             EC_data[col], EC_data[y_col] = cut(EC_data[col], EC_data[y_col], tspan_2)       
 
-    if t_zero is 'start' or type(t_zero) in [int, float]:
+    if t_zero is not None:
         if verbose:
             print('\'select_cycles\' is resetting t_zero')
             print('t_zero = ' + str(t_zero))
+        if type(t_zero) is str:
+            try:
+                n = eval(t_zero)
+                if type(n) is not int:
+                    raise NameError
+                t_zero = next(EC_data['time/s'][i] for i,c in enumerate(EC_data[cycle_str]) if c==n)
+            except NameError:     
+                #this should be the case if t_zero=='start'
+                t_zero = tspan_2[0]
+            if verbose:
+                print('aka, shifting by t_zero=' + str(t_zero))
+                
         for col in EC_data['data_cols']:
             if is_time(col):
-                if type(t_zero) in [int, float]:
-                    EC_data[col] = EC_data[col] - tspan_2[0] - t_zero
-                else:
-                    EC_data[col] = EC_data[col] - tspan_2[0]
-                    t_zero = 0
-        EC_data['tspan_2'] = tspan_2 - tspan_2[0] - t_zero
+                EC_data[col] = EC_data[col] - t_zero
+
+        EC_data['tspan'] = tspan_2 - tspan_2[0] - t_zero
+        EC_data['tspan_2'] = EC_data['tspan']
         
     EC_data['good'] = good
     return EC_data
@@ -132,7 +143,7 @@ def CV_difference(cycles_data, redox=1, Vspan=[0.5, 1.0],
         redox = [redox]
     elif redox is None:
         redox = [0,1]
-
+    
     Vs = []   
     Js = []
     Q = []
@@ -173,25 +184,33 @@ def CV_difference(cycles_data, redox=1, Vspan=[0.5, 1.0],
             print('didn''t find A_el.')
         print('difference in charge passed: a = ' + str(dQ) + ' C\n' + 
                 'difference in CV area: b = ' + str(dJV) + ' V*mA/cm^2\n' + 
-                'scan rate: b/a*A_el = ' + str(dJV / dQ * A_el) + ' mV/s') 
+                'This implies a scan rate of: b/a*A_el = ' + str(dJV / dQ * A_el) + ' mV/s') 
     
+    # We're going to return three vectors, for t V, and J, and 
+    #   all of them will be the same length as the first dataset, i.e. t[0]
     if len(Vs[0]) != len(Vs[1]):  #then we'll have to interpolate
         if 1 in redox:
             Js[1] = np.interp(Vs[0], Vs[1], Js[1])
-            V_avg = Vs[0]
+            V = Vs[0]
         else:    
             Js[1] = np.interp(-Vs[0], -Vs[1], Js[1])
+            V = Vs[0]
     else:
-        V_avg = (Vs[0] + Vs[1]) / 2
+        V = (Vs[0] + Vs[1]) / 2
     J_diff = Js[0] - Js[1] #note this is all optimized for CO stripping
+    t = ts[0]
     
     if ax:
-        ax.fill_between(V_avg, Js[0], Js[1], where=Js[0]>Js[1],
+        if ax == 'new':
+            ax = plt.figure().add_subplot(111)
+            ax.set_xlabel(V_str)
+            ax.set_ylabel(J_str)
+        ax.fill_between(V, Js[0], Js[1], where=Js[0]>Js[1],
                         facecolor=color, interpolate=True)
     if verbose:
         print('\nfunction \'CV_difference\' finished!\n\n')
     
-    return dQ, [ts, V_avg, J_diff]
+    return dQ, [t, V, J_diff]
 
     
 def smooth_pulses(CA_Data_0, verbose=1):

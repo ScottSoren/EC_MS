@@ -37,14 +37,18 @@ class Molecule:
     results for quantification. Objects of this class will link to data stored 
     in a text file in ./data/
     '''
-    def __init__(self, name, writenew=True, verbose=True):
+    def __init__(self, name, formula=None, writenew=True, verbose=True):
         self.name = name
         self.cal = {}
         self.__str__ = '<' + name + ', instance of EC_MS class \'Molecule\'>'
-        self.M = Chem.Mass(name) #molar mass from chemical formula
         self.primary = None     #the primary mass to measure at
         self.calibrations = []      #will store calibration data
         self.attr_status = {'D':0,'kH':0,'n_el':0}
+        if formula is None:
+            self.attr_status['formula'] = 0 #so that it asks me for a formula when initializing the file.
+            self.formula = name #but just put the name for now.
+        else:
+            self.formula = formula
         # 0 for undefined, 1 for loaded from file, 2 for set by function
         file_name = name + '.txt'
         cwd = os.getcwd()
@@ -56,13 +60,15 @@ class Molecule:
                     print('The file for ' + name + ' is empty! Writing new.')
                     raise FileNotFoundError
             self.reset(verbose=verbose)
-            self.file_lines = ['name: ' + self.name, 'M\t=\t' + str(self.M)] + self.file_lines
+            self.file_lines = ['name: ' + self.name] + self.file_lines
         except FileNotFoundError: # I don't know the name of the error, so I'll have to actually try it first.
             print('no file found for ' + name)  
             if writenew:
                 print('Writing new.\n')
                 self.write(self.write_new)
         os.chdir(cwd)
+        
+        self.M = Chem.Mass(self.formula) #molar mass from chemical formula
     
     
     def write(self, a, *args, **kwargs):
@@ -107,8 +113,9 @@ class Molecule:
                 setattr(self, key, value)
         
         if 'F_cal' not in dir(self) and 'primary' in dir(self):
-            self.F_cal =  self.calibration_fit(mass='primary', ax=None,
-                                               useit=True, primary=True, verbose=True)
+            if not self.primary is None:
+                self.F_cal =  self.calibration_fit(mass='primary', ax=None,
+                                                   useit=True, primary=True, verbose=True)
         elif type(self.F_cal) is list and len(self.F_cal) == 1:
             self.F_cal = self.F_cal[0]
             #print('F_cal was list of length 1. Now, F_cal = ' + str(self.F_cal))
@@ -119,15 +126,24 @@ class Molecule:
          
     def write_new(self, f):
         for (attr, status) in self.attr_status.items():
-            string = input('Enter ' + attr + ' for ' + self.name + ' as a float or anything else to skip.\n')
-            if status == 0:             
+            if status == 0: 
+                string = input('Enter ' + attr + ' for ' + self.name + ' or just whitespace.\n')
+                if len(string.strip()) == 0:
+                    print('skipped that for now.')
+                    continue
                 try: 
                     value = float(string)
                     self.attr_status = 2
                     setattr(self, attr, value) 
                     f.write(attr + '\t=\t' + str(value) + '\n')
                 except ValueError:
-                    print('skipped that for now.')
+                    print('not a float but okay.')
+                    value = string
+                    self.attr_status = '2' #just for irony, I'll save this status as not a float.
+                    setattr(self, attr, value) 
+                    f.write(attr + ': ' + str(value) + '\n')                    
+                    
+
                # self.file_lines = f.readlines() #doesn't work. But what if I need to reset later?
           #  else:
           #      f.write(attr + '\t=\t' + str(self.attr) + '\n') #not necessary...

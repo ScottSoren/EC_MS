@@ -15,7 +15,7 @@ import numpy as np
 import re
 import os #, sys    
 
-def synchronize(Dataset_List, t_zero='start', append=1, cutit=0, 
+def synchronize(Dataset_List, t_zero='start', append=None, cutit=0, 
                 override=False, verbose=1):
     '''
     This will combine array data from multiple dictionaries into a single 
@@ -36,6 +36,10 @@ def synchronize(Dataset_List, t_zero='start', append=1, cutit=0,
         Dataset_List = [Dataset_List, t_zero]
         t_zero = 'start'
     
+    if append is None: #by default, append if all datasets are same type, 17G28
+        append = len({d['data_type'] for d in Dataset_List}) == 1
+    print(append)
+        
                               #prepare to collect:
     recstarts = []            #first recorded time in each file in seconds since midnight
     t_start = 0               #latest start time (start of overlap) in seconds since midnight
@@ -47,12 +51,11 @@ def synchronize(Dataset_List, t_zero='start', append=1, cutit=0,
     Combined_Data = {'data_type':'combined', 'data_cols':[]}
     title_combined = ''
     
-    #go through once to generate the title and get the start and end times
+    #go through once to generate the title and get the start and end times of the files and of the overlap
     emptyfiles = []
     for nd, Dataset in enumerate(Dataset_List):
         Dataset['combining_number'] = nd
         title_combined += Dataset['title'] + '__as_' + str(nd) + '__and___'
-        #Dataset = numerize(Dataset)    #16I28: the dDataset should already be numerized by importdata
         
         t_0 = timestamp_to_seconds(Dataset['timestamp'])
         
@@ -78,34 +81,52 @@ def synchronize(Dataset_List, t_zero='start', append=1, cutit=0,
     
     title_combined = title_combined[:-6]
     Combined_Data['title'] = title_combined
-    #Combined_Data['timestamp'] = seconds_to_timestamp(t_start)
-    Combined_Data['tspan'] =    [t_start, t_finish] #overlap start and finish times as seconds since midnight
-    Combined_Data['tspan_1'] = [t_start - t_first, t_finish - t_first]    # start and finish times as seconds since earliest start
+    Combined_Data['tspan_0'] =    [t_start, t_finish] #overlap start and finish times as seconds since midnight
+    Combined_Data['tspan_1'] = [t_start - t_first, t_finish - t_first]    # start and finish times as seconds since earliest start   
+
     if t_zero == 'start':
         t_zero = t_start
     elif t_zero == 'first':
         t_zero = t_first
     elif t_zero == 'last':
         t_zero = t_last
-    Combined_Data['timestamp'] = seconds_to_timestamp(t_zero) #this should probably be t_zero and not t_start #17B01
+        
+    Combined_Data['first'] = t_first - t_zero
+    Combined_Data['last'] = t_last - t_zero
+    Combined_Data['start'] = t_start - t_zero
+    Combined_Data['finish'] = t_finish - t_zero
+    
+    Combined_Data['timestamp'] = seconds_to_timestamp(t_zero) #we want that timestamp refers to t=0, duh!
+
+    Combined_Data['tspan'] = [t_start - t_zero, t_finish - t_zero]    #start and finish times of overlap as seconds since t=0  
+    Combined_Data['tspan_2'] = Combined_Data['tspan'] #old code calls this tspan_2.
+    
     if verbose:
         print('first: ' + str(t_first) + ', last: ' + str(t_last) + 
         ', start: ' + str(t_start) + ', finish: ' + str(t_finish))
-    Combined_Data['tspan_2'] = [t_start - t_zero, t_finish - t_zero]    #start and finish times of overlap as seconds since zero point   
+        
     
     if t_start > t_finish and not override:
         print('No overlap. Check your files.\n')
         offerquit()
-    
-    I_sort = np.argsort(recstarts)
+        
+        #this is how I make sure to combine the datasets in the right order!     
+    I_sort = np.argsort(recstarts)    
     Dataset_List = [Dataset_List[I] for I in I_sort]       
         #sort by first recorded absolute time. This is so that successive datasets of same type can be joined,
         #with the time variables increasing all the way through 
         #(note: EC lab techniques started together have same timestamp but different recstart)
     
-    #and again to synchronize the data and put it into the combined dictionary
-    for Dataset in Dataset_List:
+    #and loop again to synchronize the data and put it into the combined dictionary.
+    
+    if append:
+        #add a datacolumn that can be used to separate again afterwards by file
+        #as of now (17G28) can't think of an obvious way to keep previous file numbers
+        Combined_Data['file_number'] = []
+        
+    for i, Dataset in enumerate(Dataset_List):
         print('cols in ' + Dataset['title'] + ':\n' + str(Dataset['data_cols']))
+        print('cols in Combined_Data:\n' + str(Combined_Data['data_cols']))
         nd = Dataset['combining_number']
         if nd in emptyfiles:
             continue
@@ -125,15 +146,24 @@ def synchronize(Dataset_List, t_zero='start', append=1, cutit=0,
         
         #then cut, and put it in the new data set
         #first, get the present length of 'time/s' to see how much fill I need in the case of appending EC data from different methods.
-        if 'time/s' in Combined_Data:
-            l1 = len(Combined_Data['time/s'])
-        else:
-            l1 = 0
+        if append:
+            print('append is True')
+            if 'time/s' in Dataset:
+                l1 = len(Dataset['time/s'])
+                fn = np.array([i]*l1)
+                Combined_Data['file_number'] = np.append(Combined_Data['file_number'], fn) 
+                print('len(file_number) = ' + str(len(Combined_Data['file_number'])))
+            else:
+                print('\'time/s\' in Dataset is False')
+            if 'time/s' in Combined_Data:
+                l0 = len(Combined_Data['time/s'])     
+            else:
+                l0 = 0
         for col in Dataset['data_cols']:
             #print(col)
             data = Dataset[col] 
             if cutit:           #cut data to only return where it overlaps
-                data = data[I_keep[get_time_col(col, verbose=verbose)]] 
+                data = data[I_keep[get_time_col(col)]]  
                     #fixed up a bit 17C22, but this whole function should just be rewritten. 
             if is_time(col):
                 data = data + offset
@@ -145,11 +175,11 @@ def synchronize(Dataset_List, t_zero='start', append=1, cutit=0,
                     data_0 = np.array([])
                 
                 if get_time_col(col) == 'time/s': #rewritten 17G26 for fig3 of sniffer paper
-                    #I got l1 before entering the present loop.
+                    #I got l0 before entering the present loop.
                     l2 = len(data_0)
-                    if l1>l2:
-                        fill = np.array([0]*(l1-l2))
-                        print('filling ' + col + ' with ' + str(len(fill)) + ' zeros')
+                    if l0>l2:
+                        fill = np.array([0]*(l0-l2))
+                        #print('filling ' + col + ' with ' + str(len(fill)) + ' zeros')
                         data_0 = np.append(data_0, fill)
                 
                 #print('len(data_0) = ' + str(len(data_0)) + ', len(data) = ' + str(len(data)))
@@ -158,6 +188,7 @@ def synchronize(Dataset_List, t_zero='start', append=1, cutit=0,
                     
             else:
                 if col in Combined_Data:
+                    print('conflicting versions of ' + col + '. adding subscripts.')
                     col = col + '_' + str(nd)                        
                     
             Combined_Data[col] = data
@@ -183,7 +214,8 @@ def synchronize(Dataset_List, t_zero='start', append=1, cutit=0,
                     fill = np.array([0]*(l1-l2))
                     print('filling ' + col + ' with ' + str(len(fill)) + ' zeros')
                     Combined_Data[col] = np.append(Combined_Data[col], fill)
-        
+        if append:
+            Combined_Data['data_cols'].append('file_number')
         
     if verbose:
         print('function \'synchronize\' finsihed!\n\n')   
@@ -334,7 +366,10 @@ def seconds_to_timestamp(seconds):
     timestamp = timestamp.replace(' ','0')
     return timestamp
 
-
+def dayshift(dataset, days=1):
+    ''' Can work for up to 4 days. After that, hh becomes hhh... '''
+    dataset['timestamp'] = seconds_to_timestamp(timestamp_to_seconds(dataset['timestamp']) + days*24*60*60) 
+    return dataset
 
 def sort_time(dataset_0, data_type='EC', verbose=True):
         dataset = {}

@@ -279,7 +279,7 @@ def smooth_data(data_0, points=3, cols=None, verbose=True):
 
 def plot_signal(MS_data,
                 masses = {'M2':'b','M4':'r','M18':'0.5','M28':'g','M32':'k'},
-                tspan=0, ax='new', unit='nA',
+                tspan=None, ax='new', unit='nA',
                 logplot=True, saveit=False, leg=False, verbose=True):
     '''
     plots selected masses for a selected time range from MS data or EC_MS data
@@ -293,7 +293,7 @@ def plot_signal(MS_data,
         fig1 = plt.figure()
         ax = fig1.add_subplot(111)    
     lines = {}
-    if tspan == 0:                  #then use the range of overlap
+    if tspan is None:                  #then use the range of overlap
         tspan = MS_data['tspan_2']  
     elif type(tspan) is str and not tspan == 'all':
         tspan = MS_data[tspan]  
@@ -390,9 +390,8 @@ def plot_experiment(EC_and_MS,
                     RE_vs_RHE=None, A_el=None, removebackground=True,
                     saveit=False, title=None, leg=False, unit='nmol/s',
                     masses=None, mols=None, #mols will overide masses will overide colors
-                    potentialcolor='k', currentcolor='r', 
-                    potentiallabel=None, currentlabel=None,
-                    fig=None,
+                    V_color='k', J_color='r', V_label=None, J_label=None,
+                    fig=None, J_str=None, V_str=None
                     ): 
     '''
     this plots signals or fluxes on one axis and current and potential on other axesaxis
@@ -422,8 +421,15 @@ def plot_experiment(EC_and_MS,
         tspan = EC_and_MS['tspan_2']
     if type(logplot) is not list:
         logplot = [logplot, False]
-
-    V_str, J_str = sync_metadata(EC_and_MS, RE_vs_RHE=RE_vs_RHE, A_el=A_el) #added 16J27... problem caught 17G26, fixed in sync_metadata
+    
+    if V_str is None or J_str is None: 
+        V_str_0, J_str_0 = sync_metadata(EC_and_MS, RE_vs_RHE=RE_vs_RHE, A_el=A_el) 
+        #added 16J27... problem caught 17G26, fixed in sync_metadata
+    if V_str is None: #this way I can get it to plot something other than V and J.
+        V_str = V_str_0
+    if J_str is None:
+        J_str = J_str_0
+    
     A_el = EC_and_MS['A_el']
 
     quantified = False      #added 16L15
@@ -455,6 +461,7 @@ def plot_experiment(EC_and_MS,
     V = EC_and_MS[V_str]
     J = EC_and_MS[J_str]      
 
+    # to check if I have problems in my dataset
     print('len(t) = ' + str(len(t)) + 
           '\nlen(V) = ' + str(len(V)) + 
           '\nlen(J) = ' + str(len(J)))
@@ -467,23 +474,33 @@ def plot_experiment(EC_and_MS,
 
     i_ax = 1
     if plotpotential:
-        ax[i_ax].plot(t, V, color=potentialcolor, label=potentiallabel)
+        ax[i_ax].plot(t, V, color=V_color, label=V_label)
         ax[i_ax].set_ylabel(V_str)
         if len(logplot) >2:
             if logplot[2]:
                 ax[i_ax].set_yscale('log')
         xlim = ax[i_ax-1].get_xlim()
         ax[i_ax].set_xlim(xlim)
+        ax[i_ax].yaxis.label.set_color(V_color)
+        ax[i_ax].tick_params(axis='y', colors=V_color)
+        ax[i_ax].spines['left'].set_color(V_color)
         i_ax += 1
         
     if plotcurrent:
-        ax[i_ax].plot(t, J, currentcolor, label=currentlabel)
+        ax[i_ax].plot(t, J, color=J_color, label=J_label)
         ax[i_ax].set_ylabel(J_str)
         ax[i_ax].set_xlabel('time / [s]')
         xlim = ax[i_ax-1].get_xlim()
         ax[i_ax].set_xlim(xlim)
         if logplot[1]: 
             ax[i_ax].set_yscale('log')
+        ax[i_ax].yaxis.label.set_color(J_color)
+        ax[i_ax].tick_params(axis='y', colors=J_color)
+        if i_ax == 2:
+            ax[i_ax].spines['right'].set_color(J_color)
+        else:
+            ax[i_ax].spines['left'].set_color(J_color)
+        
     if plotcurrent or plotpotential:
         ax[1].set_xlabel('time / [s]')
     
@@ -498,7 +515,7 @@ def plot_experiment(EC_and_MS,
     return ax
     
 def plot_masses_and_I(*args, **kwargs):
-    print('plot_masses_and_I renamed plot_experiment. Remember that next time!')
+    print('\n\n\'plot_masses_and_I\' has been renamed \'plot_experiment\'. Remember that next time!')
     return plot_experiment(*args, **kwargs)
 
 def plot_folder(folder_name, 
@@ -568,6 +585,121 @@ def plot_datapoints(integrals, colors, ax='new', label='', X=None, X_str='V',
     if logplot:
         ax.set_yscale('log')
     return ax
+
+
+
+
+def plot_operation(cc=None, t=None, j=None, z=None, tspan=None, results=None,
+                   plot_type='heat', ax='new', colormap='plasma', aspect='auto', 
+                   unit='pmol/s', dimensions=None, verbose=True):
+    if verbose:
+        print('\n\nfunction \'plot_operation\' at your service!\n')
+    # and plot! 
+    if type(cc) is dict and results is None:
+        results = cc
+        cc = None
+    if results is None:
+        results = {} #just so I don't get an error later
+    if cc is None:
+        cc = results['cc']
+    if t is None:
+        if 't' in results:
+            t = results['t']
+        elif 'x' in results:
+            t = results['x']
+        else:
+            t = np.linspace(0, 1, np.size(cc, axis=0))
+    if z is None:
+        if 'z' in results:
+            z = results['z']
+        elif 'y' in results:
+            z = results['y']
+        else:
+            z = np.linspace(0, 1, np.size(cc, axis=1))
+    if j is None:
+        if j in results:
+            j = results['j']
+        else:
+            j = cc[0, :]   
+    if dimensions is None:
+        if 'dimensions' in results:
+            dimensions = results['dimensions']
+        else:
+            dimensions = 'tz'
+    
+    
+    if tspan is None:
+        tspan = [t[0], t[-1]]
+    if plot_type == 'flux':   
+        if ax == 'new':
+            fig1 = plt.figure()
+            ax1 = fig1.add_subplot(111)
+        else:
+            ax1 = ax #making a heat map will only work with a new axis.
+        ax1.plot(t, j, label='simulated flux')
+        ax1.set_xlabel('time / s')
+        ax1.set_ylabel('flux / [' + unit + ']')
+        axes = ax1
+        
+    elif plot_type == 'heat' or plot_type == 'both':
+        if ax == 'new':
+            fig1 = plt.figure()
+            ax1 = fig1.add_subplot(111)
+        elif type(ax) is list: 
+            ax1 = ax[0]
+        else:
+            ax1 = ax
+        
+        #t_mesh, x_mesh = np.meshgrid(t,x)
+        #img = ax1.contourf(t_mesh, x_mesh*1e6, np.transpose(cc,[1,0]), cmap='Spectral', 
+        #                   levels=np.linspace(np.min(cc),np.max(cc),100))
+        
+        # imshow objects seem more versatile than contourf for some reason.
+        
+        trange = [min(t), max(t)]
+        if dimensions[0] == 'x':
+            trange = [t*1e3 for t in trange] # m to mm
+        zrange = [min(z*1e6), max(z*1e6)]
+        img = ax1.imshow(np.transpose(cc,[1,0]), 
+                         extent=trange[:] + zrange[:],  #have to be lists here!
+                         aspect=aspect, origin='lower',
+                         cmap = colormap)        
+        
+#        divider = make_axes_locatable(ax1)
+#        cax = divider.append_axes("right", size="5%", pad=0.05)
+#https://stackoverflow.com/questions/18195758/set-matplotlib-colorbar-size-to-match-graph
+
+        cbar = plt.colorbar(img, ax=ax1)
+        cbar.set_label('concentration / mM')
+        if dimensions[0] == 't':
+            ax1.set_xlabel('time / s')
+        elif dimensions[0] == 'x':
+            ax1.set_xlabel('position / mm')
+        ax1.set_ylabel('position  / um')
+        
+#        print('plot_type = ' + plot_type)
+        if plot_type == 'both':
+            if type(ax) is list:
+                ax2 = ax[1]
+            else:
+                ax2 = ax1.twinx()
+            ax2.set_ylabel('flux / [' + unit + ']')
+            ax2.plot(t, j, 'k-')
+            cbar.remove()
+            ax3 = img.figure.add_axes([0.85, 0.1, 0.03, 0.8])
+            cbar = plt.colorbar(img, cax=ax3)
+            cbar.set_label('concentration / mM')
+            ax1.set_xlim(tspan)
+            print('returning three axes!')
+            axes = [ax1, ax2, ax3]
+        else:
+            axes = [ax1, cbar]
+            
+    if verbose:
+        print('\nfunction \'plot_operation\' finished!\n\n')
+    return axes
+
+
 
     
 if __name__ == '__main__':
