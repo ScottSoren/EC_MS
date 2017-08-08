@@ -12,6 +12,7 @@ from EC_MS.Data_Importing import *
 from EC_MS.Combining import *
 from EC_MS.Plotting import *
 from EC_MS.EC import *
+from EC_MS.Quantification import * #17H08: why wasn't this included?
 from EC_MS.Molecules import *
 from EC_MS.Object_Files import *
 from EC_MS.Integrate_Signals import *

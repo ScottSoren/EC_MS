@@ -10,6 +10,7 @@ from matplotlib import pyplot as plt
 from matplotlib import gridspec
 import numpy as np
 import os
+#from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 if os.path.split(os.getcwd())[1] == 'EC_MS':      
                                 #then we're running from inside the package
@@ -660,6 +661,7 @@ def plot_operation(cc=None, t=None, j=None, z=None, tspan=None, results=None,
         if dimensions[0] == 'x':
             trange = [t*1e3 for t in trange] # m to mm
         zrange = [min(z*1e6), max(z*1e6)]
+        
         img = ax1.imshow(np.transpose(cc,[1,0]), 
                          extent=trange[:] + zrange[:],  #have to be lists here!
                          aspect=aspect, origin='lower',

@@ -1,11 +1,11 @@
+name: Cl2
 kH	=	0.42
 D	=	1.25e-09
 n_el	=	2.0
-calibration_16J13_16K17_Cl2_CP_pulse_1
+calibration_16J13_16K17_Cl2_CP_pulse_1	-	16J13_16K17_Cl2_CP_pulse_1
 	Notes:
 		sputtered Pt in 0.1M HCl
 		Cl2 signal did not reach steady state!
-	title: 16J13_16K17_Cl2_CP_pulse_1
 	n_mol	=	4.66394767065e-09
 	Q_el	=	0.00180003391631
 	raw_data: 01_steady_OER_HER_C01.mpr__as_0__and___PtTF02_new_chip_16J13_new_el_mass70__as_1__
@@ -20,11 +20,10 @@ calibration_16J13_16K17_Cl2_CP_pulse_1
 	chip: 16J13
 	F_cal	=	0.361371515512
 	analysis date: 16K17
-calibration_16J13_16K17_Cl2_CP_pulse_2
+calibration_16J13_16K17_Cl2_CP_pulse_2	-	16J13_16K17_Cl2_CP_pulse_2
 	Notes:
 		sputtered Pt in 0.1M HCl
 		Cl2 signal did not reach steady state!
-	title: 16J13_16K17_Cl2_CP_pulse_2
 	n_mol	=	6.99387722271e-09
 	Q_el	=	0.00269926189065
 	raw_data: 01_steady_OER_HER_C01.mpr__as_0__and___PtTF02_new_chip_16J13_new_el_mass70__as_1__
@@ -47,3 +46,31 @@ Spectrum
 	Title: NIST_16L14
 	M35	=	82.8782878288
 	M72	=	63.8563856386
+cal
+	M70	=	0.494525115678
+primary: M70
+formula: Cl2
+F_M70	=	0.494525115678
+F_cal	=	[ 15.39028266]
+spectrum
+	M70	=	100.0
+	M37	=	26.4226422642
+	M74	=	10.201020102
+	Title: NIST_16L14
+	M35	=	82.8782878288
+	M72	=	63.8563856386
+M	=	70.906
+IFCS
+	M70	=	2.1880422122611924
+	M37	=	0.5781385663354625
+	M74	=	0.2232026259130097
+	M35	=	1.813411922493474
+	M72	=	1.397204672996862
+ifcs	=	2.1880422122611924
+RSF
+	M70	=	2.1880422122611924
+	M37	=	0.5781385663354625
+	M74	=	0.2232026259130097
+	M35	=	1.813411922493474
+	M72	=	1.397204672996862
+rsf	=	2.1880422122611924

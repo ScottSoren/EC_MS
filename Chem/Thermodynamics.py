@@ -21,9 +21,9 @@ import numpy as np
 R = 8.3144598            #gas constant / (J/(mol*K))  #I'd like to import from PhysCon, but relative import is a pain.
 
 
-S0 = { # standard entropie / [J/(mol*K)]
+S0 = { # standard entropy / [J/(mol*K)]
       'H2O(g)':188.72, 'H2O(l)':69.940, 
-      'ethanol(g)':282, 'ethanol(l)':161,
+      'ethanol(g)':282, 'ethanol(l)':161, 'ethanol(aq)':None
       }
 dfH0 = { # standard enthalpies of formation / [kJ/mol]
         'H2O(g)': -241.82 ,'H2O(l)': -285.8, 
@@ -50,3 +50,7 @@ def p_vap(mol='H2O', T=298.15, unit='Pa'):
 
 if __name__ == '__main__':
     print(p_vap('H2O', T=298.15, unit='mbar'))
+    
+    
+    
+    

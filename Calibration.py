@@ -29,7 +29,7 @@ else:                           #then we use relative import
 
 
 
-def ML_strip_cal(CV_and_MS, cycles=[1,2], t_int=200,
+def ML_strip_cal(CV_and_MS, cycles=[1,2], t_int=200, cycle_str='cycle number',
              mol='CO2', mass='primary', n_el=None, 
              Vspan=[0.5, 1.0], redox=1, 
              ax='two', title='default', verbose=True,
@@ -74,7 +74,7 @@ def ML_strip_cal(CV_and_MS, cycles=[1,2], t_int=200,
         title = name + '_' + mass
     
 #    print(type(CV_and_MS)) #was having a problem due to multiple outputs.
-    cycles_data, ax1 = plot_CV_cycles(CV_and_MS, cycles, ax=ax1, title=title)
+    cycles_data, ax1 = plot_CV_cycles(CV_and_MS, cycles, ax=ax1, title=title, cycle_str=cycle_str)
     ax1.xaxis.tick_top()
     ax1.xaxis.set_label_position('top')
 #    print(type(cycles_data))
@@ -83,7 +83,7 @@ def ML_strip_cal(CV_and_MS, cycles=[1,2], t_int=200,
     #    ax1.set_title(title)    
     
     n_mol = Q_diff / (Chem.Far * n_el)   
-    t = diff[0][0]
+    t = diff[0]
     J_diff = diff[2]
     A_el = CV_and_MS['A_el']    
     

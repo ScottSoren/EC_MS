@@ -30,7 +30,7 @@ else:                           #then we use relative import
     
 def get_datapoints(dataset, cycles, mols=['H2','C2H4','CH4'], 
                    tspan=[0, 100], t_steady=[50, 60], Vcycle=0, 
-                   transient='CH4', colors=None,
+                   transient='CH4', colors=None, cycle_str=None,
                    plotcycles=False, plottransient=False, data_type='CA',
                    verbose=True):
     '''
@@ -87,9 +87,11 @@ def get_datapoints(dataset, cycles, mols=['H2','C2H4','CH4'],
     #get results: 
     for cycle in cycles:
         off_data = select_cycles(dataset, cycles=cycle+Vcycle, t_zero='start', 
-                                 data_type=data_type, verbose=verbose)
+                                 data_type=data_type, cycle_str=cycle_str, verbose=verbose)
+        #off_data is data from the cycle that the independent variable is obtained form
         on_data = select_cycles(dataset, cycles=[cycle, cycle+1], t_zero='start', 
-                                data_type=data_type, verbose=verbose)
+                                data_type=data_type, cycle_str=cycle_str, verbose=verbose)
+        #on_data is data from the cycle, and following cycle for the tail, that the dependent variable is obtained from
        
         t_off = off_data['time/s']
         V_off = off_data[V_str]

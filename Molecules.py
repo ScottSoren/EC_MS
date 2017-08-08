@@ -18,12 +18,15 @@ from matplotlib import pyplot as plt
 if os.path.split(os.getcwd())[1] == 'EC_MS':   
                                 #then we're running from inside the package
     import Chem
-    from Object_Files import structure_to_lines, lines_to_dictionary, lines_to_structure, date_scott
+    from Object_Files import structure_to_lines, lines_to_dictionary 
+    from Object_Files import lines_to_structure, date_scott, update_lines
 else:
     from . import Chem
-    from .Object_Files import structure_to_lines, lines_to_dictionary, lines_to_structure, date_scott
+    from .Object_Files import structure_to_lines, lines_to_dictionary 
+    from .Object_Files import lines_to_structure, date_scott, update_lines
 
 data_directory = os.path.dirname(os.path.realpath(__file__)) + os.sep + 'data'
+cwd = os.getcwd()
 #for python2:
 try:
     FileNotFoundError
@@ -50,7 +53,7 @@ class Molecule:
         else:
             self.formula = formula
         # 0 for undefined, 1 for loaded from file, 2 for set by function
-        file_name = name + '.txt'
+        file_name = self.name + '.txt'
         cwd = os.getcwd()
         os.chdir(data_directory)
         try: 
@@ -94,6 +97,23 @@ class Molecule:
             else:
                 print('Couldn''t write ' + str(a))
         os.chdir(cwd)
+    
+    
+    def rewrite(self, file='default'):
+        if file=='default':
+            file = self.name + '.txt'
+        
+        newlines = update_lines(self.file_lines, self.__dict__, 
+                                oldkeys=['file_lines', 'calibrations', 'attr_status', '__str__'],
+                                )
+        
+        if type(file) is str:
+            os.chdir(data_directory)
+            with open(file, 'w') as f:
+                f.writelines(newlines)
+            os.chdir(cwd)
+        else: 
+            file.writelines(newlines)
         
     
     def reset(self, verbose=True):
@@ -148,7 +168,7 @@ class Molecule:
           #  else:
           #      f.write(attr + '\t=\t' + str(self.attr) + '\n') #not necessary...
     
-    def get_RSF(self):
+    def get_RSF(self, RSF_source='NIST', mass='primary'):
         '''
         Requires that a spectrum and total ionization cross section are already 
         loaded, and preferably also a relative sensitivity factor.
@@ -164,29 +184,45 @@ class Molecule:
         for value in self.spectrum.values():
             if type(value) is not str:
                 spec_total += value
-        RSFit = 'Hiden' in dir(self)
-        if RSFit:
-            self.RSF = {}       #this will be the relative sensivity factor at each
-                    #mass, where N2 at M28 is 1, from Hiden Analytical  
-            mH = self.Hiden[0]
-            vH = self.Hiden[1]
-        else:
-            print('no RSF found for ' + self.name)
-        
-        for (mass, value) in self.spectrum.items():
-            if mass == 'Title':
+                
+        for (M, value) in self.spectrum.items():
+            if M == 'Title':
                 continue
-            self.IFCS[mass] = value / spec_total * self.sigma_100eV
-            if RSFit:
-                self.RSF[mass] = value / self.spectrum[mH] * vH
+            self.IFCS[M] = value / spec_total * self.sigma_100eV
         if 'primary' in dir(self):
             self.ifcs = self.IFCS[self.primary]
-            if RSFit:
+            
+        if RSF_source == 'Hiden':
+            try:
+                self.RSF = {}       #this will be the relative sensivity factor at each
+                        #mass, where N2 at M28 is 1, from Hiden Analytical  
+                mH = self.Hiden[0]
+                vH = self.Hiden[1]
+            except AttributeError: 
+                print('no Hiden RSF found for ' + self.name)
+                return None
+            for (M, value) in self.spectrum.items():
+                print(str(M) + ' ' + str(value))
+                if M == 'Title':
+                    continue
+                self.RSF[M] = value / self.spectrum[mH] * vH
+            if 'primary' in dir(self):
                 self.rsf = self.RSF[self.primary]
-                return self.rsf
+            print('returning Hiden rsf, adjusted to mass of measurement according' +
+                  'to NIST spectrum for ' + self.name)                    
+                    
+                    
+        elif RSF_source == 'NIST':
+            self.RSF = self.IFCS
+            if 'primary' in dir(self):
+                self.rsf = self.ifcs
             print('returning ionization-fragmentation cross section in Ang^2 \'ifcs\'' +
-                  ' instead of \'rsf\' for ' + self.name)
-
+                  'based on NIST cross section and spectrum for ' + self.name)
+            
+        if mass == 'primary':
+            mass = self.primary
+        
+        return self.RSF[mass]
 
     def plot_spectrum(self, top=100, ax='new'):
         if ax == 'new':
@@ -359,6 +395,16 @@ class Molecule:
 if __name__ == '__main__':
     plt.close('all')
     
+    H2 = Molecule('H2')
+    print(H2.F_cal)
+    H2.F_cal = 1.111
+    H2.rewrite('data/test.txt')
+    test = Molecule('test')
+    print(test.F_cal)
+    test.calibration_fit()
+    
+    
+    
     mols = {'CO2':('brown', 10),'H2':('b', 1),'O2':('k', 1)}
     fig = plt.figure()
     ax = fig.add_subplot(111)
@@ -366,13 +412,15 @@ if __name__ == '__main__':
         m = Molecule(mol)
         m.calibration_fit(ax=ax, color=color, plotfactor=plotfactor)
     ax.set_title('')
-    plt.savefig('Internal_calibrations.png')
+    #plt.savefig('Internal_calibrations.png')
     
     
-    mol = Molecule('C2H4')  
-    mol.plot_spectrum()
-    mol = Molecule('C2H6')  
-    mol.plot_spectrum()
+
+    #mol = Molecule('C2H4')  
+    #mol.plot_spectrum()
+    #mol = Molecule('C2H6')  
+    #mol.plot_spectrum()
+    
     
     
     

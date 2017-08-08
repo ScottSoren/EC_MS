@@ -25,7 +25,7 @@ else:                           #then we use relative import
     from .Combining import timestamp_to_seconds, is_time, cut
 
 
-def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True, cycle_str=None, data_type='CV'):
+def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True, cycle_str=None, cutMS=True, data_type='CV'):
     ''' 
     This function selects one or more cycles from EC_data_0.
     Use this before synchronizing!
@@ -77,10 +77,13 @@ def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True, cycle_str=None
     EC_data['tspan_0'] = tspan_2 + t0
     EC_data['data_type'] += ' selected'   
     
-    for col in EC_data['data_cols']:
-        if col[1] == 'M' and col[-2:] == '-x': #then we've got a QMS time variable
-            y_col = col[:-2] + '-y'
-            EC_data[col], EC_data[y_col] = cut(EC_data[col], EC_data[y_col], tspan_2)       
+    if cutMS:
+        for col in EC_data['data_cols']:
+            #print(col)
+            if col[0] == 'M' and col[-2:] == '-x': #then we've got a QMS time variable
+                y_col = col[:-2] + '-y'
+                #print('select cycles is cutting in MS data ' + col )
+                EC_data[col], EC_data[y_col] = cut(EC_data[col], EC_data[y_col], tspan_2)       
 
     if t_zero is not None:
         if verbose:
@@ -342,6 +345,7 @@ def sync_metadata(EC_data, RE_vs_RHE=None, A_el=None, verbose=True):
     
 
 def plot_CV_cycles(CV_data, cycles=[0], RE_vs_RHE=None, A_el=None, ax='new',
+                   cycle_str='cycle number',
                    saveit=0, title='default', leg=0, verbose=1, colors=None):
     '''
     plots a subset of cycles in a CV
@@ -361,7 +365,7 @@ def plot_CV_cycles(CV_data, cycles=[0], RE_vs_RHE=None, A_el=None, ax='new',
     data_to_return = [] 
     for n, cycle in enumerate(cycles):
 
-        cycle_data = select_cycles(CV_data, cycles=cycle, verbose=verbose)
+        cycle_data = select_cycles(CV_data, cycles=cycle, verbose=verbose, cycle_str=cycle_str)
         data_to_return += [cycle_data]  #added 16J25
 
         if ax is not None:

@@ -1,11 +1,11 @@
+name: CO2
 n_el	=	2.0
 kH	=	1.205
 D	=	1.92e-09
-calibration_16I28_16K17_CO_strip_1
+calibration_16I28_16K17_CO_strip_1	-	16I28_16K17_CO_strip_1
 	Notes:
 		sputtered Pt on GC
 		first use of calibration functions
-	title: 16I28_16K17_CO_strip_1
 	n_mol	=	6.70604024769e-10
 	Q_el	=	0.000129408612
 	raw_data: PtTF01_COstrip_HClO4__as_0__and___06_CV_CO_strip_C01.mpr__as_1__
@@ -20,11 +20,10 @@ calibration_16I28_16K17_CO_strip_1
 	chip: 16I28
 	F_cal	=	15.8384460555
 	analysis date: 16K17
-calibration_16I28_16K17_CO_strip_2
+calibration_16I28_16K17_CO_strip_2	-	16I28_16K17_CO_strip_2
 	Notes:
 		sputtered Pt on GC
 		first use of calibration functions
-	title: 16I28_16K17_CO_strip_2
 	n_mol	=	6.71277195927e-10
 	Q_el	=	0.000129538516
 	raw_data: PtTF01_COstrip_HClO4__as_0__and___09_CO_strip_C01.mpr__as_1__
@@ -39,11 +38,10 @@ calibration_16I28_16K17_CO_strip_2
 	chip: 16I28
 	F_cal	=	13.0956176338
 	analysis date: 16K17
-calibration_16I28_16K17_CO_strip_3
+calibration_16I28_16K17_CO_strip_3	-	16I28_16K17_CO_strip_3
 	Notes:
 		sputtered Pt on GC
 		first use of calibration functions
-	title: 16I28_16K17_CO_strip_3
 	n_mol	=	6.70832077148e-10
 	Q_el	=	0.00012945262
 	raw_data: PtTF01_COstrip_HClO4__as_0__and___10_CO_strip_again_C01.mpr__as_1__
@@ -58,11 +56,10 @@ calibration_16I28_16K17_CO_strip_3
 	chip: 16I28
 	F_cal	=	13.0179800519
 	analysis date: 16K17
-calibration_16J13_16K17_Cl2_CP_pulse_1
+calibration_16J13_16K17_Cl2_CP_pulse_1	-	16J13_16K17_Cl2_CP_pulse_1
 	Notes:
 		sputtered Pt in 0.1M HCl
 		CO2 signal did not reach steady state!
-	title: 16J13_16K17_Cl2_CP_pulse_1
 	n_mol	=	1.55119799456e-09
 	Q_el	=	0.000598679315955
 	raw_data: 10_HER_OER_old_Curr_new_QMS_C01.mpr__as_0__and___PtTF02_new_chip_16J13_new_el_mass70_2__as_1__
@@ -77,11 +74,10 @@ calibration_16J13_16K17_Cl2_CP_pulse_1
 	chip: 16J13
 	F_cal	=	13.1511828854
 	analysis date: 16K17
-calibration_16J13_16K17_Cl2_CP_pulse_2
+calibration_16J13_16K17_Cl2_CP_pulse_2	-	16J13_16K17_Cl2_CP_pulse_2
 	Notes:
 		sputtered Pt in 0.1M HCl
 		CO2 signal did not reach steady state!
-	title: 16J13_16K17_Cl2_CP_pulse_2
 	n_mol	=	2.32621919617e-09
 	Q_el	=	0.000897795975765
 	raw_data: 10_HER_OER_old_Curr_new_QMS_C01.mpr__as_0__and___PtTF02_new_chip_16J13_new_el_mass70_2__as_1__
@@ -108,5 +104,40 @@ Spectrum
 	M46	=	0.400040004
 	M16	=	9.61096109611
 Hiden	=	('M44', 1.17)
-#fit to calibrations on mass M44 16L15
-F_cal	=	14.9574848754
+F_cal	=	13.0340964396
+cal
+	M44	=	15.273086189
+primary: M44
+formula: CO2
+F_M44	=	15.273086189
+spectrum
+	M22	=	1.900190019
+	M28	=	9.81098109811
+	M29	=	0.100010001
+	M44	=	100.0
+	M12	=	8.71087108711
+	Title: NIST_16L14
+	M45	=	1.200120012
+	M46	=	0.400040004
+	M16	=	9.61096109611
+M	=	44.009
+IFCS
+	M22	=	0.053875645308176415
+	M28	=	0.27816846340723644
+	M29	=	0.002835560279377706
+	M44	=	2.8352767233526035
+	M12	=	0.24697730033408172
+	M45	=	0.03402672335253247
+	M46	=	0.011342241117510823
+	M16	=	0.27249734284848104
+ifcs	=	2.8352767233526035
+RSF
+	M22	=	0.053875645308176415
+	M28	=	0.27816846340723644
+	M29	=	0.002835560279377706
+	M44	=	2.8352767233526035
+	M12	=	0.24697730033408172
+	M45	=	0.03402672335253247
+	M46	=	0.011342241117510823
+	M16	=	0.27249734284848104
+rsf	=	2.8352767233526035

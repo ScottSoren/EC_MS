@@ -1,3 +1,4 @@
+name: He
 D	=	6.28e-09
 kH	=	110
 sigma_100eV	=	0.37
@@ -5,6 +6,18 @@ Spectrum
 	M4	=	100.0
 	Title: NIST_16L14
 Hiden	=	('M4', 0.39)
-#extrapolated from rsf on mass M4 16L15
-F_cal	=	[ 4.98582829]
+F_cal	=	[ 2.6025113]
 primary: M4
+c: a
+formula: He
+spectrum
+	M4	=	100.0
+	Title: NIST_16L14
+M: 4.002
+IFCS
+	M4	=	0.37
+ifcs	=	0.37
+RSF
+	M4	=	0.37
+rsf	=	0.37
+cal

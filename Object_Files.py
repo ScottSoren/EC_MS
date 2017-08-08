@@ -4,7 +4,9 @@ Created on Tue Nov  1 22:28 2016
 
 @author: scott
 
-This module provides badass functions for coordinating between objects and files
+This module provides badass functions for coordinating between complex
+objects and easily readable files. The compromise for so awesome a toolbox
+is that the tools themselves aren't easily readible. Good luck!
 
 """
 
@@ -15,7 +17,7 @@ import datetime
 
 float_match = r'\s[-]?\d+[\.]?\d*(e[-]?\d+)?\s'     #matches floats like -3.57e4
 
-def group_lines(lines, indent='\t', removecomments=1):
+def group_lines(lines, indent='\t', removecomments=True):
     '''
     Groups indentation blocks into list elements. The line before the 
     indentation block is included.
@@ -103,6 +105,10 @@ def structure_to_lines(structure, nest=0, indent='\t', toplevel=False,
         lines += [nest * indent + intro + str(structure) + '\n']
         
     return lines
+
+
+def dictionary_to_lines(dictionary, indent='\t'):
+    return structure_to_lines(dictionary, toplevel=True)
 
 
 def grouped_lines_to_structure(lines, indent='\t'):
@@ -197,9 +203,11 @@ def lines_to_attributes(lines, obj, verbose=1, indent='\t'):
         print('function \'lines_to_attributes\' finished!')
     #return obj #shouldn't be necessary
 
+
 def file_to_attributes(f, obj, verbose=1, indent='\t'):
     lines = f.readlines()
     return lines_to_attributes(lines, obj, verbose, indent)
+
 
 def attributes_to_file(f, obj, verbose=1, indent='\t'):
     if verbose:
@@ -216,6 +224,47 @@ def attributes_to_file(f, obj, verbose=1, indent='\t'):
         print('function \'attributes_to_file\' finished!')
     #return f #shouldn't be necessary
 
+
+def advanced_update(dict1, dict2, newstuff=True, oldstuff=False, 
+                 newkeys=[], oldkeys=[], mask=None):
+    '''
+    updates dict1 with dict2, but with options about which keys to add/update.
+    Default values give a normal update.
+    '''
+    
+    keys2 = list(dict2.keys()) # so that I don't have a dictionary changed size during iteration error
+    if not newstuff: 
+        #then don't add new keys
+        for key in keys2:
+            if key not in dict1.keys() and key not in newkeys:
+                dict2.pop(key, None)
+    if oldstuff or len(oldkeys)>0:  
+        #then don't replace values of (evt. select) existing keys
+        for key in keys2:
+            if (oldstuff and key in dict1.keys()) or key in oldkeys:
+                dict2.pop(key, None)
+    if mask is not None:
+        #then mask is a function evaluating to True if
+        #a key shouldn't be added or updated.
+        for key in keys2:
+            if mask(key):
+                dict2.pop(key)
+                
+    #print(type(dict2))
+    
+    dict1.update(dict2)
+    return dict1
+
+def update_lines(lines, dictionary, **kwargs):
+    '''
+    Does exactly what you'd think.
+    '''
+    dict1 = lines_to_dictionary(lines)
+    newdict = advanced_update(dict1, dictionary, **kwargs)
+    newlines = dictionary_to_lines(newdict)
+    
+    return newlines
+    
 
 def date_scott(date='today')  :
     '''
@@ -251,14 +300,14 @@ if __name__ == '__main__':
     a.birthday = date_scott() #today is it's birthday!
     a.mood = 'Happy'    #make it happy
     #write everything about the happy H2 molecule to a file
-    f = open('test_H2.txt', 'w')
+    f = open('data/test.txt', 'w')
     attributes_to_file(f, a)
     f.close() 
     #make a CO2 molecule from the data file... 
     b = Molecule('CO2')
     print(b.name)
     #... and confuse the shit out it!
-    f = open('test_H2.txt', 'r')
+    f = open('data/test.txt', 'r')
     file_to_attributes(f, b) #its attributes are reset with the H2 data
     f.close()
     print(b.name) #now it thinks it's H2.
