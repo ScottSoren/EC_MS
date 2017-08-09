@@ -122,7 +122,7 @@ def synchronize(Dataset_List, t_zero='start', append=None, cutit=0,
     if append:
         #add a datacolumn that can be used to separate again afterwards by file
         #as of now (17G28) can't think of an obvious way to keep previous file numbers
-        Combined_Data['file_number'] = []
+        Combined_Data['file number'] = [] #'file_number' renamed 'file number' for consistency 17H09
         
     for i, Dataset in enumerate(Dataset_List):
         print('cols in ' + Dataset['title'] + ':\n' + str(Dataset['data_cols']))
@@ -151,8 +151,8 @@ def synchronize(Dataset_List, t_zero='start', append=None, cutit=0,
             if 'time/s' in Dataset:
                 l1 = len(Dataset['time/s'])
                 fn = np.array([i]*l1)
-                Combined_Data['file_number'] = np.append(Combined_Data['file_number'], fn) 
-                print('len(file_number) = ' + str(len(Combined_Data['file_number'])))
+                Combined_Data['file number'] = np.append(Combined_Data['file number'], fn) 
+                print('len(Combined_Data[\'file number\']) = ' + str(len(Combined_Data['file number'])))
             else:
                 print('\'time/s\' in Dataset is False')
             if 'time/s' in Combined_Data:
@@ -215,7 +215,9 @@ def synchronize(Dataset_List, t_zero='start', append=None, cutit=0,
                     print('filling ' + col + ' with ' + str(len(fill)) + ' zeros')
                     Combined_Data[col] = np.append(Combined_Data[col], fill)
         if append:
-            Combined_Data['data_cols'].append('file_number')
+            Combined_Data['data_cols'].append('file number') #for new code
+            Combined_Data['file_number'] = Combined_Data['file number'] #for old code
+            Combined_Data['data_cols'].append('file_number') #for old code
         
     if verbose:
         print('function \'synchronize\' finsihed!\n\n')   
@@ -223,21 +225,61 @@ def synchronize(Dataset_List, t_zero='start', append=None, cutit=0,
     return Combined_Data        
 
     
-def cut(x, y, tspan):
+def cut(x, y, tspan=None, returnindeces=False):
     if tspan is None:
         return x, y
-    I_keep = [I for (I, x_I) in enumerate(x) if tspan[0]<x_I<tspan[-1]]
-    x = x.copy()[I_keep]
-    y = y.copy()[I_keep]
+    
     if np.size(x) == 0:
         print('\nfunction \'cut\' received an empty input\n')
         offerquit()
-    elif np.size(I_keep) == 0:
+        
+    I_keep = [I for (I, x_I) in enumerate(x) if tspan[0]<x_I<tspan[-1]]
+    
+    if np.size(I_keep) == 0:
         print ('\nWarning! cutting like this leaves an empty dataset!\n' +
                'x goes from ' + str(x[0]) + ' to ' + str(x[-1]) + 
                 ' and tspan = ' + str(tspan) + '\n')
         offerquit()
+        
+    x = x.copy()[I_keep]
+    y = y.copy()[I_keep]
+    
+    if returnindeces:
+        return x, y, I_keep #new 17H09
     return x, y
+
+
+def cut_dataset(dataset_0, tspan=None):
+    '''
+    Makes a time-cut of a dataset. Written 17H09.
+    Unlike time_cut, does not ensure all MS data columns are the same length.
+    '''
+    print('\n\nfunction \'cut dataset\' at your service!\n') 
+    dataset = dataset_0.copy()
+    if tspan is None:
+        return dataset
+    #print(dataset['title'])
+    # I need to cunt non-time variables irst
+    indeces = {} #I imagine storing indeces improves performance
+    for col in dataset['data_cols']:
+        #print(col + ', length = ' + str(len(dataset[col])))
+        if is_time(col): #I actually don't need this. 
+            continue #yes I do, otherwise it cuts it twice.
+        timecol = get_time_col(col)
+        #print(timecol + ', timecol length = ' + str(len(dataset[timecol])))
+        if timecol in indeces.keys():
+            #print('already got indeces, len = ' + str(len(indeces[timecol])))
+            
+            dataset[col] = dataset[col].copy()[indeces[timecol]]
+        else:
+            #print('about to cut!')
+            dataset[timecol], dataset[col], indeces[timecol] = (
+             cut(dataset[timecol], dataset[col], 
+                 tspan=tspan, returnindeces=True) 
+             )
+    print('\nfunction \'cut dataset\' finsihed!\n\n') 
+    return dataset
+
 
 def offerquit():
     yn = input('continue? y/n\n')
@@ -367,11 +409,14 @@ def seconds_to_timestamp(seconds):
     return timestamp
 
 def dayshift(dataset, days=1):
-    ''' Can work for up to 4 days. After that, hh becomes hhh... '''
+    ''' Can work for up to 4 days. After that, hh becomes hhh... 
+    '''
     dataset['timestamp'] = seconds_to_timestamp(timestamp_to_seconds(dataset['timestamp']) + days*24*60*60) 
     return dataset
 
-def sort_time(dataset_0, data_type='EC', verbose=True):
+def sort_time(dataset_0, data_type='EC', verbose=False):
+    #17H09: I would prefer for this to operate on the original dictionary, so
+    #that I don't need to read the return.
         dataset = {}
         if verbose:
             print('\nfunction \'sort_time\' at your service!\n\n')
@@ -424,7 +469,8 @@ def sort_time(dataset_0, data_type='EC', verbose=True):
         if verbose:
             print('\nfunction \'sort_time\' finished!\n\n')    
         
-        return dataset, sort_indeces
+        return dataset, sort_indeces 
+    #if I need to read the return for normal use, then I don't want sort_indeces
     
     
 

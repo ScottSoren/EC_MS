@@ -320,7 +320,7 @@ def stagnant_operator(tj=None, tpulse=10, tspan=None, j_el=-1,
         #plotting was moved on 17G30 some legacy code here:
     if plot_type is not None and ax is not None:
         print('We recommend you plot seperately, using the function \'operator plots\'.' )
-        axes = plot_operation(cc=cc, t=t, z=z, j=j, ax=ax, 
+        axes = plot_operation(cc=cc, t=t, z=z, j=j, ax=ax,
                              plot_type=plot_type, colormap=colormap, aspect=aspect,
                              verbose=verbose)
         if verbose:  

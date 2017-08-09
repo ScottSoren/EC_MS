@@ -20,9 +20,11 @@ import os
 
 if os.path.split(os.getcwd())[1] == 'EC_MS':      
                                 #then we're running from inside the package
-    from Combining import timestamp_to_seconds, is_time, cut
+    from Combining import timestamp_to_seconds, is_time, cut 
+    from Combining import cut_dataset#, get_time_col
 else:                           #then we use relative import
-    from .Combining import timestamp_to_seconds, is_time, cut
+    from .Combining import timestamp_to_seconds, is_time, cut 
+    from .Combining import cut_dataset#, get_time_col
 
 
 def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True, cycle_str=None, cutMS=True, data_type='CV'):
@@ -71,10 +73,10 @@ def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True, cycle_str=None
                     'type(I_keep) = ' + str(type(I_keep)))
             good = False
     t0 = timestamp_to_seconds(EC_data['timestamp'])
-    tspan_2 = np.array([min(EC_data['time/s']), max(EC_data['time/s'])])
-    EC_data['tspan'] = tspan_2
-    EC_data['tspan_2'] = tspan_2
-    EC_data['tspan_0'] = tspan_2 + t0
+    tspan = np.array([min(EC_data['time/s']), max(EC_data['time/s'])])
+    EC_data['tspan'] = tspan
+    EC_data['tspan_2'] = tspan
+    EC_data['tspan_0'] = tspan + t0
     EC_data['data_type'] += ' selected'   
     
     if cutMS:
@@ -83,7 +85,7 @@ def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True, cycle_str=None
             if col[0] == 'M' and col[-2:] == '-x': #then we've got a QMS time variable
                 y_col = col[:-2] + '-y'
                 #print('select cycles is cutting in MS data ' + col )
-                EC_data[col], EC_data[y_col] = cut(EC_data[col], EC_data[y_col], tspan_2)       
+                EC_data[col], EC_data[y_col] = cut(EC_data[col], EC_data[y_col], tspan)       
 
     if t_zero is not None:
         if verbose:
@@ -92,12 +94,15 @@ def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True, cycle_str=None
         if type(t_zero) is str:
             try:
                 n = eval(t_zero)
+                #e.g. t_zero = '3' sets t=0 to the start of the third cycle, 
+                #regardless of the selected cycles 
                 if type(n) is not int:
                     raise NameError
                 t_zero = next(EC_data['time/s'][i] for i,c in enumerate(EC_data[cycle_str]) if c==n)
+
             except NameError:     
                 #this should be the case if t_zero=='start'
-                t_zero = tspan_2[0]
+                t_zero = tspan[0]
             if verbose:
                 print('aka, shifting by t_zero=' + str(t_zero))
                 
@@ -105,7 +110,7 @@ def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True, cycle_str=None
             if is_time(col):
                 EC_data[col] = EC_data[col] - t_zero
 
-        EC_data['tspan'] = tspan_2 - tspan_2[0] - t_zero
+        EC_data['tspan'] = tspan - t_zero #fixed from tspan - tspan[0] - t_zero 17H09
         EC_data['tspan_2'] = EC_data['tspan']
         
     EC_data['good'] = good
@@ -215,6 +220,98 @@ def CV_difference(cycles_data, redox=1, Vspan=[0.5, 1.0],
     
     return dQ, [t, V, J_diff]
 
+
+def clip_cycles(dataset, cycles=1, V_clip=0, redox=1, V_str=None, t_str='time/s',
+                redox_str='ox/red', verbose=True, closecycle=False):
+    '''
+    puts the clip at a specified potential (or other data column given 
+    by V_str) V_clip, and returns a subset given by indeces in cycles. By
+    default returns the first full cycle in the dataset.
+    if redox=1, cuts on the anodic sweep, if redox=0 on the cathodic sweep.
+    '''
+    if verbose:
+        print('\n\nfunction \'clip_cycles\' at your service!\n')       
+    
+    if V_str is None:
+        V_str, J_str = sync_metadata(dataset, verbose=verbose)
+        
+    if type(cycles) is int:  #my need to always do this kind of thing is 
+        cycles = [cycles]    #an annoying aspect of python.
+    
+    t, V, ro = dataset[t_str].copy(), dataset[V_str].copy(), dataset[redox_str].copy() 
+    #wouldn't want these to get fucked up
+    N = len(V)
+    
+    if redox: #I think this is more efficient than putting the if inside the
+    #function, because it doesn't have to keep reevaluating truth value of redox
+        def condition(I):
+            return V[I] > V_clip and ro[I] == 1
+        #V[I+1] > V[I] doesn't always work. 
+    else:
+        def condition(I):
+            return V[I] < V_clip and not ro[I] == 0
+    n = 0
+
+    I_start = 0 #so that I get point 0 in the first cycle.
+    I_next = 1
+    cyclesets = []
+    endit = False
+    while n < max(cycles):
+        print('I_start = ' + str(I_start))        
+        print('t[I_start] = ' + str(t[I_start]))
+        print('V[I_start] = ' + str(V[I_start]))
+        try:
+            I_finish = next(I for I in range(I_next, N) if condition(I))
+            print('I_finish = ' + str(I_finish))        
+            print('t[I_finish] = ' + str(t[I_finish]))
+            print('V[I_finish] = ' + str(V[I_finish]))
+        except StopIteration:
+            print('StopIteration')
+            I_finish = N-1
+            endit = True
+        except IndexError:
+            print('IndexError')
+            endit = True
+            I_finish = N-1        
+        tspan = [t[I_start], t[I_finish]]
+        if not tspan[1] > tspan[0]:
+            print('warning! tspan = ' + str(tspan))
+        print('cutting dataset')
+        c = cut_dataset(dataset, tspan)
+        if closecycle:
+            c = closecycle[c]
+        cyclesets += [c]
+        print('got a cycle! len(cyclesets) = ' + str(len(cyclesets)))
+        if endit:
+            print('but also hit a problem. We\'re done here.')
+            break
+        I_start = I_finish
+        I_next = next(I for I in range(I_finish+1, N) if not condition(I))
+        #Choose I_next to be on the subsequent scan, so that I don't just
+        #cut it into a lot of single points.
+        
+    if len(cycles) == 1:
+        try:
+            return cyclesets[cycles[0]]
+        except IndexError:
+            print('couldn\'t get your cycle. returning the first one.')
+            return cyclesets[0]
+    return [cyclesets[i] for i in cycles] #Whoa.
+
+def close_cycle(cycle_0):
+    '''
+    joins the ends of the data in a cycle to make it 
+    look nice when plotted vs potential.
+    '''
+    cycle = cycle_0.copy()
+    for col in cycle['data_cols']:
+        x = cycle[col]
+        if is_time(col):
+            x = np.append(x,2 * x[-1] - x[-2]) #continue same t spacing
+        else:
+            x = np.append(x, x[0])
+        cycle[col] = x
+    return cycle
     
 def smooth_pulses(CA_Data_0, verbose=1):
     '''

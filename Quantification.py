@@ -273,10 +273,12 @@ def get_signal(MS_data, mass, tspan='tspan_2', removebackground=False,
         elif unit[:-1] == 'u' or unit[:-1] == 'micro':
             y = y*1e6
     
-    if type(tspan) is str and not tspan == 'all':
+    if tspan is None:
+        tspan = 'tspan'
+    if type(tspan) is str and not tspan=='all':
         tspan = MS_data[tspan]
-    if tspan is not None and not tspan == 'all':
-        x, y = cut(x,y,tspan) 
+    if not tspan == 'all':
+        x, y = cut(x,y,tspan)  
     
     if removebackground:
         if type(removebackground) is float:
@@ -313,9 +315,11 @@ def get_flux(MS_data, mol, tspan='tspan_2', removebackground=False,
     if 'cm^2' in unit:
         y = y / MS_data['A_el']
     
-    if type(tspan) is str:
+    if tspan is None:
+        tspan = 'tspan'
+    if type(tspan) is str and not tspan=='all':
         tspan = MS_data[tspan]
-    if tspan is not None:
+    if not tspan == 'all':
         x, y = cut(x,y,tspan) 
     
     if removebackground:

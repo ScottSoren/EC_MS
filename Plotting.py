@@ -40,13 +40,16 @@ def plot_vs_potential(CV_and_MS_0,
                       colors={'M2':'b','M4':'r','M18':'0.5','M28':'g','M32':'k'},
                       tspan=0, RE_vs_RHE=None, A_el=None, cycles='all',
                       ax1='new', ax2='new', ax=None, #spec='k-',
-                      overlay=0, logplot = [1,0], leg=1,
+                      overlay=0, logplot = [1,0], leg=False,
                       verbose=True, removebackground = None,
                       masses=None, mols=None, unit=None,
                       fig=None, spec={}):
     '''
     This will plot current and select MS signals vs E_we, as is the 
     convention for cyclic voltammagrams. added 16I29
+    
+    #there's a lot of code here that's identical to plot_experiment. Consider
+    #having another function for e.g. processing these inputs.
     '''
     if verbose:
         print('\n\nfunction \'plot_vs_potential\' at your service!\n')
@@ -82,7 +85,7 @@ def plot_vs_potential(CV_and_MS_0,
     else:
         if ax1=='new':
             gs = gridspec.GridSpec(3, 1)
-            gs.update(hspace=0.025)
+            #gs.update(hspace=0.025)
             ax1 = plt.subplot(gs[0:2, 0])
             ax2 = plt.subplot(gs[2, 0])
     if type(logplot) is int:
@@ -120,7 +123,7 @@ def plot_vs_potential(CV_and_MS_0,
             colors = mols
             quantified = True
         elif ((type(colors) is dict and list(colors.keys())[0][0] == 'M') or
-              (type(colors) is list and colors[0][0] == 'M' )):
+              (type(colors) is list and type(colors[0]) is str and colors[0][0] == 'M' )):
             if masses is None:
                 masses = colors
             else:
@@ -140,7 +143,10 @@ def plot_vs_potential(CV_and_MS_0,
             colors = {}
             for m in c:
                 if quantified:
-                    mol = Molecule(m, verbose=False)
+                    if type(m) is str:
+                        mol = Molecule(m, verbose=False)
+                    else:
+                        mol = m  
                     color = standard_colors[mol.primary]
                     colors[mol] = color
                 else:
@@ -174,7 +180,7 @@ def plot_vs_potential(CV_and_MS_0,
         if quantified:
             M_str = 'flux / [' + unit + ']'
         else:
-            M_str = 'signal / [' + unit + ']'
+            M_str = 'MS signal / [' + unit + ']'
         #ax1.set_xlabel(V_str)
         ax1.xaxis.tick_top()
         ax1.set_ylabel(M_str)
@@ -214,8 +220,8 @@ def plot_vs_time(Dataset, cols_1='input', cols_2='input', verbose=1):
         y = np.log(Dataset[pltpair[1]])/np.log(10)
         axes_1.plot(x,y, label = label_string)
         
-    axes_1.set_xlabel('time / s')
-    axes_1.set_ylabel('log(signal/[a.u.])')
+    axes_1.set_xlabel('time / [s]')
+    axes_1.set_ylabel('log(MS signal / [a.u.])')
     axes_1.legend()    
     
     if cols_2=='input':
@@ -232,8 +238,8 @@ def plot_vs_time(Dataset, cols_1='input', cols_2='input', verbose=1):
         x = np.insert(Dataset[pltpair[0]],0,0)
         y = np.insert(Dataset[pltpair[1]],0,0)
         axes_2.plot(x,y,'k--',label=label_string)
-    axes_2.set_ylabel('current / mA')
-    axes_2.set_xlabel('time / s')
+    axes_2.set_ylabel('current / [mA]')
+    axes_2.set_xlabel('time / [s]')
     axes_2.legend()
     #so capacitance doesn't blow it up:
     I_plt_top = np.where(x>2)[0][0]
@@ -294,10 +300,9 @@ def plot_signal(MS_data,
         fig1 = plt.figure()
         ax = fig1.add_subplot(111)    
     lines = {}
-    if tspan is None:                  #then use the range of overlap
-        tspan = MS_data['tspan_2']  
-    elif type(tspan) is str and not tspan == 'all':
-        tspan = MS_data[tspan]  
+    #note, tspan is processed in get_signal, and not here!
+    if type(masses) is str:
+        masses = [masses]
     if type(masses) is list:
         c = masses
         masses = {}
@@ -316,7 +321,7 @@ def plot_signal(MS_data,
             leg = 'lower right'
         ax1.legend(loc=leg)
     ax.set_xlabel('time / [s]')
-    ax.set_ylabel('signal / [' + unit + ']')           
+    ax.set_ylabel('MS signal / [' + unit + ']')           
     if logplot: 
         ax.set_yscale('log') 
     if verbose:
@@ -340,16 +345,23 @@ def plot_flux(MS_data, mols={'H2':'b', 'CH4':'r', 'C2H4':'g', 'O2':'k'},
     if ax == 'new':
         fig1 = plt.figure()
         ax = fig1.add_subplot(111)  
-    if type(tspan) is str:
-        tspan = MS_data[tspan]
+    #note, tspan is processed in get_flux, and not here!
+    
+    if type(mols) is not list and type(mols) is not dict:
+        #then it's probably just one molecule object.
+        mols = [mols]
+    
     if type(mols) is list:
         c = mols
         mols = {}
         for m in c:
-            mol = Molecule(m, verbose=False)
+            if type(m) is str:
+                mol = Molecule(m, verbose=False)
+            else:
+                mol = m  #this function should accept a list of Molecule instances!
             color = standard_colors[mol.primary]
             mols[mol] = color
-        
+    
     for (mol, color) in mols.items():
         [x,y] = get_flux(MS_data, mol, unit=unit, verbose=verbose, tspan=tspan)
         '''  17A28: this is now taken care of in the line above.
@@ -389,7 +401,7 @@ def plot_experiment(EC_and_MS,
                     tspan=None, overlay=False, logplot=[True,False], verbose=True,   
                     plotpotential=True, plotcurrent=True, ax='new',
                     RE_vs_RHE=None, A_el=None, removebackground=True,
-                    saveit=False, title=None, leg=False, unit='nmol/s',
+                    saveit=False, title=None, leg=False, unit='pmol/s',
                     masses=None, mols=None, #mols will overide masses will overide colors
                     V_color='k', J_color='r', V_label=None, J_label=None,
                     fig=None, J_str=None, V_str=None
@@ -412,19 +424,22 @@ def plot_experiment(EC_and_MS,
             ax += [ax[0].twinx()]                     
         else:
             gs = gridspec.GridSpec(3, 1)
-            gs.update(hspace=0.025)
+            #gs.update(hspace=0.025)
+            #gs.update(hspace=0.05)
             ax = [plt.subplot(gs[0:2, 0])]
             ax += [plt.subplot(gs[2, 0])]
             if plotcurrent and plotpotential:
                 ax += [ax[1].twinx()]
         
     if tspan is None:                  #then use the whole range of overlap
-        tspan = EC_and_MS['tspan_2']
+        tspan = EC_and_MS['tspan'] #changed from 'tspan_2' 17H09
+    if type(tspan) is str and not tspan=='all':
+        tspan = EC_and_MS[tspan]
     if type(logplot) is not list:
         logplot = [logplot, False]
     
     if V_str is None or J_str is None: 
-        V_str_0, J_str_0 = sync_metadata(EC_and_MS, RE_vs_RHE=RE_vs_RHE, A_el=A_el) 
+        V_str_0, J_str_0 = sync_metadata(EC_and_MS, RE_vs_RHE=RE_vs_RHE, A_el=A_el, verbose=verbose) 
         #added 16J27... problem caught 17G26, fixed in sync_metadata
     if V_str is None: #this way I can get it to plot something other than V and J.
         V_str = V_str_0
@@ -434,10 +449,15 @@ def plot_experiment(EC_and_MS,
     A_el = EC_and_MS['A_el']
 
     quantified = False      #added 16L15
+    #print(type(colors))
+    #if type(colors) is list and type(colors[0]) is not str:
+    #    print(type(colors[0]))
     if mols is not None:
         quantified = True
     elif ((type(colors) is dict and list(colors.keys())[0][0] == 'M') or
-          (type(colors) is list and colors[0][0] == 'M' )):
+          (type(colors) is list and type(colors[0]) is str and colors[0][0] == 'M' ) or
+          (type(colors) is str and colors[0]=='M')):
+        print('uncalibrated data to be plotted.')
         if masses is None:
             masses = colors
     else:
@@ -463,9 +483,9 @@ def plot_experiment(EC_and_MS,
     J = EC_and_MS[J_str]      
 
     # to check if I have problems in my dataset
-    print('len(t) = ' + str(len(t)) + 
-          '\nlen(V) = ' + str(len(V)) + 
-          '\nlen(J) = ' + str(len(J)))
+#    print('len(t) = ' + str(len(t)) + 
+#          '\nlen(V) = ' + str(len(V)) + 
+#          '\nlen(J) = ' + str(len(J)))
     
     if tspan is not 'all':
         I_keep = [I for (I, t_I) in enumerate(t) if tspan[0]<t_I and t_I<tspan[1]]
@@ -638,7 +658,7 @@ def plot_operation(cc=None, t=None, j=None, z=None, tspan=None, results=None,
         else:
             ax1 = ax #making a heat map will only work with a new axis.
         ax1.plot(t, j, label='simulated flux')
-        ax1.set_xlabel('time / s')
+        ax1.set_xlabel('time / [s]')
         ax1.set_ylabel('flux / [' + unit + ']')
         axes = ax1
         
@@ -672,12 +692,12 @@ def plot_operation(cc=None, t=None, j=None, z=None, tspan=None, results=None,
 #https://stackoverflow.com/questions/18195758/set-matplotlib-colorbar-size-to-match-graph
 
         cbar = plt.colorbar(img, ax=ax1)
-        cbar.set_label('concentration / mM')
+        cbar.set_label('concentration / [mM]')
         if dimensions[0] == 't':
-            ax1.set_xlabel('time / s')
+            ax1.set_xlabel('time / [s]')
         elif dimensions[0] == 'x':
-            ax1.set_xlabel('position / mm')
-        ax1.set_ylabel('position  / um')
+            ax1.set_xlabel('position / [mm]')
+        ax1.set_ylabel('position / [um]')
         
 #        print('plot_type = ' + plot_type)
         if plot_type == 'both':
@@ -690,7 +710,7 @@ def plot_operation(cc=None, t=None, j=None, z=None, tspan=None, results=None,
             cbar.remove()
             ax3 = img.figure.add_axes([0.85, 0.1, 0.03, 0.8])
             cbar = plt.colorbar(img, cax=ax3)
-            cbar.set_label('concentration / mM')
+            cbar.set_label('concentration / [mM]')
             ax1.set_xlim(tspan)
             print('returning three axes!')
             axes = [ax1, ax2, ax3]
@@ -701,7 +721,44 @@ def plot_operation(cc=None, t=None, j=None, z=None, tspan=None, results=None,
         print('\nfunction \'plot_operation\' finished!\n\n')
     return axes
 
+def set_figparams(figwidth=8,aspect=4/3,fontsize=7,figpad=0.15,figgap=0.08):
+    import matplotlib as mpl
+    
+    #figwidth=8  #figwidth in cm width 20.32cm = 8inches being standard and thesis textwidth being 12.
+    #aspect=4/3  #standard is 4/3
 
+    #fontsize=7  #standard is 12.0pt, thesis is 10.0pt and footnotesize is 8.0pt and lower case seems to be 2/3 of full font size, which makes 7pt "nice" for thesis plotting
+    
+    realfigwidth=20*(fontsize/12)*1.2  #a factor 1.2 makes all lines "equaly thick" - make this 1 for figwidth=4cm (sniff2fig6)
+    #figsize=[20.32,15.24]
+    figsize=[realfigwidth,realfigwidth/aspect]
+    
+    mpl.rc('font', size=fontsize*(realfigwidth/figwidth))
+    
+    mpl.rc('mathtext', fontset='custom',
+                       rm='Helvetica',
+                       #it='Helvetica:italic',
+                       #bf='Helvetica:bold',
+                       )
+    
+    mpl.rc('figure', figsize=[figsize[0]/2.54,figsize[1]/2.54],
+                     dpi=100*2.54*figwidth/realfigwidth
+                     )
+    
+    #figpad=0.14  #fraction of figure size
+    #figgap=0.08  #fraction of figure size
+    mpl.rc('figure.subplot', left=figpad,
+                             right=1-figpad,
+                             bottom=figpad,
+                             top=1-figpad,
+                             hspace=figgap,
+                             )
+    mpl.rc('xtick', labelsize='small') 
+    mpl.rc('ytick', labelsize='small')
+    
+    #mpl.rc('axes', labelweight='medium')
+    
+    mpl.rc('savefig', dpi=250*2.54*figwidth/realfigwidth)
 
     
 if __name__ == '__main__':
