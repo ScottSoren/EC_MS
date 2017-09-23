@@ -25,7 +25,7 @@ else:
     from .Object_Files import structure_to_lines, lines_to_dictionary 
     from .Object_Files import lines_to_structure, date_scott, update_lines
 
-data_directory = os.path.dirname(os.path.realpath(__file__)) + os.sep + 'data'
+data_directory = os.path.dirname(os.path.realpath(__file__)) + os.sep + 'data' + os.sep + 'molecules'
 cwd = os.getcwd()
 #for python2:
 try:
@@ -49,7 +49,9 @@ class Molecule:
         self.attr_status = {'D':0,'kH':0,'n_el':0}
         if formula is None:
             self.attr_status['formula'] = 0 #so that it asks me for a formula when initializing the file.
+            self.attr_status['M'] = 0
             self.formula = name #but just put the name for now.
+            self.M = Chem.Mass(self.formula)
         else:
             self.formula = formula
         # 0 for undefined, 1 for loaded from file, 2 for set by function
@@ -60,24 +62,67 @@ class Molecule:
             with open(file_name,'r') as f:
                 self.file_lines = f.readlines()
                 if len(self.file_lines) == 0:
-                    print('The file for ' + name + ' is empty! Writing new.')
+                    print('The file for ' + name + ' is empty!')
                     raise FileNotFoundError
             self.reset(verbose=verbose)
             self.file_lines = ['name: ' + self.name] + self.file_lines
         except FileNotFoundError: # I don't know the name of the error, so I'll have to actually try it first.
             print('no file found for ' + name)  
             if writenew:
+                string = input('Start new data file for \'' + self.name + '\'? (y/n)\n')
+                if string == 'n':
+                    return None
                 print('Writing new.\n')
                 self.write(self.write_new)
+            else:
+                string = input('Start Molecule object \'' + self.name + '\' from scratch? (y/n)')
+                if string == 'n':
+                    return None
         os.chdir(cwd)
         
-        self.M = Chem.Mass(self.formula) #molar mass from chemical formula
+        if self.M == 0:
+            self.M = Chem.Mass(self.formula)
+            
+        def T(M):
+            return M
+        self.transmission_function = T
+        
     
-    
-    def write(self, a, *args, **kwargs):
+    def write(self, a=None, attr=None, *args, **kwargs):
+        '''
+        
+        ... could move this to Object_Files, but a bit tricky
+        
+        this is supposed to be a versitile tool for writing to the Molecule's
+        data file. Whether the added intricacy will be worth the lines of code
+        it saves, I can't tell yet.
+        
+        Writes in one of the following ways:
+            
+        1. If the name of an attribute is given, that attribute is written.
+        2. If a is a string, simply write a to the molecule's datafile.
+        3. If a is a function, then it's a function that writes what you want
+           to the data file given in the first argument
+        4. If a is a dictionary, list, or tuple, convert it to lines according to
+           the system encoded in Object_Files.
+        5. If a is not given but keyword arguments are, write **kwargs to the 
+           data file according to the system encoded in Object_Files.
+        '''
+        
+        
+        if attr is not None:
+            a = (attr, getattr(self, attr))
+        elif a is None:
+            if len(kwargs) == 0:
+                print('nothing to write.')
+                return
+            else:
+                a = kwargs
+   
         cwd = os.getcwd()
         os.chdir(data_directory)
         file_name = self.name + '.txt'
+        
         with open(file_name, 'a') as f:
             if callable(a):
                 a(f, *args, **kwargs)
@@ -133,7 +178,7 @@ class Molecule:
                 setattr(self, key, value)
         
         if 'F_cal' not in dir(self) and 'primary' in dir(self):
-            if not self.primary is None:
+            if not self.primary is None and len(self.calibrations) > 0:
                 self.F_cal =  self.calibration_fit(mass='primary', ax=None,
                                                    useit=True, primary=True, verbose=True)
         elif type(self.F_cal) is list and len(self.F_cal) == 1:
@@ -147,7 +192,7 @@ class Molecule:
     def write_new(self, f):
         for (attr, status) in self.attr_status.items():
             if status == 0: 
-                string = input('Enter ' + attr + ' for ' + self.name + ' or just whitespace.\n')
+                string = input('Enter ' + attr + ' for ' + self.name + ' or whitespace to get default.\n')
                 if len(string.strip()) == 0:
                     print('skipped that for now.')
                     continue
@@ -162,13 +207,13 @@ class Molecule:
                     self.attr_status = '2' #just for irony, I'll save this status as not a float.
                     setattr(self, attr, value) 
                     f.write(attr + ': ' + str(value) + '\n')                    
-                    
 
                # self.file_lines = f.readlines() #doesn't work. But what if I need to reset later?
           #  else:
           #      f.write(attr + '\t=\t' + str(self.attr) + '\n') #not necessary...
     
-    def get_RSF(self, RSF_source='NIST', mass='primary'):
+    def get_RSF(self, RSF_source='NIST', mass='primary', 
+                transmission_function=None, verbose=True):
         '''
         Requires that a spectrum and total ionization cross section are already 
         loaded, and preferably also a relative sensitivity factor.
@@ -180,6 +225,9 @@ class Molecule:
         self.IFCS = {}       #this will be a dictionary containing the electron ionization
                             #portion of the 'relative sensitivity' for each mass,
                             #i.e. the partial ionization cross-section in Ang^2 at 100keV
+        if transmission_function is None:
+            transmission_function = self.transmission_function #T(M)=1 unless otherwise stated
+            
         spec_total = 0
         for value in self.spectrum.values():
             if type(value) is not str:
@@ -202,22 +250,27 @@ class Molecule:
                 print('no Hiden RSF found for ' + self.name)
                 return None
             for (M, value) in self.spectrum.items():
-                print(str(M) + ' ' + str(value))
+                if verbose:
+                    print(str(M) + ' ' + str(value))
                 if M == 'Title':
                     continue
                 self.RSF[M] = value / self.spectrum[mH] * vH
             if 'primary' in dir(self):
                 self.rsf = self.RSF[self.primary]
-            print('returning Hiden rsf, adjusted to mass of measurement according' +
-                  'to NIST spectrum for ' + self.name)                    
+            if verbose:
+                print('returning Hiden rsf, adjusted to mass of measurement according' +
+                      'to NIST spectrum for ' + self.name)                    
                     
                     
         elif RSF_source == 'NIST':
-            self.RSF = self.IFCS
+            self.RSF = dict((key, value*transmission_function(int(key[1:]))) for key, value in self.IFCS.items())
+            
             if 'primary' in dir(self):
-                self.rsf = self.ifcs
-            print('returning ionization-fragmentation cross section in Ang^2 \'ifcs\'' +
-                  'based on NIST cross section and spectrum for ' + self.name)
+                self.rsf = self.ifcs * transmission_function(int(self.primary[1:]))
+            if verbose:
+                print('returning ionization-fragmentation cross section in Ang^2 \'ifcs\'' +
+                      'based on NIST cross section and spectrum for ' + self.name + 
+                      'and the given transmission function T(M)')
             
         if mass == 'primary':
             mass = self.primary
@@ -391,27 +444,172 @@ class Molecule:
 
 
 
+def reset_datafiles(mols, attrs, mdict={}):
+    '''
+    loads all of the molecules in mols and rewrites their data files with
+    only the attributes listed in attrs.
+    Look through the .git history if you need any old information removed by 
+    this function.
+    Tuple entries attrs[i] rename the attribut from attrs[i][0] to attrs[i][1]
+    '''
+    for mol in mols:
+        if mol in mdict:
+            continue
+        elif type(mol) is str:
+            mdict[mol] = Molecule(mol) #might return None.
+        else: #then mol is a Molecule object and mol.name is the key
+            mdict[mol.name] = mol
+            
+    cwd = os.getcwd()
+    os.chdir(data_directory)    
+    for mol, m in mdict.items():
+        if m is None:
+            continue
+
+        f = open(mol +'.txt', 'w')
+        f.write('#cleaned up ' + date_scott() + '\n')
+        f.close()
+        print('wiped ' + mol + '.txt clean.')
+        #I think this makes blank datafiles that the molecules can then
+        #write to.
+        for attr in attrs:
+            if type(attr) is list or type(attr) is tuple: #rename attr
+                var = attr[0]
+                newvar = attr[1]
+            else:
+                var = attr
+                newvar = attr
+            try:
+                value = getattr(m, var) #keep the attribute's name
+                m.write((newvar, value))
+            except AttributeError:
+                print('no attribute ' + var + ' for Molecule ' + mol)
+    
+    os.chdir(cwd)
+    return mdict
+
+
+
+def add_to_datafiles(attr, d, mdict={}, mols='all'):
+    '''
+    d is a dictionary containing attribute attr for specified molecules.
+    This function writes that attribute to each datafile
+    '''
+    for (key, value) in d.items():
+        if type(key) is str:
+            if not mols=='all' and key not in mols:
+                continue
+            if key in mdict:
+                m = mdict[key]
+            else:    
+                m = Molecule(key)
+                mdict[key] = m
+        if m is not None:
+            setattr(m, attr, value)
+            m.write((attr, value))     
+    return mdict
+
+
+
+def add_script_to_datafiles(path, file_name, attrs='all', mdict={}, mols='all'):
+    '''
+    sorts data stored in another script in dictionary form into molecule data
+    form.    
+    Tuple entries attrs[i] rename the attribut from attrs[i][0] to attrs[i][1]
+    '''
+    module_name = file_name.split('.')[0] #drop extension
+    cwd = os.getcwd()
+    os.chdir(path)
+    module = __import__(module_name)
+    os.chdir(cwd)
+    
+    check = False
+    if attrs == 'all':
+        check = True
+        attrs = (d for d in dir(module) if type(d) is dict)
+        
+    for attr in attrs:  
+        if check: #then check manually
+            var = attr
+            newvar = input('Write data from \'' + var + '\'? (y/<newname>/n)\n')
+            if newvar == 'n':
+                continue  
+            elif newvar == 'y':
+                newvar = var        
+        elif type(attr) is list or type(attr) is tuple:
+            var = attr[0]
+            newvar = attr[1]
+        else:
+            var = attr
+            newvar = attr
+        
+        d = getattr(module, var)    
+        mdict = add_to_datafiles(newvar, d, mdict, mols=mols)
+
+
+
 
 if __name__ == '__main__':
-    plt.close('all')
     
-    H2 = Molecule('H2')
-    print(H2.F_cal)
-    H2.F_cal = 1.111
-    H2.rewrite('data/test.txt')
-    test = Molecule('test')
-    print(test.F_cal)
-    test.calibration_fit()
+
+    plt.close('all')    
+
+    
+    reset17I21 = True
+    if reset17I21:
+        #clean up old useless calibrations etc,
+        #add new data to data files, from Daniel's script
+        
+        mols = ['Ar', 'C2H4', 'C2H6', 'CH4', 'N2','O2',
+                'Cl2', 'CO', 'CO2', 'H2', 'H2O', 'He', 
+                'acetaldehyde', 'ethanol', 
+                'air','Henriksen2009', 
+                ]
+
+        mdict = dict((mol, Molecule(mol)) for mol in mols)
+
+
+        #CLEANUP:   
+            
+        keep = ['name', 'formula', 'M', 'D', 'kH', 
+                'sigma_100eV', 'spectrum', 'RSF_Hiden', ('Hiden', 'RSF_Hiden')]
+        
+        reset_datafiles(mols=mols, attrs=keep, mdict=mdict)
+        
+        
+        #ADD NEW DATA:        
+        file_name = 'Membrane_chip.py'
+        path = '/home/scott/Dropbox/Sniffer_Experiments/python_master'
+        
+        new = (('m', 'molecule_mass'), ('s', 'molecule_diameter'), 
+               ('eta', 'dynamic_viscosity'), ('rho', 'density_RTP'),
+               ('D', 'D_gas_RTP'))
+        
+        add_script_to_datafiles(path, file_name, attrs=new, mdict=mdict)
+    
+
+
+
+    testtxt = False
+    if testtxt:
+        H2 = Molecule('H2')
+        print(H2.F_cal)
+        H2.F_cal = 1.111
+        H2.rewrite('data/test.txt')
+        test = Molecule('test')
+        print(test.F_cal)
+        test.calibration_fit()
     
     
-    
-    mols = {'CO2':('brown', 10),'H2':('b', 1),'O2':('k', 1)}
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    for (mol, (color, plotfactor)) in mols.items():
-        m = Molecule(mol)
-        m.calibration_fit(ax=ax, color=color, plotfactor=plotfactor)
-    ax.set_title('')
+    plotcals=False
+    if plotcals:
+        mols = {'CO2':('brown', 10),'H2':('b', 1),'O2':('k', 1)}
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        for (mol, (color, plotfactor)) in mols.items():
+            m = Molecule(mol)
+            m.calibration_fit(ax=ax, color=color, plotfactor=plotfactor)
+        ax.set_title('')
     #plt.savefig('Internal_calibrations.png')
     
     

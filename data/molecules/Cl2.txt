@@ -1,0 +1,19 @@
+#cleaned up 17I23
+name: Cl2
+formula: Cl2
+M	=	70.906
+D	=	1.25e-09
+kH	=	0.42
+sigma_100eV	=	6.2
+spectrum
+	Title: NIST_16L14
+	M35	=	82.8782878288
+	M37	=	26.4226422642
+	M70	=	100.0
+	M72	=	63.8563856386
+	M74	=	10.201020102
+primary: M70
+#the folowing rsf is calculated for M70 on 17I23
+rsf	=	0.606074310666
+#the following F_cal value is for M70, extrapolated from trusted values based on RSF from NIST on 17I23
+F_cal	=	[ 3.13789727]

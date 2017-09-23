@@ -119,7 +119,8 @@ def synchronize(Dataset_List, t_zero='start', append=None, cutit=0,
     
     #and loop again to synchronize the data and put it into the combined dictionary.
     
-    if append:
+    if (append and 
+        'EC' in {d['data_type'] for d in Dataset_List}): #condition added 17I21
         #add a datacolumn that can be used to separate again afterwards by file
         #as of now (17G28) can't think of an obvious way to keep previous file numbers
         Combined_Data['file number'] = [] #'file_number' renamed 'file number' for consistency 17H09
@@ -151,8 +152,9 @@ def synchronize(Dataset_List, t_zero='start', append=None, cutit=0,
             if 'time/s' in Dataset:
                 l1 = len(Dataset['time/s'])
                 fn = np.array([i]*l1)
-                Combined_Data['file number'] = np.append(Combined_Data['file number'], fn) 
-                print('len(Combined_Data[\'file number\']) = ' + str(len(Combined_Data['file number'])))
+                if Dataset['data_type'] == 'EC':
+                    Combined_Data['file number'] = np.append(Combined_Data['file number'], fn) 
+                    print('len(Combined_Data[\'file number\']) = ' + str(len(Combined_Data['file number'])))
             else:
                 print('\'time/s\' in Dataset is False')
             if 'time/s' in Combined_Data:
@@ -214,7 +216,7 @@ def synchronize(Dataset_List, t_zero='start', append=None, cutit=0,
                     fill = np.array([0]*(l1-l2))
                     print('filling ' + col + ' with ' + str(len(fill)) + ' zeros')
                     Combined_Data[col] = np.append(Combined_Data[col], fill)
-        if append:
+        if append and 'file number' in Combined_Data.keys():
             Combined_Data['data_cols'].append('file number') #for new code
             Combined_Data['file_number'] = Combined_Data['file number'] #for old code
             Combined_Data['data_cols'].append('file_number') #for old code
@@ -225,7 +227,7 @@ def synchronize(Dataset_List, t_zero='start', append=None, cutit=0,
     return Combined_Data        
 
     
-def cut(x, y, tspan=None, returnindeces=False):
+def cut(x, y, tspan=None, returnindeces=False, override=False):
     if tspan is None:
         return x, y
     
@@ -235,7 +237,7 @@ def cut(x, y, tspan=None, returnindeces=False):
         
     I_keep = [I for (I, x_I) in enumerate(x) if tspan[0]<x_I<tspan[-1]]
     
-    if np.size(I_keep) == 0:
+    if np.size(I_keep) == 0 and not override:
         print ('\nWarning! cutting like this leaves an empty dataset!\n' +
                'x goes from ' + str(x[0]) + ' to ' + str(x[-1]) + 
                 ' and tspan = ' + str(tspan) + '\n')

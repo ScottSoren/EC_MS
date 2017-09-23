@@ -1,0 +1,6 @@
+#cleaned up 17I23
+name: acetaldehyde
+formula: C2H4O
+M	=	44.053
+D	=	1.23e-09
+kH	=	0.00288

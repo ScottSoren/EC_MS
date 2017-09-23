@@ -398,8 +398,8 @@ def solve_flow(alpha=1, beta=1, Cg=0, N=30, flux=False,
 
 def flow_operator(mode='steady',  #in steady mode it's not really an operator.
                   system='chip', #
-                  A=0.196e-4, q0=1.5e15/Chem.NA, Temp=None,  #universal pars
-                  L=100e-6,  w=5e-3, w2=5e-3, F=1e-9, #geometry pars
+                  A_el=0.196e-4, A=0.196e-4, q0=1.5e15/Chem.NA, Temp=None,  #universal pars
+                  L=100e-6,  w=0.5e-3, w2=0.5e-3, F=1e-9, #geometry pars
                   c0=None, j0=None, j_el=-1, #inlet flow pars
                   p_m=1e5, #chip pars
                   phi=0.5, dp=20e-9, Lp=100e-6,#DEMS pars
@@ -431,7 +431,7 @@ def flow_operator(mode='steady',  #in steady mode it's not really an operator.
         n_el = mol.n_el 
     if c0 is None:
         if j0 is None:
-            j0 = j_el*A/(n_el*Chem.Far)
+            j0 = j_el*A_el/(n_el*Chem.Far)
         c0 = j0/F 
         #concentration is production rate over flow rate: [mol/s] / [m^3/s)] = [mol/m^3] )
     
@@ -458,6 +458,9 @@ def flow_operator(mode='steady',  #in steady mode it's not really an operator.
     
     eta_m = 1 - np.trapz(CC[-1,:], Z) #Scott's MSc, page 61
     eta_m_check = w2 * np.trapz(j, x) / (c0 * F)  # m*mol/(m^2*s)*m / ((mol/m^3)*m^3/s) = 1
+
+    qm = c0 * F * eta_m
+
     if verbose:
         print('portion not escaped = ' + str(eta_m))
         print('portion collected = ' + str(eta_m_check) + '\n\n')
@@ -467,7 +470,7 @@ def flow_operator(mode='steady',  #in steady mode it's not really an operator.
         p_w = Chem.p_vap(mol='H2O',T=Temp, unit='Pa')
         M_w = Chem.Mass('H2O') * 1e-3
         j_w = A*p_w / (Chem.R*Temp) * phi * dp / (3 * Lp) * np.sqrt(8/np.pi * Chem.R*Temp / M_w)
-        eta_v = q0 / j_w
+        eta_v = q0 / ( qm + j_w)   #fixed 17H10
     
     eta = eta_m*eta_v
 
@@ -481,7 +484,7 @@ def flow_operator(mode='steady',  #in steady mode it's not really an operator.
 
     
     if verbose:
-        print('\n\nfunction \'flow_operator\' at your service!\n')  
+        print('\nfunction \'flow_operator\' at finished!\n\n')  
         
     results = {'x':x, 'z':z, 'j':j, 'cc':cc, 'eta_m':eta_m, 'eta_v':eta_v, 'eta':eta,
                'dimensions':'xz'}

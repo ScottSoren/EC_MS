@@ -1,0 +1,23 @@
+#cleaned up 17I23
+name: He
+formula: He
+M: 4.002
+D	=	6.28e-09
+kH	=	110
+sigma_100eV	=	0.37
+spectrum
+	Title: NIST_16L14
+	M4	=	100.0
+RSF_Hiden	=	('M4', 0.39)
+molecule_mass	=	6.6483186e-27
+molecule_diameter	=	2.15e-10
+dynamic_viscosity	=	1.9900000000000003e-05
+density_RTP	=	0.1786
+D_gas_RTP	=	6.97e-05
+primary: M4
+#the folowing rsf is calculated for M4 on 17I23
+rsf	=	0.428736964079
+#the following F_cal value is for M4, trusted on 17I23
+F_cal	=	2.8496814936
+#the following F_cal value is for M4, extrapolated from trusted values based on RSF from NIST on 17I23
+F_cal	=	2.8496814936

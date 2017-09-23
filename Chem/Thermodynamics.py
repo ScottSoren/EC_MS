@@ -33,6 +33,12 @@ dfG0 = { # standard enthalpies of formation / [kJ/mol]
          # to be populated later
         } 
 
+dsH0 = {'ethanol':-19.5,  #temperarily taken value for CO2 below to check that the function runs properly! Couldn't find it for ethanol
+        'CO2':-19.5,  #Carroll1991
+        } #solvation enthalpy at 25C
+
+kH = {'ethanol':None}
+
 def p_vap(mol='H2O', T=298.15, unit='Pa'):
     dH = (dfH0[mol+'(g)'] - dfH0[mol+'(l)']) * 1e3 
     dS = S0[mol+'(g)'] - S0[mol+'(l)']
@@ -47,6 +53,22 @@ def p_vap(mol='H2O', T=298.15, unit='Pa'):
     p = p0 * np.exp( -dH/(R*T) + dS/R )
     
     return p
+
+
+
+def kH_of_T(T, kH_0=None, dsH=None, mol=None, T0=298.15):
+    
+    if kH_0 is None:
+        kH_0 = kH[mol]
+    
+    if dsH is None:
+        dsH = dsH0[mol]
+    
+    kH_T = kH_0 * np.exp( - dsH/R * (1/T0 - 1/T))
+    
+    return kH_T
+
+
 
 if __name__ == '__main__':
     print(p_vap('H2O', T=298.15, unit='mbar'))

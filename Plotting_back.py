@@ -35,9 +35,6 @@ with open(preferencedir + os.sep + 'standard_colors.txt','r') as f:
     lines = f.readlines()
     standard_colors = lines_to_dictionary(lines)['standard colors']
 
-def get_standard_colors():
-    return standard_colors
-
 
 def plot_vs_potential(CV_and_MS_0, 
                       colors={'M2':'b','M4':'m','M18':'y','M28':'0.5','M32':'k'},
@@ -119,30 +116,25 @@ def plot_vs_potential(CV_and_MS_0,
         ax2.set_xlabel(V_str)
         ax2.set_ylabel(J_str)
     
-#    print(masses)
     if ax1 is not None: #option of skipping an axis added 17C01
         #check if we're going to plot signals or fluxes:
         quantified = False      #added 16L15
         if mols is not None:
             quantified = True
-            colors = mols  #added 17H11  
-        elif masses is not None:
-#            print('masses specified')
-            quantified = False
-            colors = masses
+            colors = mols  #added 17H11     
         elif ((type(colors) is dict and list(colors.keys())[0][0] == 'M') or
               (type(colors) is list and type(colors[0]) is str and colors[0][0] == 'M' ) or
               (type(colors) is str and colors[0]=='M')):
             print('uncalibrated data to be plotted.')
-            masses = colors    
-            colors = masses
+            if masses is None:
+                masses = colors    
         else:
             quantified = True
             mols = colors
         if type(colors) is not list and type(colors) is not dict:
             colors = [colors]        
         
-#        print(type(colors))
+        print(type(colors))
         
         if unit is None:
             if quantified:
@@ -299,7 +291,7 @@ def smooth_data(data_0, points=3, cols=None, verbose=True):
 def plot_signal(MS_data,
                 masses = {'M2':'b','M4':'r','M18':'0.5','M28':'g','M32':'k'},
                 tspan=None, ax='new', unit='nA',
-                logplot=True, saveit=False, leg=False, verbose=True):
+                logplot=True, saveit=False, leg=False, verbose=True, spec={}):
     '''
     plots selected masses for a selected time range from MS data or EC_MS data
     Could probably be simplified a lot, to be the same length as plot_fluxes
@@ -326,7 +318,7 @@ def plot_signal(MS_data,
         if verbose:
             print('plotting: ' + mass)
         x, y = get_signal(MS_data, mass, unit=unit, verbose=verbose, tspan=tspan)
-        lines[mass] = ax.plot(x, y, color, label = mass) 
+        lines[mass] = ax.plot(x, y, color, label = mass, dashes=[10,50]) 
         #as it is, lines is not actually used for anything         
     if leg:
         if type(leg) is not str:
@@ -346,7 +338,7 @@ def plot_masses(*args, **kwargs):
     
 def plot_flux(MS_data, mols={'H2':'b', 'CH4':'r', 'C2H4':'g', 'O2':'k'},
             tspan='tspan_2', ax='new', removebackground=True, A_el=None,
-            logplot=True, leg=False, unit='nmol/s', verbose=True):
+            logplot=True, leg=False, unit='nmol/s', verbose=True, spec={}):
     '''
     Plots the molecular flux to QMS in nmol/s for each of the molecules in
     'fluxes.keys()', using the primary mass and the F_cal value read from
@@ -391,7 +383,7 @@ def plot_flux(MS_data, mols={'H2':'b', 'CH4':'r', 'C2H4':'g', 'O2':'k'},
             l = mol
         else:
             l = mol.name
-        ax.plot(x, y, color, label=l)
+        ax.plot(x, y, color, label=l, **spec)
     if leg:
         if type(leg) is not str:
             leg = 'lower right'
@@ -416,7 +408,7 @@ def plot_experiment(EC_and_MS,
                     saveit=False, title=None, leg=False, unit='pmol/s',
                     masses=None, mols=None, #mols will overide masses will overide colors
                     V_color='k', J_color='r', V_label=None, J_label=None,
-                    fig=None, J_str=None, V_str=None
+                    fig=None, J_str=None, V_str=None, specs={'dashes':[10, 50]}
                     ): 
     '''
     this plots signals or fluxes on one axis and current and potential on other axesaxis
@@ -479,10 +471,10 @@ def plot_experiment(EC_and_MS,
     if quantified:
         plot_flux(EC_and_MS, mols=mols, tspan=tspan, A_el=A_el,
                   ax=ax[0], leg=leg, logplot=logplot[0], unit=unit, 
-                  removebackground=removebackground, verbose=verbose)
+                  removebackground=removebackground, verbose=verbose, spec=specs)
     else:
         plot_signal(EC_and_MS, masses=masses, tspan=tspan,
-                    ax=ax[0], leg=leg, logplot=logplot[0], verbose=verbose)
+                    ax=ax[0], leg=leg, logplot=logplot[0], verbose=verbose, spec=specs)
     if not overlay:
         ax[0].set_xlabel('')
         ax[0].xaxis.tick_top()  

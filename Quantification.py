@@ -28,7 +28,13 @@ else:
     data_directory = os.getcwd() + os.sep + 'EC_MS' + os.sep + 'data' + os.sep
 
 
-def rewrite_spectra(NIST_file='default', RSF_file='default',
+preferencedir = os.path.dirname(os.path.realpath(__file__)) + os.sep + 'preferences' 
+with open(preferencedir + os.sep + 'standard_colors.txt','r') as f:
+    lines = f.readlines()
+    standard_colors = lines_to_dictionary(lines)['standard colors']
+
+
+def rewrite_spectra(NIST_file='default', RSF_file='default', mols='all',
                     writesigma=False, writespectra=False, writeRSF=False):
     '''
     Reformats NIST data copied to a text file given by 'file', and writes it to 
@@ -44,11 +50,15 @@ def rewrite_spectra(NIST_file='default', RSF_file='default',
         spectra_dict = structure['Spectra'] # dictionary with QMS spectra as mass1,rel_val1 mass2,relval2 
     if writesigma:
         for (mol, sigma) in sigma_dict.items():
+            if not (mols == 'all' or mol in mols):
+                continue
             m = Molecule(mol)
             l = ('sigma_100eV', sigma)
             m.write(l)
     if writespectra:
         for (mol, specline) in spectra_dict.items():
+            if not (mols == 'all' or mol in mols):
+                continue
             m = Molecule(mol)
             masses = []
             rel_vals = []        
@@ -70,6 +80,8 @@ def rewrite_spectra(NIST_file='default', RSF_file='default',
             lines = f.readlines()
         structure = lines_to_dictionary(lines)
         for (mol, value) in structure.items():
+            if not (mols == 'all' or mol in mols):
+                continue
             m = Molecule(mol)
             mass = 'M' + str(value[0])
             RSF = value[1]
@@ -116,19 +128,24 @@ def recalibrate(quantmol = {'H2':'M2', 'He':'M4', 'CH4':'M15', 'H2O':'M18',
                              'N2':'M28', 'CO':'M28', 'C2H4':'M26', 'C2H6':'M30',
                              'O2':'M32', 'Ar':'M40', 'CO2':'M44', 'Cl2':'M70'},
                                 #molecules we want to calc F_cal (at the given mass) for by extrapolation
-                 calmol = {'O2':'M32', 'CO2':'M44', 'H2':'M2'},
+                mdict = {},
+                calibrate = {'CO2':'M44',},
                               #molecules to base the extrapolation on
-                 F_cals = {}, #new calibrations to base the extrapolation on. 
-                              #if 
-                 RSF_source = 'NIST', #'NIST' is partial ionization cross section, citable!
+                F_cals = {}, #new calibrations to base the extrapolation on. 
+                             #if 
+                RSF_source = 'NIST', #'NIST' is partial ionization cross section, citable!
                                       #'Hiden' is RSF relative to N2, uncitable!
-                 trust = 'default',  #defines the red points, i.e.
-                 #which calibrations to trust and use over extrapolated values,
-                 #  trust='default': do a calibration fit and trust it for molecules with saved calibration entries
-                 #  trust='new': trust the F_vals explicitly given in 
-                 #  can also put a list.
-                 ax = 'new', 
-                 writeit = False, writeprimary=False, rewriteit=False):
+                internal = {},
+                external = {},
+                transmission_function='default',
+                trust = 'new',  #defines the red points, i.e.
+                #which calibrations to trust and use over extrapolated values,
+                #  trust='default': do a calibration fit and trust it for molecules with saved calibration entries
+                #  trust='new': trust the F_vals explicitly given in 
+                #  can also put a list.
+                trendline = True,
+                ax = 'new', 
+                writeit = False, writeprimary=False, rewriteit=False):
     '''
     Generates calibration factors 'F_cal' for primary masses for all molecules
     in 'quantmol' that don't already have one. The new F_cal are based on the 
@@ -148,15 +165,38 @@ def recalibrate(quantmol = {'H2':'M2', 'He':'M4', 'CH4':'M15', 'H2O':'M18',
     print('\n\nfunction \'recalibrate\' at your service!\n')
 
 
-    RSF_unit = {'Hiden':'a.u.', 'NIST':'Ang^2'}[RSF_source]
+    RSF_unit = {'Hiden':'a.u.', 'NIST':'a.u.'}[RSF_source]
 
-    molset = set(quantmol.keys()) | set(calmol.keys()) | set(F_cals.keys())   
-    mdict = dict((mol, Molecule(mol, verbose=False)) for mol in molset)
+    molset = set(quantmol.keys()) | set(internal.keys()) | set(external.keys()) | set(F_cals.keys())   
+    for mol in molset:
+        if mol not in mdict:
+            mdict[mol] = Molecule(mol)
+    #mdict = dict((mol, Molecule(mol, verbose=False)) for mol in molset)
+   
+    if type(calibrate) is dict:
+        calmol = calibrate
+    else:
+        calmol = {}
+    if  calibrate == 'internal' or calibrate == 'all':
+        calmol.update(dict((mol, mdict[mol].primary) for mol in set(internal.keys())))
+    if calibrate == 'external' or calibrate == 'all':
+        calmol.update(dict((mol, mdict[mol].primary) for mol in set(external.keys())))
     
+    print(calmol)
+    #trust = [mdict[mol] for mol in trust] #trust should be molecule objects, not strings. #FALSE
+    
+    F_cals.update(internal)
+    F_cals.update(external)
+    print('F_cals = ' + str(F_cals))
+
     if trust == 'default':
         trust = {mol for mol, m in mdict.items() if 'calibrations' in m.__dict__}
     elif trust == 'new':
         trust = set(F_cals.keys())
+
+    
+    if len(internal) == 0 and len(external) == 0:
+        internal = calmol
     
     if ax == 'new':
         fig1 = plt.figure()
@@ -164,17 +204,24 @@ def recalibrate(quantmol = {'H2':'M2', 'He':'M4', 'CH4':'M15', 'H2O':'M18',
         
     RSF_vec = []
     F_cal_vec = []
+    
+    if transmission_function == 'default':
+        def T(M):
+            return np.pow(M, -1/2)
+    elif transmission_function == 1:
+        def T(M):
+            return 1
+    else:
+        T = transmission_function
 
 
-    for (mol, mass) in calmol.items():
+    for (mol, mass) in calmol.items() :
+        F_cal = F_cals[mol]
         m = mdict[mol]
-        if mol in F_cals:
-            F_cal = F_cals[mol]
-            m.F_cal = F_cal
-        else:
-            F_cal = m.calibration_fit(mass=mass, ax=None, useit=True, primary=True)
-        print(mol + ' ' + mass)
-        rsf = m.get_RSF(RSF_source=RSF_source, mass=mass)
+        #mass = m.primary
+        m.F_cal = F_cal
+        print('F_' + mol + '_' + mass + ' = ' + str(F_cal))
+        rsf = m.get_RSF(RSF_source=RSF_source, transmission_function=T, mass=mass)
         F_cal_vec += [F_cal]
         RSF_vec += [rsf]
     
@@ -195,7 +242,10 @@ def recalibrate(quantmol = {'H2':'M2', 'He':'M4', 'CH4':'M15', 'H2O':'M18',
                   'include the molecule in quantmols, or it\'s ignored.')
             mass = m.primary
             
-        rsf = m.get_RSF(RSF_source=RSF_source, mass=mass)
+        rsf = m.get_RSF(RSF_source=RSF_source, transmission_function=T, mass=mass)
+        if writeit:
+            m.write('#the folowing rsf is calculated for ' + mass + ' on ' + date_scott())
+            m.write(('rsf', rsf))
         if rsf is None:
             print('missing rsf for ' + mol)
             continue
@@ -203,8 +253,11 @@ def recalibrate(quantmol = {'H2':'M2', 'He':'M4', 'CH4':'M15', 'H2O':'M18',
         if mol in trust:      #The red points.
             if mol in F_cals:
                 F_cal = F_cals[mol]
-            elif 'calibrations' in mol.__dict__:
-                F_cal = m.calibration_fit(mass=mass, ax=None, useit=True, primary=True)
+            elif 'calibrations' in m.__dict__: #changed mol to m, 17I08
+                try:
+                    F_cal = m.calibration_fit(mass=mass, ax=None, useit=True, primary=True)
+                except ValueError:
+                    F_cal = m.F_cal
             elif 'cal' in m.__dict__:
                 F_cal = m.cal[mass]
             elif 'F_cal' in m.__dict__:
@@ -212,14 +265,17 @@ def recalibrate(quantmol = {'H2':'M2', 'He':'M4', 'CH4':'M15', 'H2O':'M18',
             else:
                 print('No value of F_cal to trust for ' + mol + '!')  
                 break #becomes blue.
-            ax.plot(rsf, F_cal, '.r', markersize=15)
-            if writeit:
+            if mol in internal:
+                ax.plot(rsf, F_cal, 's', color=standard_colors[mass], markersize=10)
+            else: #F_cals not given in internal are plotted as if they were external calibrations
+                ax.plot(rsf, F_cal, '^', color=standard_colors[mass], markersize=10)
+            if writeit:                
                 m.write('#the following F_cal value is for ' + mass + ', trusted on ' + date_scott())
                 l = ('F_cal', F_cal)
                 m.write(l)
         else:
             F_cal = r * rsf  #the extrapolation!
-            ax.plot(rsf, F_cal, '.b', markersize=15)
+            ax.plot(rsf, F_cal, '.', color=standard_colors[mass], markersize=10)
         if 'ca' in m.__dict__:
             m.cal[mass] = F_cal
         if 'primary' not in m.__dict__:
@@ -239,7 +295,11 @@ def recalibrate(quantmol = {'H2':'M2', 'He':'M4', 'CH4':'M15', 'H2O':'M18',
         if rewriteit:
             m.rewrite()
         print(mol + ': F_cal = ' + str(F_cal))
-            
+    
+    if trendline:
+        rsf_max = max([m.rsf for mol, m in mdict.items()])
+        ax.plot([0, rsf_max], [0, r * rsf_max], 'k--')
+        
     ax.set_xlabel('Relative Sensitivity Factor / [' + RSF_unit +']')
     ax.set_ylabel('F_cal / [C/mol]')
     #tickmol = ['C2H6', 'C2H4', 'CH4', 'H2', 'CO2']
@@ -254,7 +314,7 @@ def recalibrate(quantmol = {'H2':'M2', 'He':'M4', 'CH4':'M15', 'H2O':'M18',
 
 
 def get_signal(MS_data, mass, tspan='tspan_2', removebackground=False, 
-             unit='nA', verbose=True):
+             unit='A', verbose=True):
     '''
     Returns [x, y] where x is the time and y is QMS signal.
     A bit trivial, but I like having this function to work in parrallel 
@@ -289,8 +349,9 @@ def get_signal(MS_data, mass, tspan='tspan_2', removebackground=False,
     return [x, y]
 
 
-def get_flux(MS_data, mol, tspan='tspan_2', removebackground=False, 
-             unit='pmol/s', verbose=True):
+def get_flux(MS_data, mol, tspan='tspan_2',  
+             unit='pmol/s', verbose=True, 
+             removebackground=False, background='constant', endpoints=3):
     '''
     returns [x, y] where x is the t corresponding to the primary mass of the
     molecule in 'mol' and y is the molecular flux in nmol/s, calculated from 
@@ -323,11 +384,21 @@ def get_flux(MS_data, mol, tspan='tspan_2', removebackground=False,
         x, y = cut(x,y,tspan) 
     
     if removebackground:
-        if type(removebackground) is float:
-            background = removebackground * min(y)
-        else:
-            background = min(y)
-        y = y - 0.99*background
+        if background=='constant':
+            if type(removebackground) is float:
+                background = removebackground * min(y)
+            else:
+                background = min(y)
+        elif type(background) is float:
+            #background = background
+            pass
+        elif background=='linear':
+            x_end = [np.average(x[:endpoints]), np.average(x[-endpoints:])]
+            y_end = [np.average(y[:endpoints]), np.average(y[-endpoints:])]
+            background = np.interp(x, x_end, y_end) 
+        
+        y = y - 0.99*background #so that we don't break the log scale.
+        #I should get rid of this and assume the caller knows what they're doing.
     return [x,y]    
             
 def predict_current(EC_and_MS, mols, tspan=None, RE_vs_RHE=None, A_el=None,
@@ -398,7 +469,27 @@ def predict_current(EC_and_MS, mols, tspan=None, RE_vs_RHE=None, A_el=None,
 if __name__ == '__main__':
     plt.close('all')
     #calibration_compare()
-    RSF_to_F_cal(calmol = {'CO2':'M44'}, writeprimary=False)
+    
+    from EC_MS import set_figparams
+    
+    set_figparams(figwidth=8)
+    
+    F_cals = {'CO2': 23.371483271036237, 'H2': 29.899494846007542, 'O2': 14.756572997297784}
+    mdict, ax = RSF_to_F_cal(calmol = {'CO2':'M44'}, RSF_source='Hiden', 
+                             trust=['H2','O2','CO2'], F_cals=F_cals)
+    #calmol is the molecule(s) who's calibration is extrapolated to the others
+    #RSF_source can be 'NIST' or 'Hiden'.
+    #trust gives the molecules that become the red dots.
+    #F_cals overrides the stored calibration factors for given molecules.
+    #mdict containes the Molecule objects with the extrapolated F_cal
+    #ax is the axis it's plotted on.
+    
+    for mol, m in mdict.items():
+        rsf = m.get_RSF(RSF_source='Hiden', verbose=False)
+        print(mol + '\tF_cal = ' + str(m.F_cal) + '\tRSF = ' + str(rsf))
+     
+    ax.set_xlabel('Relative sensitivity factor / [a.u.]')
+    ax.set_ylabel('F$_{\mathrm{cal}}$ / [C mol$^{-1}$]')
     
     plt.savefig('Fcal_vs_RSF.png')
     

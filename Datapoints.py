@@ -221,7 +221,8 @@ def plot_errorbar(xstat, ystat,
 
         
 def plot_errorbars_y(stats, x='outer', ax='new', label='', logmean=False,
-                     colors='k', Xrange=None, verbose=True, outercall=True):
+                     Xrange=None, verbose=True, outercall=True,
+                     color='k', colors=None, specs=None):
     if verbose and outercall:
         print('\n\nfunction \'plot_errorbars_y\' at your service!\n')    
     if ax == 'new':
@@ -234,8 +235,12 @@ def plot_errorbars_y(stats, x='outer', ax='new', label='', logmean=False,
 #        print('I should have just plotted something.')
         return ax
     
+    #oh, shit, how do I reconcile the following with my desire to use specs{} 
+    #instead of just a color for plotting functions? I just won't for now.
+    if colors is None:
+        colors = color
     if (x not in ['outer', 'inner'] and type(colors) is not dict):
-        colors = fill_with(stats, colors)
+        colors = fill_with(stats, color)
     if (x not in ['outer', 'inner'] and type(Xrange) is not dict):
         colors = fill_with(stats, Xrange)
 
@@ -257,7 +262,12 @@ def plot_errorbars_y(stats, x='outer', ax='new', label='', logmean=False,
                 if verbose:
                     print('skipping ' + key)
                 continue
+        
+        if Xrange is None:
+            Xrange_val = None #17H14
+        else:
             Xrange_val = Xrange[key]
+
         plot_errorbars_y(val, x=x_val, ax=ax, colors=color_val, Xrange=Xrange_val, 
                          label=label+str(key) + '_', outercall=False, logmean=logmean)
     if verbose and outercall:

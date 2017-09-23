@@ -1,4 +1,5 @@
 sigma_100eV # Total ionization cross sections in Ang^2 and at 100 eV incident electron energy
+#
 # From NIST: http://physics.nist.gov/PhysRefData/Ionization/molTable.html
 	H2 = 0.969
 	O2 = 2.621
@@ -15,6 +16,9 @@ sigma_100eV # Total ionization cross sections in Ang^2 and at 100 eV incident el
 # http://iopscience.iop.org/article/10.1088/0953-4075/21/6/014/pdf
 	He = 0.370 
 	Ar = 2.982
+# from Rejoub et al 2003, http://aip.scitation.org/doi/pdf/10.1063/1.1531631
+	ethanol = 7.8
+
 
 #From NIST: http://webbook.nist.gov/chemistry/form-ser.html
 Spectra
@@ -30,6 +34,7 @@ Spectra
 	C2H4: 2,10 12,50 13,90 14,210 15,30 24,230 25,781 26,5295 27,6236 28,9999 29,230 30,10
 	C2H6: 2,20 12,40 13,100 14,300 15,440 16,10 24,50 25,350 26,2322 27,3323 28,9999 29,2152 30,2622 31,50
 	Cl2: 35,8287 37,2642 70,9999 72,6385 74,1020
+	ethanol: 12,20 13,139 14,145 15,664 17,70 18,55 19,279 24,61 25,246 26,985 27,2241 28,345 29,2985 30,812 31,9999 33,31 41,137 42,474 43,1144 44,71 45,5149 46,2163 47,73
 	
 
 

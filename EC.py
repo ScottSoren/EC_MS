@@ -27,13 +27,14 @@ else:                           #then we use relative import
     from .Combining import cut_dataset#, get_time_col
 
 
-def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True, cycle_str=None, cutMS=True, data_type='CV'):
+def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True, cycle_str=None, cutMS=True, data_type='CV', override=False):
     ''' 
     This function selects one or more cycles from EC_data_0.
     Use this before synchronizing!
     Works for both CA and CV
     #changed 16L22 to work on EC_and_MS data
     #just set cycle_str to 'loop number' to select loop rather than cycle.
+    #override to ignore when cut returns empty dataset.
     '''
     if verbose:
         print('\nSelecting cycles ' + str(cycles) + ' from \'' + EC_data_0['title'] + '\'\n')
@@ -85,7 +86,7 @@ def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True, cycle_str=None
             if col[0] == 'M' and col[-2:] == '-x': #then we've got a QMS time variable
                 y_col = col[:-2] + '-y'
                 #print('select cycles is cutting in MS data ' + col )
-                EC_data[col], EC_data[y_col] = cut(EC_data[col], EC_data[y_col], tspan)       
+                EC_data[col], EC_data[y_col] = cut(EC_data[col], EC_data[y_col], tspan, override=override)       
 
     if t_zero is not None:
         if verbose:
@@ -190,6 +191,8 @@ def CV_difference(cycles_data, redox=1, Vspan=[0.5, 1.0],
         except KeyError:
             A_el = 1
             print('didn''t find A_el.')
+        if A_el is None:
+            A_el = 1
         print('difference in charge passed: a = ' + str(dQ) + ' C\n' + 
                 'difference in CV area: b = ' + str(dJV) + ' V*mA/cm^2\n' + 
                 'This implies a scan rate of: b/a*A_el = ' + str(dJV / dQ * A_el) + ' mV/s') 
@@ -229,11 +232,12 @@ def clip_cycles(dataset, cycles=1, V_clip=0, redox=1, V_str=None, t_str='time/s'
     default returns the first full cycle in the dataset.
     if redox=1, cuts on the anodic sweep, if redox=0 on the cathodic sweep.
     '''
+    print(redox)
     if verbose:
         print('\n\nfunction \'clip_cycles\' at your service!\n')       
     
     if V_str is None:
-        V_str, J_str = sync_metadata(dataset, verbose=verbose)
+        V_str, J_str = sync_metadata(dataset, verbose=False)
         
     if type(cycles) is int:  #my need to always do this kind of thing is 
         cycles = [cycles]    #an annoying aspect of python.
@@ -241,25 +245,36 @@ def clip_cycles(dataset, cycles=1, V_clip=0, redox=1, V_str=None, t_str='time/s'
     t, V, ro = dataset[t_str].copy(), dataset[V_str].copy(), dataset[redox_str].copy() 
     #wouldn't want these to get fucked up
     N = len(V)
-    
+
     if redox: #I think this is more efficient than putting the if inside the
     #function, because it doesn't have to keep reevaluating truth value of redox
+        print('I_finish will be when redox==1.')
         def condition(I):
             return V[I] > V_clip and ro[I] == 1
         #V[I+1] > V[I] doesn't always work. 
     else:
+        print('I_finish will be when redox==0.')
         def condition(I):
-            return V[I] < V_clip and not ro[I] == 0
+            return V[I] < V_clip and ro[I] == 0
     n = 0
 
     I_start = 0 #so that I get point 0 in the first cycle.
+    I_finish = 1
     I_next = 1
     cyclesets = []
     endit = False
-    while n < max(cycles):
+    while n < max(cycles) + 1:
         print('I_start = ' + str(I_start))        
         print('t[I_start] = ' + str(t[I_start]))
         print('V[I_start] = ' + str(V[I_start]))
+        
+        I_next = next(I for I in range(I_start+1, N) if not condition(I))
+        print('I_next = ' + str(I_next))        
+        print('t[I_next] = ' + str(t[I_next]))
+        print('V[I_next] = ' + str(V[I_next]))
+        #Choose I_next to be on the subsequent scan, so that I don't just
+        #cut it into a lot of single points.
+        
         try:
             I_finish = next(I for I in range(I_next, N) if condition(I))
             print('I_finish = ' + str(I_finish))        
@@ -281,14 +296,14 @@ def clip_cycles(dataset, cycles=1, V_clip=0, redox=1, V_str=None, t_str='time/s'
         if closecycle:
             c = closecycle[c]
         cyclesets += [c]
-        print('got a cycle! len(cyclesets) = ' + str(len(cyclesets)))
+        print('got a cycle! len(cyclesets) = ' + str(len(cyclesets)) + '\n')
         if endit:
             print('but also hit a problem. We\'re done here.')
             break
         I_start = I_finish
-        I_next = next(I for I in range(I_finish+1, N) if not condition(I))
-        #Choose I_next to be on the subsequent scan, so that I don't just
-        #cut it into a lot of single points.
+        n += 1
+        print('\n\n')
+
         
     if len(cycles) == 1:
         try:
@@ -296,6 +311,12 @@ def clip_cycles(dataset, cycles=1, V_clip=0, redox=1, V_str=None, t_str='time/s'
         except IndexError:
             print('couldn\'t get your cycle. returning the first one.')
             return cyclesets[0]
+
+    if verbose:
+        print('\nfunction \'clip_cycles\' finished!\n\n')       
+ 
+
+
     return [cyclesets[i] for i in cycles] #Whoa.
 
 def close_cycle(cycle_0):

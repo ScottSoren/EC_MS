@@ -1,0 +1,53 @@
+
+
+
+
+
+#micro capillary
+w_cap = 5e-6
+h_cap = 3e-6
+l_cap = 1.5e-3
+#a_cap = ((w_cap*h_cap)/pi)**0.5
+
+#outlet channel leading to micro capillery.
+#
+w_out = 100e-6
+#h_out = h_cap
+#l_out = 4e-3-l_cap
+#a_out = ((w_out*h_out)/pi)**0.5
+#V_out = w_out*h_out*l_out
+#V_outlet_channel=V_out
+
+#through hole between chamber and backside of chip
+d_throu=100e-6
+a_throu=d_throu/2
+h_throu=300e-6
+V_throu=(a_throu)**2*pi*h_throu
+
+#chamber
+d_cham=10e-3
+a_cham=d_cham/2
+w_cham=((d_cham/2)**2*pi)**0.5
+h_cham=3e-6
+l_cham=w_cham
+V_cham=(a_cham)**2*pi*h_cham
+support_pillar_fraction=0.1  #volumen fraction of support pillars
+V_cham=V_cham*(1-support_pillar_fraction)
+
+V_total=V_cham+V_throu+V_out
+
+#inlet channel(s)
+num_in=1  #number of inlet channels
+out_pos=1  #set to 1 if in- and outlets are both at rim of chamber and 2 if one is in the center
+w_in=100e-6
+h_in=h_cap
+l_in=2.6e-3
+a_in=((w_in*h_in)/pi)**0.5
+
+#main flow channel
+w_flow=500e-6
+h_flow=200e-6
+l_flow=10e-3
+a_flow=((w_in*h_in)/pi)**0.5
+
+V_dot_main= 1*1.66e-8  #1 ml/min = 1.66e-8 m^3/s

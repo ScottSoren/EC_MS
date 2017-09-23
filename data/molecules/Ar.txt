@@ -1,0 +1,26 @@
+#cleaned up 17I23
+name: Ar
+formula: Ar
+M	=	39.948
+D	=	2e-09
+kH	=	29.4
+sigma_100eV	=	2.982
+spectrum
+	Title: NIST_16L14
+	M20	=	14.6214621462
+	M36	=	0.300030003
+	M38	=	0.0500050005001
+	M40	=	100.0
+RSF_Hiden	=	('M40', 1.27)
+molecule_mass	=	6.6353628e-26
+molecule_diameter	=	3.58e-10
+dynamic_viscosity	=	2.2700000000000003e-05
+density_RTP	=	1.784
+D_gas_RTP	=	7.26e-05
+primary: M40
+#the folowing rsf is calculated for M40 on 17I23
+rsf	=	0.950400501179
+#the following F_cal value is for M40, trusted on 17I23
+F_cal	=	4.12452166884
+#the following F_cal value is for M40, extrapolated from trusted values based on RSF from NIST on 17I23
+F_cal	=	4.12452166884

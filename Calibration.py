@@ -22,12 +22,14 @@ if os.path.split(os.getcwd())[1] == 'EC_MS':
     import Chem
     from EC import plot_CV_cycles, CV_difference, sync_metadata
     from Molecules import Molecule
+    from Chips import Chip
+    from Quantification import get_signal
 else:                           #then we use relative import
     from . import Chem
     from .EC import plot_CV_cycles, CV_difference, sync_metadata
     from .Molecules import Molecule
-
-
+    from .Chips import Chip
+    from .Quantification import get_signal
 
 def ML_strip_cal(CV_and_MS, cycles=[1,2], t_int=200, cycle_str='cycle number',
              mol='CO2', mass='primary', n_el=None, 
@@ -224,6 +226,65 @@ def steady_state_cal(CA_and_MS, t_int='half',
         print('\ncalibration function \'steady_state_cal\' finished!\n\n')  
     
     return calibration
+
+
+def carrier_gas_cal(dataset=None, #if signal not given, reads average from dataset
+                    signal=None,  #steady-state signal from in-flux of carrier gas
+                    mol='He', #calibration Molecule object or name of calibration molecule
+                    carrier = None,
+                    viscosity = None,
+                    mass='primary', #mass at which to calibrate
+                    composition = 1, #mol fraction calibration molecule in carrier gas
+                    chip='SI-3iv1-1-C5', #chip object or name of chip
+                    tspan=None,
+                    ):
+    '''
+    returns a calibration factor based the carrier gas concentration 
+    '''
+    
+    calibration = {'type': 'carrier gas'}
+    
+    if type(chip) is str:
+        chip = Chip(chip)
+
+    if type(mol) is str:
+        mol = Molecule(mol)
+    
+    if carrier is None:
+        carrier = mol
+    elif type(carrier) is str:
+        carrier = Molecule(carrier)
+
+    if mass == 'primary':
+        mass = mol.primary
+    
+    if type(composition) in (float, int):
+        fraction = composition
+    elif type(composition) is dict:
+        fraction = composition[mol.name]
+    
+    n_dot = chip.capillary_flow(gas=carrier) 
+    
+    n_dot_i = fraction * n_dot
+
+    F_cal = signal/n_dot_i
+
+    if signal is None:
+        if tspan is None:
+            tspan = dataset['txpan']
+        x, y = get_signal(dataset, mass=mass, tspan=tspan)
+        calibration['Q_QMS'] = np.trapz(y,x)
+        signal = calibration['Q_QMS'] / (tspan[-1] - tspan[0])
+        
+        calibration['n_mol'] = n_dot_i * (tspan[-1] - tspan[0])
+
+    calibration['mass'] = mass
+    calibration['n_dot_i'] = n_dot_i
+    calibration['signal'] = signal
+    calibration['F_cal'] = F_cal
+    
+    return calibration
+
 
 def LCA_cal():
     calibration = {'type': 'LCA'}

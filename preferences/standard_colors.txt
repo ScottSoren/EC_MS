@@ -1,9 +1,9 @@
 standard colors
 	M43: greenyellow
-	M70: purple
+	M70: teal
 	M30: olive
 	M15: r
-	M31: palegreen
+	M31: orange
 	M2: b
 	M34: darkred
 	M40: c
@@ -14,7 +14,7 @@ standard colors
 	M3: darkgoldenrod
 	M17: chocolate
 	M16: indigo
-	M19: teal
+	M19: darkviolet
 	M36: darkgreen
 	M18: y
 	M26: g
