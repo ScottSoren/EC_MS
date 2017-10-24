@@ -279,7 +279,8 @@ class Electrolyte:
    #         print(ion)
             charge = read_charge(ion)
             if charge != 0:
-                self.kap[ion] = conc * Chem.Far * np.abs(charge) * electrolyte_dict['mobility'][ion]
+                self.kap[ion] = conc * 1e3 * Chem.Far * np.abs(charge) * electrolyte_dict['mobility'][ion]
+                #units: mol/l * l/m^3 * C/mol * m^2/(V*s) = A/(V*m) = S/m 
                 self.kappa += self.kap[ion]
         return self.kappa
     

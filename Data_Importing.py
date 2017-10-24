@@ -23,6 +23,15 @@ import codecs
 from copy  import deepcopy #necessary?
 import numpy as np
 
+if os.path.split(os.getcwd())[1] == 'EC_MS':      
+                                #then we're running from inside the package
+    from Combining import synchronize, sort_time
+else:                           #then we use relative import
+    from .Combining import synchronize, sort_time
+
+
+
+
 def import_text(full_path_name='current', verbose=1):   
     '''
     This method will import the full text of a file selected by user input as a 
@@ -325,6 +334,32 @@ def import_data(full_path_name='current', title='get_from_file',
     DataDict = numerize(DataDict)
 
     return DataDict
+
+
+def import_set(directory, MS_file='QMS.txt', EC_file=None, tag='01', verbose=True): 
+    if verbose:
+        print('\n\nfunction import_set at your service!\n')
+    
+    lslist = os.listdir(directory)
+    
+    if type(MS_file) is str:
+        MS_file = [MS_file]
+    MS_datas = [import_data(directory + os.sep + f, data_type='MS', verbose=verbose) for f in MS_file]
+    MS_data = synchronize(MS_datas, verbose=verbose)
+    
+    if EC_file is None:
+        EC_file = [f for f in lslist if f[:2] == tag and f[-4:] == '.mpt']
+    elif type(EC_file) is str:
+        EC_file = [EC_file]
+    EC_datas = [import_data(directory + os.sep + f, verbose=verbose) for f in EC_file]
+    EC_data = synchronize(EC_datas, verbose=verbose)
+    if 'loop number' in EC_data['data_cols']:
+        EC_data = sort_time(EC_data, verbose=verbose)
+        
+    data = synchronize([MS_data, EC_data], t_zero='start', verbose=verbose)
+    if verbose:
+         print('\nfunction import_set finished!\n\n')       
+    return data
 
 
 def import_folder(directory, verbose=1):

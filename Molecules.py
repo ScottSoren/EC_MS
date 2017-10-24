@@ -160,6 +160,16 @@ class Molecule:
         else: 
             file.writelines(newlines)
         
+    def p_vap(self, T=None):
+        if T is None:
+            if 'T' in dir(self) and self.T is not None:
+                T = self.T
+            else:
+                T = 298.15
+        elif 'T' not in dir(self) or self.T is None:
+            self.T = T
+        return Chem.p_vap(self.name, T)
+        
     
     def reset(self, verbose=True):
         '''
@@ -435,7 +445,24 @@ class Molecule:
             ax.set_xlabel('amount produced / nmol')
             ax.set_ylabel('int. signal / nC')
         return F_cal
-   
+    
+    def mass_transfer_coefficient(self, system='chip', T=298.15,
+                                  phi=0.5, l_p=100e-6, d_p=20e-9, 
+                                  p_chip=1e5, n_dot_0=2.6e-9, A=0.196e-4,
+                                  verbose=True):
+        K_H = self.kH * Chem.R * T
+        self.K_H = K_H
+        if verbose:
+            print('K_H = ' + str(K_H*1e-2) + ' bar/mol')
+        if system == 'chip':
+            self.h = K_H * n_dot_0 / (p_chip * A)
+        else:
+            self.h = K_H * phi * d_p / (3 * l_p) \
+                     * np.sqrt(8 / (np.pi * Chem.R * T * self.M*1e-3))
+        if verbose:
+            print('h = ' + str(self.h) + ' m/s')
+        return self.h   
+
     def set_temperature(self, T):
         self.T = T
         print('The set_temperature function is not implemented yet.')

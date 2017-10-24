@@ -226,6 +226,7 @@ def synchronize(Dataset_List, t_zero='start', append=None, cutit=0,
     
     return Combined_Data        
 
+
     
 def cut(x, y, tspan=None, returnindeces=False, override=False):
     if tspan is None:
@@ -471,7 +472,7 @@ def sort_time(dataset_0, data_type='EC', verbose=False):
         if verbose:
             print('\nfunction \'sort_time\' finished!\n\n')    
         
-        return dataset, sort_indeces 
+        return dataset#, sort_indeces  #sort indeces are useless, 17J11
     #if I need to read the return for normal use, then I don't want sort_indeces
     
     

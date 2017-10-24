@@ -487,6 +487,8 @@ def plot_experiment(EC_and_MS,
         ax[0].set_xlabel('')
         ax[0].xaxis.tick_top()  
     
+    ax[0].set_xlim(tspan)
+    
     if title is not None:
             plt.title(title)
     
@@ -536,6 +538,7 @@ def plot_experiment(EC_and_MS,
         
     if plotcurrent or plotpotential:
         ax[1].set_xlabel('time / [s]')
+        ax[1].set_xlim(tspan)
     
     if saveit:
         if title == 'default':

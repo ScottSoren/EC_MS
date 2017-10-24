@@ -15,10 +15,10 @@ colorlist = list(colors.cnames.items())
 
 
 ourcolors_0 = {'M2':'b','M4':'m', 'M18':'y', 'M28':'0.5', 'M32':'k', 'M40':'c', 'M44':'brown', #H2, He, and air 
-             'M15':'r', 'M26':'g', 'M27':'limegreen', 'M30':'olive', 'M31':'palegreen', 'M43':'greenyellow', #hydrocarbons
-             'M34':'darkred', 'M36':'darkgreen', 'M16':'indigo', #O isotopes
+             'M15':'r', 'M26':'g', 'M27':'limegreen', 'M30':'olive', 'M31':'darkorange', 'M43':'yellowgreen', #hydrocarbons
+             'M34':'indigo', 'M36':'darkslategray', 'M16':'steelblue', #O isotopes
              'M20':'slateblue', 'M19':'teal', 'M17':'chocolate', # O isotopes continued
-             'M70':'purple', 'M3':'darkgoldenrod' #exotic stuff
+             'M70':'purple', 'M3':'palevioletred' #exotic stuff
              }  
 
 
@@ -43,7 +43,7 @@ if __name__ == '__main__':
         print(mass + ' : ' + color)
         m = int(mass[1:])
         ax1.barh(m, 1, align='center', color=color)
-        rgb = ColorConverter.to_rgb(ColorConverter, color) #why do I have to do this?
+        rgb = ColorConverter.to_rgb(color) #why do I have to do this?
         html = colors.rgb2hex(rgb)
         ourcolors[mass] = (color, rgb, html)
         rgb = [np.round(a,3) for a in rgb]

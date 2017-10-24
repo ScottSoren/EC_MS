@@ -422,11 +422,14 @@ def sync_metadata(EC_data, RE_vs_RHE=None, A_el=None, verbose=True):
         print('data doesn\'t include Ewe!')  
         E_str = None
         V_str = None
-    if RE_vs_RHE is None:
-        V_str = E_str
-    elif E_str is not None:
-        V_str = 'U vs RHE / [V]' #changed from E to U 17E21
-        EC_data[V_str] = EC_data[E_str] + RE_vs_RHE
+    if 'V_str' in EC_data.keys(): #added 17J12
+        V_str = EC_data['V_str']
+    else:
+        if RE_vs_RHE is None:
+            V_str = E_str
+        elif E_str is not None:
+            V_str = 'U vs RHE / [V]' #changed from E to U 17E21
+            EC_data[V_str] = EC_data[E_str] + RE_vs_RHE
     
     if A_el is not None:
         EC_data['A_el'] = A_el
@@ -441,11 +444,14 @@ def sync_metadata(EC_data, RE_vs_RHE=None, A_el=None, verbose=True):
         print('data doesn\'t include I!')
         I_str = None
         J_str = None
-    if A_el is None:
-        J_str = I_str
-    elif I_str is not None:
-        J_str = 'J /[mA/cm^2]'
-        EC_data[J_str] = EC_data[I_str] / A_el
+    if 'J_str' in EC_data.keys(): #added 17J12
+        J_str = EC_data['J_str']
+    else:
+        if A_el is None:
+            J_str = I_str
+        elif I_str is not None:
+            J_str = 'J /[mA/cm^2]'
+            EC_data[J_str] = EC_data[I_str] / A_el
 
     EC_data['E_str'] = E_str 
     EC_data['V_str'] = V_str   

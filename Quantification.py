@@ -312,6 +312,21 @@ def recalibrate(quantmol = {'H2':'M2', 'He':'M4', 'CH4':'M15', 'H2O':'M18',
     return mdict, ax
 
 
+def line_through_zero(x,y):
+    '''
+    This returns a minimizing the square error of y = a * x
+    '''
+    a_i = np.mean(y/x)
+    pars_i = [a_i]    
+
+    def ax(x, a):
+        return a*x
+
+    pars, pcov = curve_fit(ax, x, y, p0=pars_i)
+#    pars = [tau, y0, y1]
+    a = pars[0]
+    return a
+
 
 def get_signal(MS_data, mass, tspan='tspan_2', removebackground=False, 
              unit='A', verbose=True):
