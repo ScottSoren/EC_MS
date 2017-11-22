@@ -347,6 +347,8 @@ def get_signal(MS_data, mass, tspan='tspan_2', removebackground=False,
             y = y*1e9
         elif unit[:-1] == 'u' or unit[:-1] == 'micro':
             y = y*1e6
+        elif unit[:-1] == 'p' or unit[:-1] == 'pico':
+            y = y*1e12
     
     if tspan is None:
         tspan = 'tspan'

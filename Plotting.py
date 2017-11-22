@@ -190,7 +190,7 @@ def plot_vs_potential(CV_and_MS_0,
                 ms_spec['color'] = color
             ax1.plot(V[I_plot], Y[I_plot], label=Y_str, **ms_spec)
         if quantified:
-            M_str = 'flux / [' + unit + ']'
+            M_str = 'cal. signal / [' + unit + ']'
         else:
             M_str = 'MS signal / [' + unit + ']'
         #ax1.set_xlabel(V_str)
@@ -325,7 +325,11 @@ def plot_signal(MS_data,
     for mass, color in masses.items():
         if verbose:
             print('plotting: ' + mass)
-        x, y = get_signal(MS_data, mass, unit=unit, verbose=verbose, tspan=tspan)
+        try:
+            x, y = get_signal(MS_data, mass, unit=unit, verbose=verbose, tspan=tspan)
+        except KeyError:
+            print('Can\'t get signal for ' + str(mass))
+            continue
         lines[mass] = ax.plot(x, y, color, label = mass) 
         #as it is, lines is not actually used for anything         
     if leg:
@@ -375,13 +379,11 @@ def plot_flux(MS_data, mols={'H2':'b', 'CH4':'r', 'C2H4':'g', 'O2':'k'},
             mols[mol] = color
     
     for (mol, color) in mols.items():
-        [x,y] = get_flux(MS_data, mol, unit=unit, verbose=verbose, tspan=tspan)
-        '''  17A28: this is now taken care of in the line above.
-        if tspan is not None:
-            if verbose:
-                print('cutting ' + str(mol) + ' at ' + str(tspan))
-            x,y = cut(x, y, tspan)
-        '''
+        try:
+            [x,y] = get_flux(MS_data, mol, unit=unit, verbose=verbose, tspan=tspan)
+        except KeyError:
+            print('Can\'t get signal for ' + str(mol))
+            continue
         if removebackground:
             try:
                 y = y - 0.99 * min(y) #0.99 to avoid issues when log plotting.
@@ -397,7 +399,7 @@ def plot_flux(MS_data, mols={'H2':'b', 'CH4':'r', 'C2H4':'g', 'O2':'k'},
             leg = 'lower right'
         ax.legend(loc=leg)
     ax.set_xlabel('time / [s]')
-    ylabel = 'flux / [' + unit + ']'
+    ylabel = 'cal. signal / [' + unit + ']'
 
     ax.set_ylabel(ylabel)
     if logplot:
@@ -415,8 +417,8 @@ def plot_experiment(EC_and_MS,
                     RE_vs_RHE=None, A_el=None, removebackground=True,
                     saveit=False, title=None, leg=False, unit='pmol/s',
                     masses=None, mols=None, #mols will overide masses will overide colors
-                    V_color='k', J_color='r', V_label=None, J_label=None,
-                    fig=None, J_str=None, V_str=None
+                    V_color='k', J_color='0.5', V_label=None, J_label=None,
+                    fig=None, t_str=None, J_str=None, V_str=None
                     ): 
     '''
     this plots signals or fluxes on one axis and current and potential on other axesaxis
@@ -444,13 +446,18 @@ def plot_experiment(EC_and_MS,
                 ax += [ax[1].twinx()]
         
     if tspan is None:                  #then use the whole range of overlap
-        tspan = EC_and_MS['tspan'] #changed from 'tspan_2' 17H09
+        if 'tspan_EC' in EC_and_MS:
+            tspan = EC_and_MS['tspan_EC']
+        else:                              
+            tspan = EC_and_MS['tspan'] #changed from 'tspan_2' 17H09
     if type(tspan) is str and not tspan=='all':
         tspan = EC_and_MS[tspan]
     if type(logplot) is not list:
         logplot = [logplot, False]
     
-    if V_str is None or J_str is None: 
+    if t_str is None:
+        t_str = 'time/s'
+    if V_str is None or J_str is None or RE_vs_RHE is not None or A_el is not None: 
         V_str_0, J_str_0 = sync_metadata(EC_and_MS, RE_vs_RHE=RE_vs_RHE, A_el=A_el, verbose=verbose) 
         #added 16J27... problem caught 17G26, fixed in sync_metadata
     if V_str is None: #this way I can get it to plot something other than V and J.
@@ -492,20 +499,35 @@ def plot_experiment(EC_and_MS,
     if title is not None:
             plt.title(title)
     
-    t = EC_and_MS['time/s']        
-    V = EC_and_MS[V_str]
-    J = EC_and_MS[J_str]      
-
-    # to check if I have problems in my dataset
+    try:
+        t = EC_and_MS[t_str]       
+    except KeyError:
+        print('data doesn\'t contain \'' + str(t_str) + '\', i.e. t_str. Can\'t plot EC data.')
+        plotpotential = False
+        plotcurrent = False
+    try:
+        V = EC_and_MS[V_str]
+    except KeyError:
+        print('data doesn\'t contain \'' + str(V_str) + '\', i.e. V_str. Can\'t plot that data.')
+        plotpotential = False      
+    try:
+        J = EC_and_MS[J_str]      
+    except KeyError:
+        print('data doesn\'t contain \'' + str(J_str) + '\', i.e. J_str. Can\'t plot that data.')
+        plotcurrent = False     
+        
+        # to check if I have problems in my dataset
 #    print('len(t) = ' + str(len(t)) + 
 #          '\nlen(V) = ' + str(len(V)) + 
 #          '\nlen(J) = ' + str(len(J)))
     
-    if tspan is not 'all':
+    if tspan is not 'all' and plotcurrent or plotpotential:
         I_keep = [I for (I, t_I) in enumerate(t) if tspan[0]<t_I and t_I<tspan[1]]
         t = t[I_keep]
-        V = V[I_keep]
-        J = J[I_keep]
+        if plotpotential:
+            V = V[I_keep]
+        if plotcurrent:
+            J = J[I_keep]
 
     i_ax = 1
     if plotpotential:

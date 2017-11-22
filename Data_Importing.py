@@ -336,16 +336,22 @@ def import_data(full_path_name='current', title='get_from_file',
     return DataDict
 
 
-def import_set(directory, MS_file='QMS.txt', EC_file=None, tag='01', verbose=True): 
+def import_set(directory, MS_file='QMS.txt', MS_data=None, t_zero='start',
+               EC_file=None, tag='01', verbose=True, override=False): 
     if verbose:
         print('\n\nfunction import_set at your service!\n')
     
     lslist = os.listdir(directory)
     
-    if type(MS_file) is str:
-        MS_file = [MS_file]
-    MS_datas = [import_data(directory + os.sep + f, data_type='MS', verbose=verbose) for f in MS_file]
-    MS_data = synchronize(MS_datas, verbose=verbose)
+    if MS_data is None:
+        if type(MS_file) is str:
+            MS_file = [MS_file]
+        MS_datas = [import_data(directory + os.sep + f, 
+                                data_type='MS', verbose=verbose) 
+                    for f in MS_file]
+        MS_data = synchronize(MS_datas, verbose=verbose)
+        if len(MS_datas) > 1:
+            sort_time(MS_data)
     
     if EC_file is None:
         EC_file = [f for f in lslist if f[:2] == tag and f[-4:] == '.mpt']
@@ -354,30 +360,58 @@ def import_set(directory, MS_file='QMS.txt', EC_file=None, tag='01', verbose=Tru
     EC_datas = [import_data(directory + os.sep + f, verbose=verbose) for f in EC_file]
     EC_data = synchronize(EC_datas, verbose=verbose)
     if 'loop number' in EC_data['data_cols']:
-        EC_data = sort_time(EC_data, verbose=verbose)
+        sort_time(EC_data, verbose=verbose) #note, sort_time no longer returns!
         
-    data = synchronize([MS_data, EC_data], t_zero='start', verbose=verbose)
+    data = synchronize([MS_data, EC_data], t_zero=t_zero, verbose=verbose, override=override)
     if verbose:
          print('\nfunction import_set finished!\n\n')       
     return data
 
 
-def import_folder(directory, verbose=1):
+def import_folder(directory, tags=None, MS_file=None, verbose=True):
     '''
-    import an entire folder of data at once
+    import everything you need from directory at once.
+    tags = None imports as one dataset
+    tags = 'all' separates by EC file tag, imports evertything
+    tags = ['01','02'] imports two datasets, one for each tag
     '''
     if verbose:
-        print('\n\nIMPORTING EVERYTHING!!!! \nImporting from ' + directory +'\n')
-    if directory[-1] != os.sep:
-        directory += os.sep
-    lslist = os.listdir(directory)
-    Datasets = []
-    for f in lslist:
-        if f[-4:] == '.mpt':
-            Datasets += [import_data(directory + f, data_type='EC')]
-        elif 'QMS' in f: 
-            Datasets += [import_data(directory + f, data_type='MS')]
+        print('\n\nfunction \'imoprt_folder\' at your service!\n')
+        print('Importing from \'' + directory + '\'')
+     
+    if directory[-1] == os.sep: 
+        directory = directory[:-1] #import_set adds the os.sep
     
+    lslist = os.listdir(directory)
+
+    if MS_file is None:
+        MS_file = [f for f in lslist if 'QMS' in f]
+
+    #importing MS data here rather than in import_set to avoid redundant importing
+    MS_datas = [import_data(directory + os.sep + f, 
+                            data_type='MS', verbose=verbose) 
+                for f in MS_file]
+    MS_data = synchronize(MS_datas, verbose=verbose)
+    #if len(MS_datas) > 1:          #not necessary, as synchronize sorts by recstart
+        #sort_time(MS_data)
+    
+    if tags is None:
+        EC_file = [f for f in lslist if '.mpt' in f]
+        Datasets = import_set(directory, MS_data=MS_data, EC_file=EC_file, verbose=verbose)
+       # sort_time(Datasets)  #probably not necessary, as synchronize sorts by recstart
+    
+    else:
+        if tags == 'all':
+            taglist = {f[0:2] for f in lslist if f[-4:]=='.mpt'}
+        else:
+            taglist = tags #Renamed so I keep info on what tags originally was
+        Datasets = dict([(t, import_set(directory, MS_data=MS_data, 
+                                        tag=t, verbose=verbose))
+                         for t in taglist])
+    
+    
+    if verbose:
+        print('\n\nfunction \'imoprt_folder\' finished!\n')    
     return Datasets
         
 

@@ -12,10 +12,12 @@ standard colors
 	M30: olive
 	M31: darkorange
 	M43: yellowgreen
-	M34: indigo
-	M36: darkslategray
-	M16: steelblue
+	M34: r
+	M36: g
+	M46: purple
+	M48: darkslategray
 	M20: slateblue
+	M16: steelblue
 	M19: teal
 	M17: chocolate
 	M70: purple

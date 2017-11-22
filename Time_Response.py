@@ -427,7 +427,8 @@ def flow_operator(mode='steady',  #in steady mode it's not really an operator.
         kH = mol.kH     #dimensionless henry's law constant
     if M is None:
         M = Chem.Mass(mol.name) * 1e-3 # molar mass / [kg/mol]
-    if n_el is None and not normalize:
+    #print(c0)
+    if n_el is None and c0 is None and not normalize:
         n_el = mol.n_el 
     if c0 is None:
         if j0 is None:
