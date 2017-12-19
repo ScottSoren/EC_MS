@@ -30,7 +30,8 @@ else:                           #then we use relative import
     from .Combining import synchronize, sort_time
 
 
-
+float_match = r'[-]?\d+[\.]?\d*(e[-]?\d+)?'     #matches floats like -3.54e4 or 7 or 245.13 or 1e-15
+#note, no white space included on the ends! Seems to work fine.
 
 def import_text(full_path_name='current', verbose=1):   
     '''

@@ -328,7 +328,7 @@ def line_through_zero(x,y):
     return a
 
 
-def get_signal(MS_data, mass, tspan='tspan_2', removebackground=False, 
+def get_signal(MS_data, mass, tspan='tspan', removebackground=False, 
              unit='A', verbose=True):
     '''
     Returns [x, y] where x is the time and y is QMS signal.
@@ -366,7 +366,7 @@ def get_signal(MS_data, mass, tspan='tspan_2', removebackground=False,
     return [x, y]
 
 
-def get_flux(MS_data, mol, tspan='tspan_2',  
+def get_flux(MS_data, mol, tspan='tspan',  
              unit='pmol/s', verbose=True, 
              removebackground=False, background='constant', endpoints=3):
     '''
@@ -417,7 +417,34 @@ def get_flux(MS_data, mol, tspan='tspan_2',
         y = y - 0.99*background #so that we don't break the log scale.
         #I should get rid of this and assume the caller knows what they're doing.
     return [x,y]    
-            
+
+
+def get_current(EC_data, tspan='tspan', unit='A'):
+    '''
+    I'm not happy with this function. I need to completely upgrade the way 
+    mass-, area-, and otherwise normalized currents and units are handled.
+    This should work for now.
+    '''
+    t_str = 'time/s'
+    V_str, J_str = sync_metadata(EC_data, verbose=False)
+    if '/' in unit: #then it's normalized in some way
+        t, j = EC_data[t_str], EC_data[J_str]
+    else:   # Then you want the raw current data
+        t, j = EC_data[t_str], EC_data[EC_data['I_str']]  
+        if unit == 'A':
+            j = j * 1e-3
+    
+    print('Scott has not yet done something smart for current units. If you try' +
+          ' anything unusual it will likely mess up!')            
+
+    if type(tspan) is str and not tspan=='all':
+        tspan = EC_data[tspan]
+    if not tspan == 'all':
+        t, j = cut(t, j, tspan) 
+    
+    return [t, j]
+
+           
 def predict_current(EC_and_MS, mols, tspan=None, RE_vs_RHE=None, A_el=None,
                     ax='new', colors=None, verbose=1):
     '''

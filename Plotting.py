@@ -201,6 +201,9 @@ def plot_vs_potential(CV_and_MS_0,
     
     if verbose:
         print('\nfunction \'plot_vs_potential\' finished!\n\n')
+    
+    for ax in [ax1, ax2]:    
+        ax.tick_params(axis='both', direction='in') #17K28  
         
         #parameter order of np.interp is different than Matlab's interp1
     return [ax1, ax2]    
@@ -340,6 +343,7 @@ def plot_signal(MS_data,
     ax.set_ylabel('MS signal / [' + unit + ']')           
     if logplot: 
         ax.set_yscale('log') 
+    ax.tick_params(axis='both', direction='in') #17K28  
     if verbose:
         print('function \'plot_masses\' finsihed! \n\n')
     return ax
@@ -404,6 +408,8 @@ def plot_flux(MS_data, mols={'H2':'b', 'CH4':'r', 'C2H4':'g', 'O2':'k'},
     ax.set_ylabel(ylabel)
     if logplot:
         ax.set_yscale('log')
+        
+    ax.tick_params(axis='both', direction='in') #17K28  
     
     if verbose:
         print('\nfunction \'plot_flux\' finished!\n\n')    
@@ -417,7 +423,7 @@ def plot_experiment(EC_and_MS,
                     RE_vs_RHE=None, A_el=None, removebackground=True,
                     saveit=False, title=None, leg=False, unit='pmol/s',
                     masses=None, mols=None, #mols will overide masses will overide colors
-                    V_color='k', J_color='0.5', V_label=None, J_label=None,
+                    V_color='k', J_color='r', V_label=None, J_label=None,
                     fig=None, t_str=None, J_str=None, V_str=None
                     ): 
     '''
@@ -541,6 +547,7 @@ def plot_experiment(EC_and_MS,
         ax[i_ax].yaxis.label.set_color(V_color)
         ax[i_ax].tick_params(axis='y', colors=V_color)
         ax[i_ax].spines['left'].set_color(V_color)
+        ax[i_ax].tick_params(axis='both', direction='in') #17K28  
         i_ax += 1
         
     if plotcurrent:
@@ -557,6 +564,7 @@ def plot_experiment(EC_and_MS,
             ax[i_ax].spines['right'].set_color(J_color)
         else:
             ax[i_ax].spines['left'].set_color(J_color)
+        ax[i_ax].tick_params(axis='both', direction='in') #17K28  
         
     if plotcurrent or plotpotential:
         ax[1].set_xlabel('time / [s]')

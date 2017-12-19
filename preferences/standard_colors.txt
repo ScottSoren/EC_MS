@@ -9,8 +9,8 @@ standard colors
 	M15: r
 	M26: g
 	M27: limegreen
-	M30: olive
-	M31: darkorange
+	M30: darkorange
+	M31: olive
 	M43: yellowgreen
 	M34: r
 	M36: g

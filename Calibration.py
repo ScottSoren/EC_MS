@@ -29,7 +29,7 @@ else:                           #then we use relative import
     from .EC import plot_CV_cycles, CV_difference, sync_metadata
     from .Molecules import Molecule
     from .Chips import Chip
-    from .Quantification import get_signal
+    from .Quantification import get_signal, get_current
 
 def ML_strip_cal(CV_and_MS, cycles=[1,2], t_int=200, cycle_str='cycle number',
              mol='CO2', mass='primary', n_el=None, 
@@ -284,6 +284,57 @@ def carrier_gas_cal(dataset=None, #if signal not given, reads average from datas
     calibration['F_cal'] = F_cal
     
     return calibration
+
+
+
+def point_calibration(data, mol, mass='primary', cal_type='internal', 
+                      tspan=0, n_el=None, tail=0, remove_background=True,
+                      chip=None, composition=1, carrier=None,
+):
+    '''
+    Returns a molecule object calibrated based in one of the following ways.
+        internally: cal_type='internal', need n_el 
+        externally: cal_type='external', need chip, carrier, composition
+    The signal is taken as an average over the tspan, or at a linear 
+    extrapolated point if len(tspan)==1. Same for current for internal cal.
+    For external calibration, 
+    '''
+    
+    m = Molecule(mol)
+    if mass == 'primary':
+        mass = m.primary
+    
+    #get average signal 
+    if type(tspan) in [int, float]:
+        x, y = get_signal(data, mass, [tspan-10, tspan+10])
+        S = np.interp(tspan, x, y)
+    else:
+        x, y = get_signal(data, mass, tspan=[tspan[0], tspan[1]+tail])
+        S = np.trapz(y, x) #/ (x[-1] - x[1])
+       # S = np.mean(y) #more accurate for few, evenly spaced datapoints
+
+    if cal_type == 'internal':
+        if type(tspan) in [int, float]:
+            t, i = get_current(data, tspan=[tspan-10, tspan+10], unit='A')
+            I = np.interp(tspan, t, i) 
+        else:
+            t, i = get_current(data, tspan=tspan, unit='A')
+            I = np.trapz(i, t) #/ (t[-1] - t[1])
+        n = I/(n_el*Chem.Far)
+    
+    elif cal_type == 'external':
+        if type(chip) is str:
+            chip = Chip(chip)    
+        if carrier==None:
+            carrier = mol
+        n = chip.capillary_flow(gas=carrier) / Chem.NA * composition
+        if type(tspan) not in [int, float]:
+            n = n * (tspan[-1]- tspan[0])
+    
+    F_cal = S/n        
+    m.F_cal = F_cal
+    
+    return m
 
 
 def LCA_cal():

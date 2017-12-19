@@ -316,8 +316,10 @@ def clip_cycles(dataset, cycles=1, V_clip=0, redox=1, V_str=None, t_str='time/s'
         print('\nfunction \'clip_cycles\' finished!\n\n')       
  
 
-
-    return [cyclesets[i] for i in cycles] #Whoa.
+    try:
+        return [cyclesets[i] for i in cycles] #Whoa.
+    except:
+        return cyclesets
 
 def close_cycle(cycle_0):
     '''

@@ -200,7 +200,7 @@ def stagnant_operator(tj=None, tpulse=10, tspan=None, j_el=-1,
                    D=None, kH=None, n_el=None, Temp=None, 
                    unit = 'pmol/s', flux_direction='out',
                    verbose=True, ax=None, plot_type=None, 
-                   startstate='zero', 
+                   startstate='zero', N=30,
                    colormap='plasma', aspect='auto'):
     '''                   
     Models a pulse of current towards a specified product in our EC-MS setup.
@@ -283,7 +283,7 @@ def stagnant_operator(tj=None, tpulse=10, tspan=None, j_el=-1,
     Cg = cg / c0 #non-dimensionalized concentration analyte at equilibrium with carrier gas, 17B02
     
     #pars = ([alpha, J_fun, Cg],) #odeint needs the tuple. 17A12: Why ?!
-    [T, CC] = solve_stagnant(alpha=alpha, J_fun=J_fun, Cg=Cg, Tspan=Tspan, startstate=startstate, flux=False)   
+    [T, CC] = solve_stagnant(alpha=alpha, J_fun=J_fun, Cg=Cg, Tspan=Tspan, startstate=startstate, flux=False, N=N)   
     cc = CC*c0
     t = T*t0
     j = h * (cc[:,0] - cg)       #mass transport at the membrane
@@ -399,7 +399,7 @@ def solve_flow(alpha=1, beta=1, Cg=0, N=30, flux=False,
 def flow_operator(mode='steady',  #in steady mode it's not really an operator.
                   system='chip', #
                   A_el=0.196e-4, A=0.196e-4, q0=1.5e15/Chem.NA, Temp=None,  #universal pars
-                  L=100e-6,  w=0.5e-3, w2=0.5e-3, F=1e-9, #geometry pars
+                  L=100e-6,  w=5e-3, w2=5e-3, F=1e-9, #geometry pars   #w and w2 changed from 0.5e-3 to 5e-3 on 17K28.
                   c0=None, j0=None, j_el=-1, #inlet flow pars
                   p_m=1e5, #chip pars
                   phi=0.5, dp=20e-9, Lp=100e-6,#DEMS pars
