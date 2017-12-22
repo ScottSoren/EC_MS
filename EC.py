@@ -27,6 +27,12 @@ else:                           #then we use relative import
     from .Combining import cut_dataset#, get_time_col
 
 
+E_string_list = ['Ewe/V', '<Ewe>/V', '|Ewe|/V']
+V_string_default = 'U vs RHE / [V]'
+I_string_list = ['I/mA', '<I>/mA', '|EI|/mA']
+J_string_default = 'J / [mA/cm^2]'
+
+
 def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True, cycle_str=None, cutMS=True, data_type='CV', override=False):
     ''' 
     This function selects one or more cycles from EC_data_0.
@@ -51,6 +57,9 @@ def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True, cycle_str=None
             cycle_str = 'Ns'
         else:
             print('no cycle numbers detected!')
+    
+    if verbose:
+        print('selecting based on ' + cycle_str)
 
     cycle_numbers = EC_data[cycle_str]
 
@@ -58,20 +67,22 @@ def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True, cycle_str=None
     N = len(cycle_numbers)
     if type(cycles)==int:
         cycles = [cycles]
-    I_keep = np.array([I for I in range(N) if cycle_numbers[I] in cycles])
+    mask = np.array([cycle_numbers[I] in cycles for I in range(N)])
     #list comprehension is awesome.
 
     for col in EC_data['data_cols']:
         try:
             if not (col[0] == 'M' and col[-2:] in ['-x', '-y']):  
+                if verbose:
+                    print(col + ' is EC data. Cutting based on ' + cycle_str)
                 #then we're dealing with EC data
                 try:
-                    EC_data[col] = EC_data[col].copy()[I_keep]
+                    EC_data[col] = EC_data[col].copy()[mask]
                 except KeyError:
                     print('hm... \'' + col + '\' in EC_data[data_cols] but not in EC_data')
         except IndexError:
             print('trouble selecting cycle ' + str(cycles) + ' of ' + col + '\n' +
-                    'type(I_keep) = ' + str(type(I_keep)))
+                    'type(mask) = ' + str(type(mask)))
             good = False
     t0 = timestamp_to_seconds(EC_data['timestamp'])
     tspan = np.array([min(EC_data['time/s']), max(EC_data['time/s'])])
@@ -84,6 +95,8 @@ def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True, cycle_str=None
         for col in EC_data['data_cols']:
             #print(col)
             if col[0] == 'M' and col[-2:] == '-x': #then we've got a QMS time variable
+                if verbose:
+                    print(col + 'is MS data. Cutting based on tspan = ' + str(tspan))
                 y_col = col[:-2] + '-y'
                 #print('select cycles is cutting in MS data ' + col )
                 EC_data[col], EC_data[y_col] = cut(EC_data[col], EC_data[y_col], tspan, override=override)       
@@ -109,7 +122,7 @@ def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True, cycle_str=None
                 
         for col in EC_data['data_cols']:
             if is_time(col):
-                EC_data[col] = EC_data[col] - t_zero
+                EC_data[col] = EC_data[col].copy() - t_zero
 
         EC_data['tspan'] = tspan - t_zero #fixed from tspan - tspan[0] - t_zero 17H09
         EC_data['tspan_2'] = EC_data['tspan']
@@ -397,11 +410,180 @@ def plot_vs_time(EC_data, axes='new', y_strings='default', colors=None,
     return axes
 
 
-def sync_metadata(EC_data, RE_vs_RHE=None, A_el=None, verbose=True):
+
+def sync_metadata(data, RE_vs_RHE=None, A_el=None, 
+                  V_str=None, J_str=None, E_str=None, I_str=None,
+                  verbose=True):
+    '''
+    A nice one-serve-all function for calibrating data, updating calibration, checking
+    if it's calibrated, and checking what the most useful data available is called.
+    It does simple things, but it does a lot.
+    Intuitiveness of use is valued over intuitiveness of internal working.
+    Here's the details:       
+        
+    -----
+    
+    data is a dictionary containing uncalibrated and perhaps calibrated data, as well
+    as the name of the keys pointing to certain types of data.
+    
+    E_str and I_str are the keys pointing to uncalibrated variable 1 (i.e. 
+    potential vs RE) and variable 2 (i.e. absolute current), respectively.
+    
+    V_str and J_str are the keys pointing to the calibrated variable 1 (i.e.
+    potential vs RHE) and variable 2 (i.e. normalized current), respectively.
+
+    RE_vs_RHE, if given, calibrates variable 1 such that data[V_str] = data[E_str] + RE_vs_RHE
+    
+    A_el, if given, calibrates variable 2 such that data[J_str] = data[I_str] / A_el
+    
+    RE_vs_RHE and A_el are also stored in data as data['RE_vs_RHE'] and data['A_el'].
+    If either RE_vs_RHE or A_el are set here to 'existing', the data is re-calibrated
+    according to the stored value.
+    
+    All strings E_str, V_str, I_str, and J_str are pointed to by data['E_str'] etc after
+    a call to this function.
+    
+    All strings E_str, V_str, I_str, and J_str can be updated to point to a new column in the dataset.
+    This does not recalibrate the data unless the relavent of RE_vs_RHE or A_el are given.
+    
+    If RE_vs_RHE and/or A_el are given and V_str and J_str are neither specified here
+    nor pre-specified in data['V_str'] or data['J_str'], new columns are created
+    with the default names V_str = 'U vs RHE / [V]' and J_str = 'J / [mA/cm^2]'
+    to contain the calibrated values for variable 1 and varible 2, respectively
+    
+    V_str are J_str are returned if known. 
+    If V_str is not known (no variable 1 calibration), E_str is returned in its place.   
+    If J_str is not known (no variable 2 calibration), I_str is returned in its place.   
+    
+    if verbose=True, the function talks to you.
+    
+    '''
+    
+    if verbose:
+        print('\nsyncing metadata for ' + data['title'] + '\n')
+
+    # use these to keep track of whether variables 1 and 2 will be calibrated:
+    cal1 = False
+    cal2 = False
+    
+    # obviously we will calibrate if given RE_vs_RHE and/or A_el
+    if RE_vs_RHE is not None:
+        data['RE_vs_RHE'] = RE_vs_RHE
+        cal1 = True       
+    if A_el is not None: 
+        data['A_el'] = A_el
+        cal2 = True
+    
+    # Now, look through the strins input here and in data. Are we setting or 
+    # getting column names?
+    
+    if E_str is None and 'E_str' in data:   # then get it
+        E_str = data['E_str']
+    elif E_str in data:                     # then set it
+        data['E_str'] = E_str
+    
+    if I_str is None and 'I_str' in data:   # then get it
+        I_str = data['I_str']
+    elif I_str in data:                     # then set it 
+        data['I_str'] = I_str               
+    
+    if V_str is None and 'V_str' in data:   # then get it
+        V_str = data['V_str']
+    elif V_str in data:                     # then set it 
+        data['V_str'] = V_str
+    elif V_str is not None:                 # A brand new V_str demands calibration of variable 1
+        cal1 = True                 
+        
+    if J_str is None and 'J_str' in data:   # then get it 
+        J_str = data['J_str']
+    elif J_str in data:                     # then set it
+        data['J_str'] = J_str
+    elif J_str is not None:                 # A brand new J_str demands calibration of variable 1
+        cal2 = True
+
+    # If we're calibrating variable 1 or still looking for a V_str, we need an E_str
+    if E_str is None and (cal1 or V_str is None):   # then we'll need an E_str!
+        try:   # see if a possible E_str (listed at the top of the module) is represented in the data
+            E_str = next(s for s in E_string_list if s in data['data_cols'])
+        except StopIteration:
+            print('sync metadata can\'t find any value for E_str!')
+            print('if you needed to calibrate variable 1, that won\'t happen now.')
+            cal1 = False
+            
+    # If we're calibrating variable 2 or still looking for a J_str, we need an I_str
+    if I_str is None and (cal2 or J_str is None):   # then we'll need an E_str!
+        try:   # see if a possible I_str (listed at the top of the module) is represented in the data
+            I_str = next(s for s in I_string_list if s in data['data_cols'])
+        except StopIteration:
+            print('sync metadata can\'t find any value for I_str!')
+            print('if you needed to calibrate variable 2, that won\'t happen now.')
+            cal1 = False
+    
+    #----------  alright, now we're ready to calibrate! --------------
+    
+    if cal1:   #Calibrate variable 1 (i.e., electrode potential)
+        E = data[E_str]            # get the data to be calibrated     
+        # get the calibration factor
+        if (RE_vs_RHE is None or RE_vs_RHE =='existing') and 'RE_vs_RHE ' in data:
+            A_el = data['A_el']   
+        if RE_vs_RHE  is None:
+            print('Your call to sync_metadata demands calibration of variable 2, ' + 
+                  'but I can\'t figure out what RE_vs_RHE is. Using RE_vs_RHE = 0.')
+            RE_vs_RHE = 0
+        V = E + RE_vs_RHE          #calibrate the data
+        if V_str is None:         # figure out where to put it
+            V_str = V_string_default
+        data['V_str'] = V_str   # remind yourself where you're putting it            
+        data[V_str] = V         # and put it there!
+
+
+    if cal2:  #Calibrate variable 2 (i.e., electrical current)
+        I = data[I_str]              # get the data to be calibrated   
+        # get the calibration factor
+        if (A_el is None or A_el=='existing') and 'A_el' in data:
+            A_el = data['A_el']   
+        if A_el is None:
+            print('Your call to sync_metadata demands calibration of variable 2, ' + 
+                  'but I can\'t figure out what A_el is. Using A_el=1.')
+            A_el = 1
+        J = I / A_el        #calibrate the data
+        if J_str is None:        # figure out where to put it
+            J_str = J_string_default
+        data['J_str'] = J_str  # remind yourself where you're putting it  
+        data[J_str] = J        # and put it there!
+
+    #----------  and, let's get out of here! --------------        
+
+    # make sure this function points to uncalibrated data if necessary.
+    data['E_str'] = E_str
+    data['I_str'] = I_str
+    if V_str is None:
+        V_str = E_str
+    if J_str is None:
+        J_str = I_str
+        
+    # oh, yeah, and they're all data columns!
+    for s in [E_str, I_str, V_str, J_str]:
+        if s is not None and s not in data['data_cols']:
+            data['data_cols'] += [s]
+    
+
+    # return the keys for the most useful data
+    return V_str, J_str        
+        
+    
+
+
+def sync_metadata_old(EC_data, RE_vs_RHE=None, A_el=None, verbose=True):
     '''
     Deal with all the annoying RE and J vs I vs <I> stuff once and for all here.
     After this has been called, all plotting methods need only to utilize
     EC_data['V_str'] and EC_data['J_str']
+    
+    This function desparately needs to be deleted and rewritten from the bottom up.
+    I can not find my way around it's logic, and I wrote it. It should be simple!!!
+    
+    Rewritten 17L21, see sync_metadata above. This is now antiquated.
     '''    
     if verbose:
         print('\nsyncing metadata for ' + EC_data['title'] + '\n')
@@ -418,13 +600,15 @@ def sync_metadata(EC_data, RE_vs_RHE=None, A_el=None, verbose=True):
         RE_vs_RHE = EC_data['RE_vs_RHE']
     else:
         EC_data['RE_vs_RHE'] = None
+        
     try:
         E_str = [s for s in ['Ewe/V', '<Ewe>/V', '|Ewe|/V'] if s in EC_data['data_cols']][0] 
     except IndexError:
         print('data doesn\'t include Ewe!')  
         E_str = None
         V_str = None
-    if 'V_str' in EC_data.keys(): #added 17J12
+        
+    if 'V_str' in EC_data.keys() and RE_vs_RHE is not None: #added 17J12
         V_str = EC_data['V_str']
     else:
         if RE_vs_RHE is None:
@@ -446,13 +630,14 @@ def sync_metadata(EC_data, RE_vs_RHE=None, A_el=None, verbose=True):
         print('data doesn\'t include I!')
         I_str = None
         J_str = None
-    if 'J_str' in EC_data.keys(): #added 17J12
+    
+    if 'J_str' in EC_data.keys() and A_el is not None: #added 17J12
         J_str = EC_data['J_str']
     else:
         if A_el is None:
             J_str = I_str
         elif I_str is not None:
-            J_str = 'J /[mA/cm^2]'
+            J_str = 'J / [mA/cm^2]'
             EC_data[J_str] = EC_data[I_str] / A_el
 
     EC_data['E_str'] = E_str 
@@ -469,6 +654,9 @@ def sync_metadata(EC_data, RE_vs_RHE=None, A_el=None, verbose=True):
         
     return V_str, J_str
     
+
+
+
 
 def plot_CV_cycles(CV_data, cycles=[0], RE_vs_RHE=None, A_el=None, ax='new',
                    cycle_str='cycle number',

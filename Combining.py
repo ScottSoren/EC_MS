@@ -15,12 +15,12 @@ import numpy as np
 import re
 import os #, sys    
 
-def synchronize(Dataset_List, t_zero='start', append=None, cutit=0, 
+def synchronize(Dataset_List, t_zero='start', append=None, cutit=False, 
                 override=False, verbose=1):
     '''
     This will combine array data from multiple dictionaries into a single 
     dictionary with all time variables aligned according to absolute time.
-    Data will be retained where the time spans overlap, unless cutit = 0, in 
+    Data will be retained where the time spans overlap, unless cutit = False, in 
     which case all data will be retained, but with t=0 at the start of the overlap.
     if t_zero is specified, however, t=0 will be set to t_zero seconds after midnight
     (added 16J29:) if append=1, data columns of the same name will be joined
@@ -250,9 +250,11 @@ def synchronize(Dataset_List, t_zero='start', append=None, cutit=0,
                     print('filling ' + col + ' with ' + str(len(fill)) + ' zeros')
                     Combined_Data[col] = np.append(Combined_Data[col], fill)
         if append and 'file number' in Combined_Data.keys():
-            Combined_Data['data_cols'].append('file number') #for new code
+            if not 'file number' in Combined_Data['data_cols']:    #these somehow get added twice somehow, which sometimes gives problems
+                Combined_Data['data_cols'].append('file number') #for new code            
             Combined_Data['file_number'] = Combined_Data['file number'] #for old code
-            Combined_Data['data_cols'].append('file_number') #for old code
+            if not 'file_number' in Combined_Data['data_cols']:
+                Combined_Data['data_cols'].append('file_number') #for old code
 
             
     if len(Combined_Data['data_cols']) == 0:
@@ -271,30 +273,35 @@ def cut(x, y, tspan=None, returnindeces=False, override=False):
     
     if np.size(x) == 0:
         print('\nfunction \'cut\' received an empty input\n')
-        offerquit()
-        
-    I_keep = [I for (I, x_I) in enumerate(x) if tspan[0]<x_I<tspan[-1]]
+        if not override:
+            offerquit()
+        if returnindeces:
+            return x, y, [] #I_keep #new 17H09
+        return x, y        
+    #I_keep = [I for (I, x_I) in enumerate(x) if tspan[0]<x_I<tspan[-1]] #list comprehensions are slow
+    mask = np.logical_and(tspan[0]<x, x<tspan[-1]) #vectorized logic is fast
     
-    if np.size(I_keep) == 0 and not override:
+    if True not in mask and not override:
         print ('\nWarning! cutting like this leaves an empty dataset!\n' +
                'x goes from ' + str(x[0]) + ' to ' + str(x[-1]) + 
                 ' and tspan = ' + str(tspan) + '\n')
         offerquit()
         
-    x = x.copy()[I_keep]
-    y = y.copy()[I_keep]
+    x = x.copy()[mask]
+    y = y.copy()[mask]
     
     if returnindeces:
-        return x, y, I_keep #new 17H09
+        return x, y, mask #I_keep #new 17H09
     return x, y
 
 
-def cut_dataset(dataset_0, tspan=None):
+def cut_dataset(dataset_0, tspan=None, verbose=True, override=False):
     '''
     Makes a time-cut of a dataset. Written 17H09.
     Unlike time_cut, does not ensure all MS data columns are the same length.
     '''
-    print('\n\nfunction \'cut dataset\' at your service!\n') 
+    if verbose:
+        print('\n\nfunction \'cut dataset\' at your service!\n') 
     dataset = dataset_0.copy()
     if tspan is None:
         return dataset
@@ -302,22 +309,29 @@ def cut_dataset(dataset_0, tspan=None):
     # I need to cunt non-time variables irst
     indeces = {} #I imagine storing indeces improves performance
     for col in dataset['data_cols']:
-        #print(col + ', length = ' + str(len(dataset[col])))
+        if verbose:
+            print(col + ', length = ' + str(len(dataset[col])))
         if is_time(col): #I actually don't need this. 
             continue #yes I do, otherwise it cuts it twice.
         timecol = get_time_col(col)
-        #print(timecol + ', timecol length = ' + str(len(dataset[timecol])))
+        if verbose:
+            print(timecol + ', timecol length = ' + str(len(dataset[timecol])))
         if timecol in indeces.keys():
-            #print('already got indeces, len = ' + str(len(indeces[timecol])))
-            
+            if verbose:
+                print('already got indeces, len = ' + str(len(indeces[timecol])))
+            if timecol == col:
+                continue
             dataset[col] = dataset[col].copy()[indeces[timecol]]
         else:
-            #print('about to cut!')
-            dataset[timecol], dataset[col], indeces[timecol] = (
-             cut(dataset[timecol], dataset[col], 
-                 tspan=tspan, returnindeces=True) 
-             )
-    print('\nfunction \'cut dataset\' finsihed!\n\n') 
+            if verbose:
+                print('about to cut!')
+            dataset[timecol], dataset[col], indeces[timecol] = \
+                cut(dataset[timecol], dataset[col],
+                    tspan=tspan, returnindeces=True, override=override) 
+    tspan0 = dataset['tspan']
+    dataset['tspan'] = [max([tspan[0], tspan0[0]]), min([tspan[-1], tspan0[-1]])]
+    if verbose:   
+        print('\nfunction \'cut dataset\' finsihed!\n\n') 
     return dataset
 
 
@@ -330,6 +344,7 @@ def time_cut(MS_Data_0, tspan, verbose=1):
     '''
     cuts an MS data set, retaining the portion of the data set within a specified
     time interval. Does nothing to the EC data.
+    # antiquated. Replaced by cut_dataset
     '''
     if verbose:
         print('\n\nfunction \'time_cut\' at your service! \n Time cutting ' + MS_Data_0['title'])

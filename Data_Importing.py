@@ -272,10 +272,13 @@ def text_to_data(file_lines, title='get_from_file',
     DataDict['timestamp'] = timestamp
     DataDict['data_type'] = data_type
     
-    if data_type == 'EC':           #so that synchronize can combine current data from different EC-lab techniques
+    if data_type == 'EC':           #so that synchronize can combine current and potential data from different EC-lab techniques
         if '<I>/mA' in DataDict['data_cols'] and 'I/mA' not in DataDict['data_cols']:
             DataDict['data_cols'].append('I/mA')
             DataDict['I/mA'] = DataDict['<I>/mA']
+        if '<Ewe>/V' in DataDict['data_cols'] and 'Ewe/V' not in DataDict['data_cols']:
+            DataDict['data_cols'].append('Ewe/V')
+            DataDict['Ewe/V'] = DataDict['<Ewe>/V']            
 
     if verbose:
         print('\nfunction \'text_to_data\' finished!\n\n')    
@@ -338,7 +341,8 @@ def import_data(full_path_name='current', title='get_from_file',
 
 
 def import_set(directory, MS_file='QMS.txt', MS_data=None, t_zero='start',
-               EC_file=None, tag='01', verbose=True, override=False): 
+               EC_file=None, tag='01', 
+               cutit=False, verbose=True, override=False): 
     if verbose:
         print('\n\nfunction import_set at your service!\n')
     
@@ -363,7 +367,8 @@ def import_set(directory, MS_file='QMS.txt', MS_data=None, t_zero='start',
     if 'loop number' in EC_data['data_cols']:
         sort_time(EC_data, verbose=verbose) #note, sort_time no longer returns!
         
-    data = synchronize([MS_data, EC_data], t_zero=t_zero, verbose=verbose, override=override)
+    data = synchronize([MS_data, EC_data], t_zero=t_zero, verbose=verbose, 
+                       override=override, cutit=cutit)
     if verbose:
          print('\nfunction import_set finished!\n\n')       
     return data

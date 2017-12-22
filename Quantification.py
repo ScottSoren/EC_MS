@@ -329,7 +329,7 @@ def line_through_zero(x,y):
 
 
 def get_signal(MS_data, mass, tspan='tspan', removebackground=False, 
-             unit='A', verbose=True):
+             unit='A', verbose=True, override=False):
     '''
     Returns [x, y] where x is the time and y is QMS signal.
     A bit trivial, but I like having this function to work in parrallel 
@@ -355,7 +355,7 @@ def get_signal(MS_data, mass, tspan='tspan', removebackground=False,
     if type(tspan) is str and not tspan=='all':
         tspan = MS_data[tspan]
     if not tspan == 'all':
-        x, y = cut(x,y,tspan)  
+        x, y = cut(x,y,tspan, override=override)  
     
     if removebackground:
         if type(removebackground) is float:
@@ -367,7 +367,7 @@ def get_signal(MS_data, mass, tspan='tspan', removebackground=False,
 
 
 def get_flux(MS_data, mol, tspan='tspan',  
-             unit='pmol/s', verbose=True, 
+             unit='pmol/s', verbose=True, override=False,
              removebackground=False, background='constant', endpoints=3):
     '''
     returns [x, y] where x is the t corresponding to the primary mass of the
@@ -398,7 +398,7 @@ def get_flux(MS_data, mol, tspan='tspan',
     if type(tspan) is str and not tspan=='all':
         tspan = MS_data[tspan]
     if not tspan == 'all':
-        x, y = cut(x,y,tspan) 
+        x, y = cut(x, y, tspan, override=override) 
     
     if removebackground:
         if background=='constant':

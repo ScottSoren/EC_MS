@@ -203,7 +203,8 @@ def plot_vs_potential(CV_and_MS_0,
         print('\nfunction \'plot_vs_potential\' finished!\n\n')
     
     for ax in [ax1, ax2]:    
-        ax.tick_params(axis='both', direction='in') #17K28  
+        if ax is not None:
+            ax.tick_params(axis='both', direction='in') #17K28  
         
         #parameter order of np.interp is different than Matlab's interp1
     return [ax1, ax2]    
@@ -302,7 +303,8 @@ def smooth_data(data_0, points=3, cols=None, verbose=True):
 def plot_signal(MS_data,
                 masses = {'M2':'b','M4':'r','M18':'0.5','M28':'g','M32':'k'},
                 tspan=None, ax='new', unit='nA',
-                logplot=True, saveit=False, leg=False, verbose=True):
+                logplot=True, saveit=False, leg=False, 
+                override=False, verbose=True):
     '''
     plots selected masses for a selected time range from MS data or EC_MS data
     Could probably be simplified a lot, to be the same length as plot_fluxes
@@ -329,7 +331,8 @@ def plot_signal(MS_data,
         if verbose:
             print('plotting: ' + mass)
         try:
-            x, y = get_signal(MS_data, mass, unit=unit, verbose=verbose, tspan=tspan)
+            x, y = get_signal(MS_data, mass, unit=unit, tspan=tspan,
+                              override=override, verbose=verbose, )
         except KeyError:
             print('Can\'t get signal for ' + str(mass))
             continue
@@ -354,7 +357,7 @@ def plot_masses(*args, **kwargs):
     
 def plot_flux(MS_data, mols={'H2':'b', 'CH4':'r', 'C2H4':'g', 'O2':'k'},
             tspan='tspan_2', ax='new', removebackground=True, A_el=None,
-            logplot=True, leg=False, unit='nmol/s', verbose=True):
+            logplot=True, leg=False, unit='nmol/s', override=False, verbose=True):
     '''
     Plots the molecular flux to QMS in nmol/s for each of the molecules in
     'fluxes.keys()', using the primary mass and the F_cal value read from
@@ -384,7 +387,8 @@ def plot_flux(MS_data, mols={'H2':'b', 'CH4':'r', 'C2H4':'g', 'O2':'k'},
     
     for (mol, color) in mols.items():
         try:
-            [x,y] = get_flux(MS_data, mol, unit=unit, verbose=verbose, tspan=tspan)
+            [x,y] = get_flux(MS_data, mol, unit=unit, tspan=tspan,
+                             override=override, verbose=verbose)
         except KeyError:
             print('Can\'t get signal for ' + str(mol))
             continue
@@ -423,8 +427,9 @@ def plot_experiment(EC_and_MS,
                     RE_vs_RHE=None, A_el=None, removebackground=True,
                     saveit=False, title=None, leg=False, unit='pmol/s',
                     masses=None, mols=None, #mols will overide masses will overide colors
-                    V_color='k', J_color='r', V_label=None, J_label=None,
-                    fig=None, t_str=None, J_str=None, V_str=None
+                    V_color='k', J_color='0.5', V_label=None, J_label=None,
+                    fig=None, t_str=None, J_str=None, V_str=None,
+                    override=False
                     ): 
     '''
     this plots signals or fluxes on one axis and current and potential on other axesaxis
@@ -451,11 +456,8 @@ def plot_experiment(EC_and_MS,
             if plotcurrent and plotpotential:
                 ax += [ax[1].twinx()]
         
-    if tspan is None:                  #then use the whole range of overlap
-        if 'tspan_EC' in EC_and_MS:
-            tspan = EC_and_MS['tspan_EC']
-        else:                              
-            tspan = EC_and_MS['tspan'] #changed from 'tspan_2' 17H09
+    if tspan is None:                  #then use the range of overlap                     
+        tspan = EC_and_MS['tspan'] #changed from 'tspan_2' 17H09
     if type(tspan) is str and not tspan=='all':
         tspan = EC_and_MS[tspan]
     if type(logplot) is not list:
@@ -471,7 +473,10 @@ def plot_experiment(EC_and_MS,
     if J_str is None:
         J_str = J_str_0
     
-    A_el = EC_and_MS['A_el']
+    if A_el in EC_and_MS:
+        A_el = EC_and_MS['A_el']
+    else:
+        A_el = 1
 
     quantified = False      #added 16L15
     #print(type(colors))
@@ -492,10 +497,12 @@ def plot_experiment(EC_and_MS,
     if quantified:
         plot_flux(EC_and_MS, mols=mols, tspan=tspan, A_el=A_el,
                   ax=ax[0], leg=leg, logplot=logplot[0], unit=unit, 
-                  removebackground=removebackground, verbose=verbose)
+                  removebackground=removebackground, 
+                  override=override, verbose=verbose)
     else:
         plot_signal(EC_and_MS, masses=masses, tspan=tspan,
-                    ax=ax[0], leg=leg, logplot=logplot[0], verbose=verbose)
+                    ax=ax[0], leg=leg, logplot=logplot[0], 
+                    override=override, verbose=verbose)
     if not overlay:
         ax[0].set_xlabel('')
         ax[0].xaxis.tick_top()  
