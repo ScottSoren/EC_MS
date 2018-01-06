@@ -13,7 +13,7 @@ Most recently edited: 16J27
 
 from __future__ import division, print_function
 
-import os
+import os, sys
 import numpy as np
 from matplotlib import pyplot as plt
 
@@ -24,6 +24,8 @@ if os.path.split(os.getcwd())[1] == 'EC_MS':
     from Molecules import Molecule
     from Chips import Chip
     from Quantification import get_signal
+    print(os.getcwd())
+    sys.exit()
 else:                           #then we use relative import
     from . import Chem
     from .EC import plot_CV_cycles, CV_difference, sync_metadata

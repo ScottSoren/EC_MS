@@ -517,7 +517,7 @@ def sync_metadata(data, RE_vs_RHE=None, A_el=None,
         except StopIteration:
             print('sync metadata can\'t find any value for I_str!')
             print('if you needed to calibrate variable 2, that won\'t happen now.')
-            cal1 = False
+            cal2 = False
     
     #----------  alright, now we're ready to calibrate! --------------
     
