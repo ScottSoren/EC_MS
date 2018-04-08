@@ -332,6 +332,10 @@ def point_calibration(data, mol, mass='primary', cal_type='internal',
         n = chip.capillary_flow(gas=carrier) / Chem.NA * composition
         if type(tspan) not in [int, float]:
             n = n * (tspan[-1]- tspan[0])
+
+    else:
+        print('not sure what you mean, dude, when you say cal_type = \'' + 
+              cal_type + '\'')
     
     F_cal = S/n        
     m.F_cal = F_cal

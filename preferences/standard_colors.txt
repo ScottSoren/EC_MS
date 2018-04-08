@@ -10,8 +10,8 @@ standard colors
 	M26: g
 	M27: limegreen
 	M30: darkorange
-	M31: olive
-	M43: yellowgreen
+	M31: yellowgreen
+	M43: tan
 	M34: r
 	M36: g
 	M46: purple
@@ -20,5 +20,8 @@ standard colors
 	M16: steelblue
 	M19: teal
 	M17: chocolate
+	M41: r
+	M42: olive
+	M29: g
 	M70: purple
 	M3: palevioletred

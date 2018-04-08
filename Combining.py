@@ -1,89 +1,184 @@
 # -*- coding: utf-8 -*-
 """
 Created on Tue Jul 19 10:40:46 2016
-Most recently edited: 16J27
 @author: Scott
 
-This is the core file of the package. Includes functions for combining EC and MS 
+This is the core file of the package. Includes functions for combining datasets.
 """
 
 # make python2-compatible:
 from __future__ import print_function
 from __future__ import division
 
-import numpy as np
+import time
 import re
 import os #, sys    
+import numpy as np
 
-def synchronize(Dataset_List, t_zero='start', append=None, cutit=False, 
-                override=False, verbose=1):
+
+
+
+def synchronize(data_objects, t_zero='start', append=None, file_number_type='EC',
+                cutit=False, override=None, update=True, tz=None,
+                verbose=True, vverbose=False):
     '''
-    This will combine array data from multiple dictionaries into a single 
+    'synchronize' is the most important function of electropy/ECpy/EC_MS/EC_Xray
+    
+    It combines numpy array data from multiple dictionaries into a single 
     dictionary with all time variables aligned according to absolute time.
-    Data will be retained where the time spans overlap, unless cutit = False, in 
-    which case all data will be retained, but with t=0 at the start of the overlap.
-    if t_zero is specified, however, t=0 will be set to t_zero seconds after midnight
-    (added 16J29:) if append=1, data columns of the same name will be joined
+    If cutit=True, data will be retained in the interval of overlap. Otherwise,
+    all data will be retained, but with t=0 at the start of the overlap,
+    unless t_zero is specified (details below). 
+    If append=1, data columns of the same name will be joined and filled with
+    zeros for sets that don't have them so that all columns remain the same length
+    as their time columns, and a data_column 'file number' will be added to 
+    keep track of where the data comes from. 
+    
+    ----  inputs -----
+        data_objects: traditionally a list of dictionaries, each of which has
+    a key ['data_cols'] pointing to a list of keys for columns of data to be
+    synchronized. data_objects can also contain objects with attribute data, in
+    which data_objects[i].data is used in the same way as data_objects normally is,
+    and then, if update is True, replaced by the combined data set.
+        t_zero: a string or number representing the moment that is considered t=0
+    in the synchronized dataset. If t_zero is a number, it is interpreted as a
+    unix epoch time. t_zero='start' means it starts at the start of the overlap. 
+    'first' means t=0 at the earliest datapoint in any data set.
+        append: True if identically named data columns should be appended. False
+    if the data from the individual sets should be kept in separate columns. By 
+    default (append=None), append will be set inside the function to True if all of
+    the data sets have the same 'data type'.
+        file_number_type: When appending data, a column file_number is added
+    storing the file numbers corresponding to the data from datasets of type
+    file_number_type. combined_data['file number'] will thus have the same length
+    as combined_data[timecol] where timecol is the time variable for that data
+    type, i.e. 'time/s' for file_number_type='EC', as is the default.
+        cutit: True if data from outside the timespan where all input datasets
+    overlap should be removed. This can make things a bit cleaner to work with 
+    in the front-panel scripts.
+        override: True if you don't want the function to pause and ask for your
+    consent to continue in the case that there is no range of overlap in the datasets.
+    override = False helps you catch errors if you're importing the wrong datasets.
+    By default, override gets set to True if append is True. 
+        update: True if you want object.data to be replaced with the synchronized
+    dataset for any non-dictionary objects in data_objects
+        tz: timezone for genrating timestamp, as pytz.timezone() instance or string 
+    to be read by pytz.timezone(). Local timezone assumed by default.
+        verbose: True if you want the function to talk to you. Recommended, as it
+    helps catch your mistakes and my bugs. False if you want a clean terminal or stdout
+    
+    ---- output ----
+        the combined and synchronized data set, as a dictionary
+    
+    It's really quite nice... 
+    But it's a monster function.
+    There's lots of comments in the code to explain the reasoning.
+    I'm happy for suggestions on how to improve! scott@fysik.dtu.dk
+    
     '''
     if verbose:
-        print('\n\nfunction \'synchronize\' at your service!')
+        print('\n\nfunction \'synchronize\' at your service!') 
         
-    if type(Dataset_List) is dict:
+    from .Data_Importing import timestamp_to_epoch_time, epoch_time_to_timestamp
+    
+    if type(data_objects) is not list:
         print('''The first argument to synchronize should be a list of datasets! 
                 You have instead input a dictionary as the first argument. 
                 I will assume that the first two arguments are the datasets you
                 would like to synchronize with standard settings.''')
-        Dataset_List = [Dataset_List, t_zero]
+        data_objects = [data_objects, t_zero]
         t_zero = 'start'
     
-    if append is None: #by default, append if all datasets are same type, 17G28
-        append = len({d['data_type'] for d in Dataset_List}) == 1
-        override = True #added 17J28
+    # figure out which of the inputs, if any, are objects with attribute 'data' vs simply datasets:
+    datasets = []
+    objects_with_data = []
+    for i, dataset in enumerate(data_objects):
+        if type(dataset) is dict:
+            datasets += [dataset]
+        else:
+            try:
+                data = dataset.data
+            except AttributeError:  # just ignore objects that don't have attribute 'data'.
+                print('can\'t get data from data_object number ' + str(i))
+                continue
+            objects_with_data += [dataset]
+            datasets += [data]       
+    
+    if append is None: #by default, append if all datasets are same type
+        append = len({d['data_type'] for d in datasets}) == 1
+    if override is None:
+        override = append  # Without override, it checks for overlap.
+                           # So, I should override when I expect no overlap.
+                           # I expect no overlap when appending datasets
+                           # Thus, override should be True when append is True.
     if verbose:
         print('append is ' + str(append))
-        
-                              #prepare to collect some data in the first loop:
-    recstarts = []            #first recorded time in each file in seconds since midnight
-    t_start = 0               #latest start time (start of overlap) in seconds since midnight
-    t_finish = 60*60*24*7     #earliest finish time (finish of overlap) in seconds since midnight 
-    t_first = 60*60*24*7      #earliest timestamp in seconds since midnight
-    t_last = 0                #latest timestamp in seconds since midnight
-    hasdata = {}              #'combining number' of dataset with 0 if its empty or 1 if it has data
     
-    Combined_Data = {'data_type':'combined', 'data_cols':[]}
+    now = time.time()  #now in unix epoch time, 
+    # ^ which is necessarily larger than the acquisition epochtime of any of the data.
+               #prepare to collect some data in the first loop:
+    recstarts = []            #first recorded time in unix epoch time
+    t_start = 0               #latest start time (start of overlap) in unix epoch time
+    t_finish = now            #earliest finish time (finish of overlap) in unix epoch time
+    t_first = now             #earliest timestamp in unix epoch time
+    t_last = 0                #latest timestamp in unix epoch time
+    hasdata = {}              #'combining number' of dataset with False if its empty or True if it has data
+    
+    combined_data = {'data_type':'combined', 'data_cols':[]}
     title_combined = ''
     
     #go through once to generate the title and get the start and end times of the files and of the overlap
     if verbose:
         print('---------- syncrhonize entering first loop -----------')
 
-    for nd, Dataset in enumerate(Dataset_List):
-        Dataset['combining_number'] = nd
-        if 'data_cols' not in Dataset or len(Dataset['data_cols']) == 0:
-            print(Dataset['title'] + ' is empty')
-            hasdata[nd] = 0
-            recstarts += [60*60*24*7] # don't want dataset list to be shortened when sorted later according to recstarts!
-            continue
-        hasdata[nd] = 1    
-        title_combined += Dataset['title'] + '__as_' + str(nd) + '__and___'
+    for nd, dataset in enumerate(datasets):
+        dataset['combining_number'] = nd
+        if 'data_cols' not in dataset or len(dataset['data_cols']) == 0:
+            print(dataset['title'] + ' is empty')
+            hasdata[nd] = False
+            recstarts += [now] # don't want dataset list to be shortened 
+            #when sorted later according to recstarts!
+            continue     #any dataset making it to the next line is not empty, i.e. has data.
+        hasdata[nd] = True    
+        if len(title_combined) > 0:
+            title_combined += ', '
+            if nd == len(datasets) - 1:
+                title_combined += 'and '
+        title_combined += '(' + dataset['title'] + ') as ' + str(nd)
         if verbose:
-            print('working on ' + Dataset['title'])
-            print('timestamp is ' + Dataset['timestamp'])
-        t_0 = timestamp_to_seconds(Dataset['timestamp'])
+            print('working on ' + dataset['title'])
         
-        t_f = 0
-        t_s = 60*60*24*7
+        try:
+            t_0 = dataset['tstamp'] # UNIX epoch time !!! The t=0 for the present dataset
+        except KeyError:
+            print('No tstamp in dataset. Trying to read it from date and timestamp.')
+            date = None
+            timestamp = None
+            if 'date' in dataset:
+                date = dataset['date']
+            if 'timestamp' in dataset:
+                timestamp = dataset['timestamp']
+            t_0 = timestamp_to_epoch_time(timestamp, date, tz=tz, verbose=verbose)
+
+        if verbose:
+                print('\ttstamp is ' + str(t_0) + ' seconds since Epoch')
+
+        t_s = now           # will decrease to the earliest start of time data in the dataset        
+        t_f = 0             # will increase to the latest finish of time data in the dataset
         
-        for col in Dataset['data_cols']:
+        for col in dataset['data_cols']:
+            #print('col = ' + str(col))
             if is_time(col):
                 try:
-                    t_s = min(t_s, t_0 + Dataset[col][0])   #earliest start of time data in dataset
-                    t_f = max(t_f, t_0 + Dataset[col][-1])  #latest finish of time data in dataset
-                except IndexError:
-                    print(Dataset['title'] + ' may be an empty file.')
-                    hasdata[nd] = 0
+                    t_s = min(t_s, t_0 + dataset[col][0])   
+                    # ^ earliest start of time data in dataset in epoch time
+                    t_f = max(t_f, t_0 + dataset[col][-1])  
+                    # ^ latest finish of time data in dataset in epoch time
+                except IndexError:  #if dataset['data_cols'] points to nonexisting data, something went wrong.
+                    print(dataset['title'] + ' may be an empty file.')
+                    hasdata[nd] = False # files that are empty after the header are caught here
                     
-        if hasdata[nd] == 0:
+        if not hasdata[nd]:  # move on from empty files
             continue
         recstarts += [t_s]               #first recorded time
     
@@ -92,194 +187,269 @@ def synchronize(Dataset_List, t_zero='start', append=None, cutit=False,
         t_start = max([t_start, t_s])    #latest start of time variable overall
         t_finish = min([t_finish, t_f])  #earliest finish of time variable overall
     
-    title_combined = title_combined[:-6]
-    Combined_Data['title'] = title_combined
-    Combined_Data['tspan_0'] =    [t_start, t_finish] #overlap start and finish times as seconds since midnight
-    Combined_Data['tspan_1'] = [t_start - t_first, t_finish - t_first]    # start and finish times as seconds since earliest start   
-
+    # out of the first loop. We've got the title to be given to the new combined dataset, 
+    # the tspan of all the data in unix epoch time, info on which sets if any are empty,
+    # and the start of data recording for each data set. Now, we save that info
+    # and use it to get ready for the second loop.
+    
+    # t_zero is the UNIX epoch time corresponding to t=0 in the retunred data set.
+    # It can be 'first', 'last', 'start', or 'finish', which work as illustrated here:
+    # | = timestamp, *--* = data acquisition
+    # dataset1 | *----------------------------*
+    # dataset2 |       *-----------------------------------------*
+    # dataset3              |     *----------------------*
+    # t =      first        last  start      finish            
+    if verbose:
+        print('first: ' + str(t_first) + ', last: ' + str(t_last) + 
+        ', start: ' + str(t_start) + ', finish: ' + str(t_finish))   
+        
+    if t_start > t_finish and not override:
+        print('No overlap. Check your files.\n')
+        offerquit()  
+        
     if t_zero == 'start':
         t_zero = t_start
     elif t_zero == 'first':
         t_zero = t_first
     elif t_zero == 'last':
         t_zero = t_last
-        
-    Combined_Data['first'] = t_first - t_zero
-    Combined_Data['last'] = t_last - t_zero
-    Combined_Data['start'] = t_start - t_zero
-    Combined_Data['finish'] = t_finish - t_zero
+    elif t_zero == 'finish':
+        t_zero = t_finish
     
-    Combined_Data['timestamp'] = seconds_to_timestamp(t_zero) #we want that timestamp refers to t=0, duh!
+    # some stuff is now ready to put into combined_data:
+    
+    combined_data['title'] = title_combined
+    combined_data['tspan_0'] = [t_start, t_finish] 
+    # ^ overlap start and finish times as unix epoch times
+    combined_data['tspan_1'] = [t_start - t_first, t_finish - t_first]    
+    # ^ overlap start and finish times as seconds since earliest start 
+    combined_data['tspan'] = [t_start - t_zero, t_finish - t_zero]    
+    # ^ start and finish times of overlap as seconds since t=0  
+    combined_data['tspan_2'] = combined_data['tspan'] #old code calls this tspan_2.
 
-    Combined_Data['tspan'] = [t_start - t_zero, t_finish - t_zero]    #start and finish times of overlap as seconds since t=0  
-    Combined_Data['tspan_2'] = Combined_Data['tspan'] #old code calls this tspan_2.
+    combined_data['tstamp'] = t_zero
+    combined_data['timestamp'] = epoch_time_to_timestamp(t_zero, tz=tz, verbose=verbose) 
+    # ^ we want that timestamp refers to t=0
     
-    if verbose:
-        print('first: ' + str(t_first) + ', last: ' + str(t_last) + 
-        ', start: ' + str(t_start) + ', finish: ' + str(t_finish))
-        
-    
-    if t_start > t_finish and not override:
-        print('No overlap. Check your files.\n')
-        offerquit()
-    
-    print(hasdata)
+    combined_data['first'] = t_first - t_zero
+    combined_data['last'] = t_last - t_zero
+    combined_data['start'] = t_start - t_zero
+    combined_data['finish'] = t_finish - t_zero
+
+    # Deal with the cases that all or all but one dataset is empty:
     N_notempty = len([1 for v in hasdata.values() if v==1])
     if N_notempty == 0:
-        print('First loop indicates that no files have data!!! Synchronize will return an empty dataset!!!')
+        print('First loop indicates that no files have data!!! ' + 
+              'synchronize will return an empty dataset!!!')
     elif N_notempty == 1:
-        print('First loop indicates that only one dataset has data! Synchronize will just return that dataset!')
-        Combined_Data = next(Dataset_List[nd] for nd, v in hasdata.items() if v==1)
+        print('First loop indicates that only one dataset has data! ' + 
+              'Synchronize will just return that dataset!')
+        combined_data = next(datasets[nd] for nd, v in hasdata.items() if v==1)
         print('\nfunction \'synchronize\' finished!\n\n')
-        return Combined_Data
+        return combined_data
     
-        #this is how I make sure to combine the datasets in the right order!     
+    # Sort datasets by start of recording so that in the second loop they are combined in the right order   
     I_sort = np.argsort(recstarts)    
-    Dataset_List = [Dataset_List[I] for I in I_sort]       
-        #sort by first recorded absolute time. This is so that successive datasets of same type can be joined,
-        #with the time variables increasing all the way through 
-        #(note: EC lab techniques started together have same timestamp but different recstart)
+    datasets = [datasets[I] for I in I_sort]       
+        #note: EC lab techniques started together have same tstamp but different recstart
     
-    #and loop again to synchronize the data and put it into the combined dictionary.
-    
+    # It's very nice when appending data from multiple files (EC data especially, 
+    # from experience), to be able to select data later based on file number
     if (append and 
-        'EC' in {d['data_type'] for d in Dataset_List}): #condition added 17I21
-        #add a datacolumn that can be used to separate again afterwards by file
-        #as of now (17G28) can't think of an obvious way to keep previous file numbers
-        Combined_Data['file number'] = [] #'file_number' renamed 'file number' for consistency 17H09
-
+        file_number_type in {d['data_type'] for d in datasets}): 
+        combined_data['file number'] = [] 
+        fn_timecol = get_timecol(data_type=file_number_type)
+        
+    combined_data_keys_0 = list(combined_data.keys()) 
+# used to avoid overwriting metadata at end of second loop
+    
+    # ... And loop again to synchronize the data and put it into the combined dictionary.
     if verbose:
         print('---------- syncrhonize entering second loop -----------')
         
-    for i, Dataset in enumerate(Dataset_List):
-        nd = Dataset['combining_number']
-        if hasdata[nd] == 0:
-            if verbose:
-                print('skipping this dataset, because its combining number, ' + str(nd) + ' is in the empty files list')
-            continue
-        elif verbose:
-            print('proceding with this dataset, with combining number ' + str(nd))
-            
+    for i, dataset in enumerate(datasets):
+        nd = dataset['combining_number']
+        # ^ note, nd is the number of the dataset from the first loop, and is 
+        #not scrambled by the sorting of the datasets according to recstart done above.
         if verbose:
-            print('cols in ' + Dataset['title'] + ':\n' + str(Dataset['data_cols']))
-            print('cols in Combined_Data:\n' + str(Combined_Data['data_cols']))
-        #this way names in Combined_Data match the order the datasets are input with
-        t_0 = timestamp_to_seconds(Dataset['timestamp'])
+            print('working on dataset ' + dataset['title'] + 
+                  ', which has combining number = ' + str(nd))
+            #print('cols in ' + dataset['title'] + ':\n' + str(dataset['data_cols']))
+            #print('cols in combined_data:\n' + str(combined_data['data_cols']))
+        if not hasdata[nd]: 
+            if verbose:
+                print('skipping this dataset, because its combining number, ' + 
+                      str(nd) + ', is in the empty files list')
+            continue
+            
+        # the synchronization is based on the offset of the individual dataset
+        # with respect to t_zero, both in unix time.
+        t_0 = dataset['tstamp']
         offset = t_0 - t_zero
         
-        #first figure out where I need to cut, by getting the indeces striclty corresponding to times lying within the overlap
-            
-        I_keep = {}    
-            #figure out what to keep:
-        for col in Dataset['data_cols']:        
-                #fixed up a bit 17C22, but this whole function should just be rewritten.
-            if is_time(col):
-                t = Dataset[col] + t_0 #absolute time
-                I_keep[col] = [I for (I, t_I) in enumerate(t) if t_start < t_I < t_finish]
-        
-        #then cut, and put it in the new data set
-        #first, get the present length of 'time/s' to see how much fill I need in the case of appending EC data from different methods.
+        # Prepare to cut based on the absolute (unix epoch) time interval. 
+        if cutit:
+            masks = {}     #will store a mask for each timecol to cut the corresponding cols with
+            for col in dataset['data_cols']:     
+                if is_time(col):
+                    if verbose:
+                        print('preparing mask to cut according to timecol ' + col)
+                    t = dataset[col]
+                    masks[col] = np.logical_and((t_start - t_0) < t, t < (t_finish - t_0))
+                    
+        # Check how many rows will be needed for relevant data types when appending data,
+        #and append to in the 'file number' column
         if append:
-            print('append is True')
-            if 'time/s' in Dataset:
-                l1 = len(Dataset['time/s'])
-                fn = np.array([i]*l1)
-                if Dataset['data_type'] == 'EC':
-                    Combined_Data['file number'] = np.append(Combined_Data['file number'], fn) 
-                    print('len(Combined_Data[\'file number\']) = ' + str(len(Combined_Data['file number'])))
-            else:
-                print('\'time/s\' in Dataset is False')
-            if 'time/s' in Combined_Data:
-                l0 = len(Combined_Data['time/s'])     
-            else:
-                l0 = 0
-        for col in Dataset['data_cols']:
-            #print(col)
-            data = Dataset[col] 
+            # sometimes, a certain data col is absent from some files of the same
+            #data type, but we still want it to match up with the corresponding 
+            #time variable for the rest of the files in combined_data. The most
+            #common example is OCV between other methods in EC data, which has no 
+            #current. When that happens, we want the filler values 0 to make sure
+            #all the collumns line up. oldcollength and collength will help with that:
+            oldcollength = {} # will store the existing length of each data col
+            for col in combined_data['data_cols']:
+                if is_time(col):
+                    oldcollength[col] = len(combined_data[col])
+            collength = {}  # will store the length to be appended to each data col
+            for col in dataset['data_cols']:
+                if is_time(col):
+                    collength[col] = len(dataset[col])
+                    if col not in oldcollength.keys():
+                        oldcollength[col] = 0
+                    else: #the case that the timecol is in both combined_data and dataset
+                        if vverbose:  
+                            print('prepared to append data according to timecol ' + col)
+            # now, fill in file number according to datasets of type file_number_type            
+            if dataset['data_type'] == file_number_type: 
+                fn = np.array([i] * collength[fn_timecol])             
+                combined_data['file number'] = np.append(combined_data['file number'], fn) 
+                if verbose:    
+                    print('len(combined_data[\'file number\']) = ' + str(len(combined_data['file number'])))
+                    
+        # now we're ready to go through the columns and actually process the data
+        #for smooth entry into combined_data
+        for col in dataset['data_cols']:
+            data = dataset[col]
+            # processing: cutting
             if cutit:           #cut data to only return where it overlaps
-                data = data[I_keep[get_time_col(col)]]  
-                    #fixed up a bit 17C22, but this whole function should just be rewritten. 
+                #print('cutting ' + col) # for debugging
+                data = data[masks[get_timecol(col)]]  
+            # processing: offsetting 
             if is_time(col):
                 data = data + offset
-            
+            # processing: for appended data
             if append:
-                if col in Combined_Data:
-                    data_0 = Combined_Data[col]
+                # get data from old column for appending
+                if col in combined_data:
+                    olddata = combined_data[col]    
                 else:
-                    data_0 = np.array([])
-                
-                if get_time_col(col) == 'time/s': #rewritten 17G26 for fig3 of sniffer paper
-                    #I got l0 before entering the present loop.
-                    l2 = len(data_0)
-                    if l0>l2:
-                        fill = np.array([0]*(l0-l2))
-                        #print('filling ' + col + ' with ' + str(len(fill)) + ' zeros')
-                        data_0 = np.append(data_0, fill)
-                
-                #print('len(data_0) = ' + str(len(data_0)) + ', len(data) = ' + str(len(data)))
-                data = np.append(data_0, data)
-                #print('len(data_0) = ' + str(len(data_0)) + ', len(data) = ' + str(len(data)))
-                    
+                    olddata = np.array([])
+                #but first...
+                # proccessing: ensure elignment with timecol for appended data
+                l1 = len(data) + len(olddata)
+                #print('col = ' + col) #debugging
+                timecol = get_timecol(col)
+                #print('timecol = ' + str(timecol)) #debugging
+                l0 = oldcollength[timecol] + collength[timecol] 
+                # ^ I had to get these lengths before because I'm not sure whether 
+                #timecol will have been processed first or not...
+                if l0 > l1: #this is the case if the previous dataset was missing col but not timecol
+                    filler = np.array([0] * (l0 - l1))
+                    olddata = np.append(olddata, filler) 
+                    # ^ and now len(olddata) = len(combined_data[timecol])
+                # APPEND!
+                data = np.append(olddata, data)
+            # processing: ensuring unique column names for non-appended data
             else:
-                if col in Combined_Data:
+                if col in combined_data:
                     print('conflicting versions of ' + col + '. adding subscripts.')
                     col = col + '_' + str(nd)                        
-                    
-            Combined_Data[col] = data
-            if col not in Combined_Data['data_cols']:
-                Combined_Data['data_cols'].append(col)  
-        #offerquit()          
-        
-        #keep all of the metadata from the original datasets (added 16J27)
-        for col, value in Dataset.items():
-            if col not in Dataset['data_cols'] and col not in ['combining_number', 'data_cols']:     #fixed 16J29
-                if col in Combined_Data.keys():
-                    Combined_Data[col + '_' + str(nd)] = value
-                else:
-                    Combined_Data[col] = value
-                    
-    #17G28: There's still a problem if the last dataset is missing columns! Fixing now.  
-    if 'time/s' in Combined_Data:
-        Combined_Data['tspan_EC'] = [Combined_Data['time/s'][0], Combined_Data['time/s'][-1]] #this is nice to use
-        l1 = len(Combined_Data['time/s'])
-        for col in Combined_Data['data_cols']:   
-            if get_time_col(col) == 'time/s': #rewritten 17G26 for fig3 of sniffer paper
-                l2 = len(Combined_Data[col])
-                if l1>l2:
-                    fill = np.array([0]*(l1-l2))
-                    print('filling ' + col + ' with ' + str(len(fill)) + ' zeros')
-                    Combined_Data[col] = np.append(Combined_Data[col], fill)
-        if append and 'file number' in Combined_Data.keys():
-            if not 'file number' in Combined_Data['data_cols']:    #these somehow get added twice somehow, which sometimes gives problems
-                Combined_Data['data_cols'].append('file number') #for new code            
-            Combined_Data['file_number'] = Combined_Data['file number'] #for old code
-            if not 'file_number' in Combined_Data['data_cols']:
-                Combined_Data['data_cols'].append('file_number') #for old code
-
             
-    if len(Combined_Data['data_cols']) == 0:
-        print('The input did not have recognizeable data! Synchronize is returning an empty dataset!')    
+            # ---- put the processed data into combined_data! ----
+            combined_data[col] = data
+            # And make sure it's in data_cols
+            if col not in combined_data['data_cols']:
+                combined_data['data_cols'].append(col)  
+         
         
+        #keep the metadata from the original datasets
+        for col, value in dataset.items():
+            if col in combined_data['data_cols']:
+                continue # Otherwise I duplicate all the data.
+            if col[0] == '_': #let's keep it to one level of '_', and nest dictionaries
+                #print(col)
+                if col in combined_data: 
+                    if nd in combined_data[col] and verbose:
+                        print('overwriting ' + col + '[' + str(nd) + '] with nested metadata.')
+                    combined_data[col][nd] = value
+                else:
+                    combined_data[col] = {nd:value}
+                    if verbose:
+                        print('nesting metadata for ' + col + ', nd = ' + str(nd))
+                continue
+            if col not in combined_data_keys_0: # avoid ovewriting essentials
+                combined_data[col] = value # this will store that from the
+                                           #latest dataset as top-level
+            col = '_' + col  # new name so that I don't overwrite
+                #essential combined metadata like tstamp
+            if col in combined_data:
+                #print(col) #debugging
+                if nd in combined_data[col]:
+                    if verbose:
+                        print(col + '[' + str(nd) + '] has nested metadata, skipping unnested.')
+                else:        
+                    combined_data[col][nd] = value
+            else:
+                # I expect to arrive here only once, so good place for output
+                if verbose:
+                    print('metadata from original files stored as ' + col)
+                combined_data[col] = {nd: value}
+
+    # ----- And now we're out of the loop! --------               
+    
+    # There's still a column length problem if the last dataset is missing 
+    #columns! Fixing that here. 
+    for col in combined_data['data_cols']:
+        l1 = len(combined_data[col])
+        timecol = get_timecol(col)
+        l0 = len(combined_data[timecol])
+        if l0 > l1:
+            filler = np.array([0] * (l0 - l1))
+            combined_data[col] = np.append(combined_data[col], filler)
+    
+    # add 'file number' to data_cols
+    if 'file number' in combined_data.keys() and 'file number' not in combined_data['data_cols']:    
+        combined_data['data_cols'].append('file number') #for new code
+
+    # check that there's actually data in the result of all this        
+    if len(combined_data['data_cols']) == 0:
+        print('The input did not have recognizeable data! Synchronize is returning an empty dataset!')    
+
+    # update the objects (e.g. ScanImages object in EC_Xray). This is nice!
+    if update:
+        for instance in objects_with_data:
+            instance.data = combined_data
+    
+    # and, we're done!
     if verbose:
         print('function \'synchronize\' finsihed!\n\n')   
     
-    return Combined_Data        
+    return combined_data        
 
 
     
 def cut(x, y, tspan=None, returnindeces=False, override=False):
+    '''
+    Vectorized 17L09 for EC_Xray. Should be copied back into EC_MS
+    '''
     if tspan is None:
         return x, y
     
     if np.size(x) == 0:
         print('\nfunction \'cut\' received an empty input\n')
-        if not override:
-            offerquit()
-        if returnindeces:
-            return x, y, [] #I_keep #new 17H09
-        return x, y        
-    #I_keep = [I for (I, x_I) in enumerate(x) if tspan[0]<x_I<tspan[-1]] #list comprehensions are slow
-    mask = np.logical_and(tspan[0]<x, x<tspan[-1]) #vectorized logic is fast
+        offerquit()
+        
+    mask = np.logical_and(tspan[0]<x, x<tspan[-1])
     
     if True not in mask and not override:
         print ('\nWarning! cutting like this leaves an empty dataset!\n' +
@@ -291,17 +461,16 @@ def cut(x, y, tspan=None, returnindeces=False, override=False):
     y = y.copy()[mask]
     
     if returnindeces:
-        return x, y, mask #I_keep #new 17H09
+        return x, y, mask #new 17H09
     return x, y
 
 
-def cut_dataset(dataset_0, tspan=None, verbose=True, override=False):
+def cut_dataset(dataset_0, tspan=None):
     '''
     Makes a time-cut of a dataset. Written 17H09.
     Unlike time_cut, does not ensure all MS data columns are the same length.
     '''
-    if verbose:
-        print('\n\nfunction \'cut dataset\' at your service!\n') 
+    print('\n\nfunction \'cut dataset\' at your service!\n') 
     dataset = dataset_0.copy()
     if tspan is None:
         return dataset
@@ -309,29 +478,22 @@ def cut_dataset(dataset_0, tspan=None, verbose=True, override=False):
     # I need to cunt non-time variables irst
     indeces = {} #I imagine storing indeces improves performance
     for col in dataset['data_cols']:
-        if verbose:
-            print(col + ', length = ' + str(len(dataset[col])))
+        #print(col + ', length = ' + str(len(dataset[col])))
         if is_time(col): #I actually don't need this. 
             continue #yes I do, otherwise it cuts it twice.
-        timecol = get_time_col(col)
-        if verbose:
-            print(timecol + ', timecol length = ' + str(len(dataset[timecol])))
+        timecol = get_timecol(col)
+        #print(timecol + ', timecol length = ' + str(len(dataset[timecol])))
         if timecol in indeces.keys():
-            if verbose:
-                print('already got indeces, len = ' + str(len(indeces[timecol])))
-            if timecol == col:
-                continue
+            #print('already got indeces, len = ' + str(len(indeces[timecol])))
+            
             dataset[col] = dataset[col].copy()[indeces[timecol]]
         else:
-            if verbose:
-                print('about to cut!')
-            dataset[timecol], dataset[col], indeces[timecol] = \
-                cut(dataset[timecol], dataset[col],
-                    tspan=tspan, returnindeces=True, override=override) 
-    tspan0 = dataset['tspan']
-    dataset['tspan'] = [max([tspan[0], tspan0[0]]), min([tspan[-1], tspan0[-1]])]
-    if verbose:   
-        print('\nfunction \'cut dataset\' finsihed!\n\n') 
+            #print('about to cut!')
+            dataset[timecol], dataset[col], indeces[timecol] = (
+             cut(dataset[timecol], dataset[col], 
+                 tspan=tspan, returnindeces=True) 
+             )
+    print('\nfunction \'cut dataset\' finsihed!\n\n') 
     return dataset
 
 
@@ -339,106 +501,86 @@ def offerquit():
     yn = input('continue? y/n\n')
     if yn == 'n':
         raise SystemExit
+
     
-def time_cut(MS_Data_0, tspan, verbose=1):
-    '''
-    cuts an MS data set, retaining the portion of the data set within a specified
-    time interval. Does nothing to the EC data.
-    # antiquated. Replaced by cut_dataset
-    '''
-    if verbose:
-        print('\n\nfunction \'time_cut\' at your service! \n Time cutting ' + MS_Data_0['title'])
-    MS_Data = MS_Data_0.copy() #otherwise I cut the original dataset!
-    length = 10**9
-    for col in MS_Data['data_cols']:
-        if is_time(col):
-            x = MS_Data[col].copy()
-            if col[-2:] == '-x': 
-                ycols = [col[:-2] +'-y',]      #then this is an MS time variable. 
-                #This assumes column names haven't been fucked with by synchronization
-            else:           #then MS_data is in fact MS_and_EC data
-                #break       #will need to change this when EC file lasts longer than tspan
-                ycols = [c for c in MS_Data['data_cols'] if c != col if c[-2:] != '-x' if c[-2:] != '-y']
-                #Assuming that everything that doesn't end in -x and -y is EC data
-            
-            I_start_object = np.where(x>tspan[0])
-            if len(I_start_object[0])>0:
-                if verbose:
-                    print('cutting ' + col + ' at start')
-                I_start = I_start_object[0][0]
-            else:
-                I_start = 0
-            I_finish_object = np.where(x>tspan[1])
-            if len(I_finish_object[0])>0:
-                if verbose:
-                    print('cutting ' + col + ' at finish')
-                I_finish = I_finish_object[0][0]
-            else:
-                I_finish = len(x)
-            x = x[I_start:I_finish]
-            MS_Data[col]=x
-            for ycol in ycols:
-                y = MS_Data[ycol].copy()
-                y = y[I_start:I_finish]       
-                MS_Data[ycol]=y
-            if col[-2:] == '-x':
-                length = min(length, len(x))
-            #and now, to make sure all of the QMS columns are still the same length:
-    for col in MS_Data['data_cols']:
-        if col[-2:] == '-x' or col[-2:] == '-y':
-            MS_Data[col] = MS_Data[col][:length]
-    if verbose:
-        print('function \'time_cut\' finished!\n\n')    
-    return MS_Data
-  
-    
-def is_time(col, verbose=0):
+def is_time(col, verbose=False):
     '''
     determines if a column header is a time variable, 1 for yes 0 for no
     '''
     if verbose:
         print('\nfunction \'is_time\' checking \'' + col + '\'!')
-    if col[0:4]=='time':
-        return 1
-    if col[-2:]=='-x': 
-        return 1         
+    col_type = get_type(col)
+    if col_type == 'EC':
+        if col[0:4]=='time':
+            return True
+        return False
+    elif col_type in ['MS', 'cinfdata']:
+        if col[-2:] == '-x': 
+            return True
+        return False
+    elif col_type == 'Xray':
+        if col == 't':
+            return True
+        return False
     #in case it the time marker is just burried in a number suffix:
     ending_object = re.search(r'_[0-9][0-9]*\Z',col) 
     if ending_object:
         col = col[:ending_object.start()]
         return is_time(col)
-    if verbose:
-        print('...not time')
-    return 0
+    print('can\'t tell if ' + col + ' is time. Returning False.')
+    return False
 
-def is_MS_data(col, verbose=False):
-    if re.search(r'^M[0-9]', col):
+def is_MS_data(col):
+    if re.search(r'^M[0-9]+-[xy]', col):
         return True
     return False
 
-def is_EC_data(col, verbose=False):
-    return not is_MS_data(col)
-    
-def get_type(col, verbose=False):
-    if is_MS_data(col, verbose):
-        return 'MS'
-    if is_EC_data(col, verbose):
-        return 'EC'
-    return None
+def is_EC_data(col):
+    from .EC import EC_cols_0
+    if col in EC_cols_0:
+    #this list should be extended as needed
+        return True
+    if col[-1] == '*' and col[:-1] in EC_cols_0:
+        return True
+    return False
 
-def get_time_col(col, verbose=False):
-    if is_time(col):
-        time_col = col
-    elif is_MS_data(col):
-        time_col = col.replace('-y','-x')
-    elif is_EC_data(col): 
-        time_col = 'time/s'
+def is_Xray_data(col):
+    if is_EC_data(col):
+        return False
+    if is_MS_data(col):
+        return False
+    return True
+
+def get_type(col):
+    if is_EC_data(col):
+        return 'EC'
+    if is_MS_data(col):
+        return 'MS'
+    elif col[-2:] in ['-x', '-y']:
+        return 'cinfdata' #it's cinfdata but not from a mass channel
+    return 'Xray' # to be refined later...
+
+def get_timecol(col=None, data_type=None, verbose=False):
+    if data_type is None:
+        data_type = get_type(col)
+    if data_type == 'EC':
+        timecol = 'time/s'
+    elif data_type == 'MS':
+        if col is None:
+            timecol = 'M4-x' # probably the least likely timecol to be missing from MS data
+        else:
+            timecol = col[:-2] + '-x'
+    elif data_type == 'Xray':
+        timecol = 't' # to be refined later...
+    elif col[-2:] in ['-y', '-x']: # a timecol is its own timecol
+        timecol = col[:-2] + '-x' #for any data downloaded from cinfdata
     else:
-        print('don\'t know what ' + col + ' is or what it\'s time col is.')
-        time_col = None
+        print('couldn\'t get a timecol for ' + col + 
+              '. data_type=' + str(data_type))
+        timecol = None
     if verbose:
-        print('\'' + col + '\' should correspond to time col \'' + str(time_col) +'\'')
-    return time_col
+        print('\'' + str(col) + '\' should correspond to timecol \'' + str(timecol) +'\'')
+    return timecol
 
 def timestamp_to_seconds(timestamp):
     '''
@@ -465,80 +607,389 @@ def seconds_to_timestamp(seconds):
 
 def dayshift(dataset, days=1):
     ''' Can work for up to 4 days. After that, hh becomes hhh... 
+    This function should find little use now that 
     '''
     dataset['timestamp'] = seconds_to_timestamp(timestamp_to_seconds(dataset['timestamp']) + days*24*60*60) 
     return dataset
 
-def sort_time(dataset, data_type='EC', verbose=False):
+
+
+def sort_time(dataset, data_type='EC', verbose=False, vverbose=False):
     #17K11: This now operates on the original dictionary, so
     #that I don't need to read the return.
-        if verbose:
-            print('\nfunction \'sort_time\' at your service!\n\n')
-        
-        if 'NOTES' in dataset.keys():
-            dataset['NOTES'] += '\nTime-Sorted\n'
-        else: 
-            dataset['NOTES'] = 'Time-Sorted\n'
-        
-        if data_type == 'all':
-            data_type = ['EC','MS']
-        elif type(data_type) is str:
-            data_type = [data_type]
+    if verbose:
+        print('\nfunction \'sort_time\' at your service!\n\n')
+    
+    if 'NOTES' in dataset.keys():
+        dataset['NOTES'] += '\nTime-Sorted\n'
+    else: 
+        dataset['NOTES'] = 'Time-Sorted\n'
+    
+    if data_type == 'all':
+        data_type = ['EC','MS']
+    elif type(data_type) is str:
+        data_type = [data_type]
 
-        sort_indeces = {} #will store sort indeces of the time variables
-        data_cols = dataset['data_cols'].copy()
-        dataset['data_cols'] = []
-        for col in data_cols:
-            if verbose:
-                print('working on ' + col)
-            data = dataset[col] #do I need the copy?
-            if get_type(col) in data_type: #retuns 'EC' or 'MS', else I don't know what it is.
-                time_col = get_time_col(col, verbose)
-                if time_col in sort_indeces.keys():
-                    indeces = sort_indeces[time_col]
-                else:
-                    print('getting indeces to sort ' + time_col)
-                    indeces = np.argsort(dataset[time_col])
-                    sort_indeces[time_col] = indeces
-                if len(data) != len(indeces):
-                    if verbose:
-                        print(col + ' is not the same length as its time variable!\n' +
-                              col + ' will not be included in the time-sorted dataset.')
-                else:
-                    dataset[col] = data[indeces]
-                    dataset['data_cols'] += [col]
-                    print('sorted ' + col + '!')
-            else: #just keep it without sorting.
+    sort_indeces = {} #will store sort indeces of the time variables
+    data_cols = dataset['data_cols'].copy()
+    dataset['data_cols'] = []
+    for col in data_cols:
+        if vverbose:
+            print('working on ' + col)
+        data = dataset[col] #do I need the copy?
+        if get_type(col) in data_type: #retuns 'EC' or 'MS', else I don't know what it is.
+            timecol = get_timecol(col, verbose=vverbose)
+            if timecol in sort_indeces.keys():
+                indeces = sort_indeces[timecol]
+            else:
+                if verbose:
+                    print('getting indeces to sort ' + timecol)
+                indeces = np.argsort(dataset[timecol])
+                sort_indeces[timecol] = indeces
+            if len(data) != len(indeces):
+                if verbose:
+                    print(col + ' is not the same length as its time variable!\n' +
+                          col + ' will not be included in the time-sorted dataset.')
+            else:
+                dataset[col] = data[indeces]
                 dataset['data_cols'] += [col]
-                dataset[col] = data
-                
+                if verbose:
+                    print('sorted ' + col + '!')
+        else: #just keep it without sorting.
+            dataset['data_cols'] += [col]
+            dataset[col] = data
+            
 
-        if verbose:
-            print('\nfunction \'sort_time\' finished!\n\n')    
-        
-        #return dataset#, sort_indeces  #sort indeces are useless, 17J11
+    if verbose:
+        print('\nfunction \'sort_time\' finished!\n\n')    
+    
+    #return dataset#, sort_indeces  #sort indeces are useless, 17J11
     #if I need to read the return for normal use, then I don't want sort_indeces
-    
+    return dataset
     
 
-if __name__ == '__main__':
+
+
+def time_cal(data, ref_data=None, points=[(0,0)], point_type=['time', 'time'], 
+             timecol='t', pseudotimecol=None, reftimecol='time/s', verbose=True):
+    '''
+    Calibrates the time column of a dataset according to sync points with a 
+    reference dataset. tstamps are never changed.
+    ------- inputs ---------
+        data: the dataset for which to calibrate a timecolumn
+        ref_data: the reference dataset.
+        points: pairs of corresponding times or indeces in data and ref_data. 
+    If only one point is given, time is calibrated just by a linear shift. If
+    two or more are given, time is calibrated by the linear transformation best
+    fitting the the calibration points (exact for two). 
+        sync_type: Tuple specifying the mode of reference used in points, first
+    for data and then for ref_data. Options are 'time', in which case the reference
+    is to the actual value of the uncalibrated/reference time; and 'index' in 
+    which case it is to the datapoint number of uncalibrated/reference time vector.
+        timecol: the name of the column of data into which to save the calibrated time
+        pseudotimecol: the name of the column of data containing the uncalibrated time.
+    By default pseudotime is taken to be the same as time, i.e. the uncalibrated
+    time is overwritten by the calibrated time.
+        reftimecol: the name of the column of ref_data containing the reference time.
+        verbose: True if you want the function to talk to you, useful for catching
+    your mistakes and my bugs. False if you want a clean terminal or stdout.
+    ------- output --------
+        data: same as the input data, but with the calibrated time saved in the
+    specified column.
+    '''
+    if verbose:
+        print('\n\nfunction \'time_cal\' at your service!\n')
     
-    from Data_Importing import import_data #honestly, I would just have everything in one module if you could fold code in spyder3
-    from Plotting import plot_vs_time
-    import os    
+    if type(points[0]) not in [list, tuple]:
+        points = [points]
+    if type(point_type) is str:
+        point_type = (point_type, point_type)
     
-    default_directory = os.path.abspath(os.path.join(os.getcwd(), os.pardir))     
-#    
-    CA_Data = import_data(default_directory, data_type='EC')
-    MS_Data = import_data(default_directory, data_type='MS')
-    
-    CA_and_MS = synchronize([CA_Data,MS_Data], cutit = 1)
-    
-    plot_vs_time(CA_and_MS,
-                 cols_1=[('M4-x','M4-y'),('M18-x','M18-y'),('M28-x','M28-y'),('M32-x','M32-y')],  
-#                 cols_2=[('time/s', '<I>/mA'),],       #for CV
-                 cols_2=[('time/s', 'I/mA'),],          #for CA
-                 )
+    t_vecs = np.zeros([2, len(points)]) # this is easiest if I pre-allocate an array
+    mask = np.array([True for point in points]) # to record if a poitn has problems
     
     
+    if ref_data in ['absolute', 'epoch', None]:
+        ref_data = {reftimecol:None, 'tstamp':0} 
+        #this is enough to keep the loop from crashing
+        print('time calbration referenced to absolute time! point_type[1] must be \'time\'.')
+    if 'tstamp' not in ref_data:
+        offset_0 = 0
+        print('No ref_data given or no ref_data[\'tstamp\']. ' + 
+              'Assuming reference times are relative to the same tstamp!')
+    else:
+        offset_0 = ref_data['tstamp'] - data['tstamp']
+        if verbose:
+            print('tstamp offset = ' + str(offset_0))
+        
+    for i, t in enumerate([data[pseudotimecol], ref_data[reftimecol]]):    
+        # this loop will go through twice. First for time from data, then
+        # for the reftime from refdata. sync_type is a vector of two corresponding
+        # to these two iterations, as is each point of points.
+        
+        #check the input
+        if not point_type[i] in ['time', 'index', 'timestamp']:
+            print('WARNING: Don\'t know what you mean, dude, when you say ' + 
+                  str(point_type[i]) + '. Options for point_type[' + str(i) +
+                  '] are \'index\', \'time\',  and \'timestamp\'.' +
+                  ' Gonna try and guess from the first point of points.')
+            if type(points[0][i]) is int:
+                point_type[i] = 'index'
+            elif type(points[0][i]) is float:
+                point_type[i] = 'time'
+            elif type(points[0][i]) is str:
+                point_type[i] = 'timestamp'
+
+        #get the times corresponding to the syncpoints into the array
+        for j, point in enumerate(points):
+            #print('point_type[' + str(i) + '] = ' + str(point_type[i])) #debugging
+            try:
+                if point_type[i] == 'index':
+                    t_vecs[i][j] = t[point[i]]
+                elif point_type[i] == 'time':
+                    t_vecs[i][j] = point[i]
+                elif point_type[i] == 'timestamp':
+                    t_vecs[i][j] = timestamp_to_seconds(point[i])
+            except (IndexError, TypeError) as e:
+                print(str(e) + ' at point ' + str(point) + ' of ' +str(i) + ' (0=data, 1=refdata)')
+                mask[j] = False
+    
+    N_good = len(mask[mask])
+    
+    if verbose:
+        print('Got ' + str(N_good) + ' out of ' + str(len(points)) + ' points!') 
+        # looks silly, but len(mask[mask]) easy way to get the number of True in mask
+    
+    
+    if N_good == 1:
+        offset = t_vecs[:, mask][1][0] - t_vecs[:, mask][0][0]
+        if verbose:
+            print('offset with respect to ref tstamp = ' + str(offset))
+            print('total offset = ' + str(offset + offset_0))
+        data[timecol] = data[pseudotimecol] + offset + offset_0
+    
+    else:
+        t, t_ref = t_vecs[:, mask]  # this drops any point that had a problem
+        #print(t_vecs)
+        pf = np.polyfit(t, t_ref, 1)
+        #print(pf)
+        if verbose:
+            print('with respect to ref tstamp:')
+            print('time = ' + str(pf[0]) + ' * pseudotime + ' + str(pf[1]))
+            print('with respect to tstamp:')
+            print('time = ' + str(pf[0]) + ' * pseudotime + ' + str(pf[1] + offset_0))
+        data[timecol] = pf[0] * data[pseudotimecol] + pf[1] + offset_0
+
+    if time not in data['data_cols']:
+        data['data_cols'] += [timecol] # otherwise synchronizing later can give error
+    
+    if verbose:
+        print('\nfunction \'time_cal\' finished!\n\n')
+    return data
+
+def trigger_times(x, y, threshhold=2.5):
+    '''
+    '''
+    trigger_on = y > threshhold
+    trigger_on_down = np.append(False, trigger_on[0:-1])
+    trigger_start = np.logical_and(trigger_on, np.logical_not(trigger_on_down))
+    times = x[trigger_start]
+    return times
+
+def get_trigger_times(data, xcol=None, ycol=None, label='Analog In', threshhold=2.5):
+    from .Data_Importing import get_xy
+    x, y = get_xy(data, xcol, ycol, label)
+    triggers = trigger_times(x, y, threshhold=threshhold)
+    data['triggers'] = triggers
+    return triggers
+
+
+def trigger_cal(data, triggers=None, pseudotimecol=None, pt_str=None, 
+                t_str=None, timecol=None, shiftcol='selector', edge=2, 
+                verbose=True):
+    '''
+    data is the only required argument, given that the trigger times are
+    stored in data['triggers'], as they are after a call to get_trigger_times(data).
+    
+    By default data['time/s'] is adjusted linearly to line up triggers with
+    changes in data['loop number'] and data['file number'] and stored as
+    data['time/s*'], which is subsequently used by other functions.
+    
+    More generally, this function:
+    
+    Calibrates a time column in the dataset given by pt_str or pseudotimecol
+    according to a list of triggers, which are assumed to come at times where 
+    another column, given by shiftcol, changes.
+    Thre does not need to be a trigger for every change in data[shiftcol], but
+    there should be a change in data[shiftcol] at every trigger time. The 
+    function shouldn't trip up so long as this is satisfied and the time between
+    adjacent triggers is much larger than the needed correction in the time.
+    
+    The calibrated time is stored in the column given by t_str or timecol. The
+    name of the calibrated time column is stored as data['t_str'] for plotting 
+    functions to refer to by default. The name of the uncalibrated time column
+    is stored as data['pt_str'].
+    
+    By default shiftcol points to a custom 'selector' column which, if not
+    defined prior to calling this function, is defined here as a linear 
+    combination of file number, loop number, and cycle number weighted oddly
+    to keep values unique. Triggers are assumed to correspond to changes in 
+    this column.
+    
+    '''
+    if verbose:
+        print('\n\nfunction \'trigger cal\' at your service!\n')
+    
+    # first, parse inputs. This means figuring out where in the data the
+    # uncalibrated time data is, i.e. data[pt_str],
+    # then figure out where the calibrated data should go, i.e. data[t_str]
+    # t_str is synonymous with timecol. pt_str is synonymous with pseudotimecol
+    # This is thus a mixture of old notation (i.e. sync_metadata with V_str etc)
+    # and new notation (i.e. time_cal with timecol etc)
+    
+    if pt_str is None and 'pt_str' in data:
+        pt_str = data['pt_str']
+    if t_str is None and 't_str' in data:
+        t_str = data['t_str']
+    
+    if pseudotimecol is None:
+        if pt_str is not None:
+            pseudotimecol = pt_str
+        elif t_str is not None:
+            pseudotimecol = t_str
+        else:
+            pseudotimecol = 'time/s'
+    
+    if timecol is None:
+        if pseudotimecol == t_str:
+            timecol = pseudotimecol + '*'
+            t_str = timecol
+        elif t_str is not None:
+            timecol = t_str
+        else:
+            timecol = pseudotimecol + '*'
+            
+    if triggers is None:
+        triggers = data['triggers']
+    
+    if type(triggers) is not np.ndarray:
+        if triggers in [list, tuple]:
+            triggers = np.array(triggers)
+        else:
+            triggers = np.array([triggers])
+    
+    pt = data[pseudotimecol]
+    
+    # set up the selector column to use for shift data
+    if shiftcol == 'selector' and 'selector' not in data:
+        data['selector'] = np.tile(0, np.shape(pt))
+        for col, weight in [('loop number', 1), ('file number', 0.11)]:
+            if col in data:
+                #print(col + ' ' + str(data[col]))  #debugging
+                data['selector'] = data['selector'] + weight*data[col] 
+    
+    # ---- check if there are triggers in the set and in the time interval ----
+    if len(triggers) == 0:
+        if verbose:
+            print('There are no triggers in this data set! No calibration. Finished!')
+        return pseudotimecol
+    
+    if verbose:
+        print(str(len(triggers)) + ' triggers spanning t= ' + str(triggers[0]) +
+              ' to ' + str(triggers[-1]))
+    triggermask = np.logical_and(pt[0]-edge<triggers, triggers<pt[-1]+edge)
+    triggers = triggers[triggermask]
+    if len(triggers)==0:
+        print('no triggers in time range. can\'t calibrate.')
+        data['t_str'] = pseudotimecol
+        return pseudotimecol
+    if verbose:
+        print('... of which ' + str(len(triggers)) + ' are between t= ' +
+              str(pt[0]-edge) + ' and ' + str(pt[-1]+edge) + '.')
+    
+    if shiftcol not in data:
+        if verbose:
+            print('no column \'' + shiftcol + '\' in dataset.')
+            if len(triggers) == 1:
+                print('Assuming the trigger is the start of the file.')
+            else:
+                print('Assuming the first trigger is the start of the file, \n' +
+                      '... and ignoring subsequent triggers.')
+        offset = triggers[0] - pt[0]
+        data[timecol] = pt + offset
+        data['pt_str'] = pseudotimecol
+        data['t_str'] = timecol
+        return timecol
+        
+    
+    # ----- find the times at which data[shiftcol] changes value ----
+    shiftvalue = data[shiftcol]
+    shiftvalue_down = np.append(shiftvalue[0]-1, shiftvalue[:-1])
+    shiftmask = np.logical_not(shiftvalue == shiftvalue_down)
+    shifttimes = pt[shiftmask]        
+    
+    # ----- get vectors of trigger times and corresponding shift times -----
+    pt_points = np.array([])  #pseutodimes, corresponding to shifts in data[shiftcolumn]
+    pt_indeces = np.array([]) #indeces of the pseudotimes (to check for duplicates)
+    t_points = np.array([])   #times, corresponding to trigger times
+    for trigger in triggers:
+        #find the shift_time closest to it:
+        err = abs(shifttimes - trigger)
+        index = np.argmin(err)
+        pt_point = shifttimes[index]
+        if err[index]>edge and verbose:
+            print('Large offset between matched trigger at ' + str(trigger) + 
+                  ' and ' + shiftcol + ' change at ' + str(pt_point) + '!')
+        #Check if that shift_time has already been linked to a trigger
+        if index in pt_indeces:
+            if verbose:
+                print('Multiple triggers seem to correspond to the file start at ' +
+                      str(pt_point) + '. I\'ll assume the first ones ' + 
+                      'were false starts and just keep the last one.')
+            pt_points[pt_indeces==index] = pt_point # if so, use tghe new shift_time
+        else: #otherwise add it to the vectors.
+            pt_points = np.append(pt_points, pt_point)
+            pt_indeces = np.append(pt_indeces, index)
+            t_points = np.append(t_points, trigger)
+    
+    print('matched ' + str(len(pt_points)) + ' triggers to shifts in ' + shiftcol + '.')
+    
+    t = pt.copy()  #get ready to build the new time variable
+    # points before the trigger should be shifted so the first trigger matches
+    startmask = pt <= pt_points[0]
+    if np.any(startmask):
+        startoffset = t_points[0] - pt_points[0]
+        if verbose:
+            print('shifting start point(s) by ' + str(startoffset) + '.')
+            #print(len(np.where(startmask))) #debugging 
+            # turns out it's always exactly 1 point, of course
+        t[startmask] = pt[startmask] + startoffset
+    # points between the first and last trigger should be interpolated according to the triggers
+    middlemask = np.logical_and(pt_points[0]<pt, pt<pt_points[-1])
+    if np.any(middlemask):
+        if verbose:
+            print('interpolating to trigger times between t= ' 
+                  + str(t_points[0]) + ' and ' + str(t_points[-1]) + '.')
+        t[middlemask] = np.interp(pt[middlemask], pt_points, t_points)
+    # points after the last trigger should be shifted so the last trigger matches
+    endmask = pt_points[-1] <= pt
+    if np.any(endmask):
+        endoffset = t_points[-1] - pt_points[-1]
+        if verbose:
+            print('shifting end points by ' + str(endoffset) + '.')
+        t[endmask] = pt[endmask] + endoffset
+        
+    data[timecol] = t
+    
+    data['t_str'] = timecol
+    data['pt_str'] = pseudotimecol
+    if t_str not in data['data_cols']:
+        data['data_cols'] += [t_str]
+    if pt_str not in data['data_cols']:
+        data['data_cols'] += [pt_str]
+    if verbose:
+        print('\nfunction \'trigger cal\' finished!\n\n')
+    return timecol
+
+           
     

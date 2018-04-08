@@ -12,23 +12,12 @@ import numpy as np
 import os
 #from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-if os.path.split(os.getcwd())[1] == 'EC_MS':      
-                                #then we're running from inside the package
-    from EC import sync_metadata, select_cycles
-    from Data_Importing import import_folder
-    from Combining import synchronize
-    from Quantification import get_flux, get_signal
-    from Object_Files import lines_to_dictionary
-    from Molecules import Molecule
+from .EC import sync_metadata, select_cycles
 
-    
-else:                           #then we use relative import
-    from .EC import sync_metadata, select_cycles
-    from .Data_Importing import import_folder
-    from .Combining import synchronize
-    from .Quantification import get_flux, get_signal
-    from .Object_Files import lines_to_dictionary
-    from .Molecules import Molecule
+from .Combining import synchronize
+from .Quantification import get_flux, get_signal
+from .Object_Files import lines_to_dictionary
+from .Molecules import Molecule
     
 preferencedir = os.path.dirname(os.path.realpath(__file__)) + os.sep + 'preferences' 
 with open(preferencedir + os.sep + 'standard_colors.txt','r') as f:
@@ -46,7 +35,7 @@ def plot_vs_potential(CV_and_MS_0,
                       overlay=0, logplot = [1,0], leg=False,
                       verbose=True, removebackground = None,
                       masses=None, mols=None, unit=None,
-                      fig=None, spec={}):
+                      fig=None, spec={}, t_str=None):
     '''
     This will plot current and select MS signals vs E_we, as is the 
     convention for cyclic voltammagrams. added 16I29
@@ -102,9 +91,14 @@ def plot_vs_potential(CV_and_MS_0,
     V_str, J_str = sync_metadata(CV_and_MS, RE_vs_RHE=RE_vs_RHE, A_el=A_el)
     V = CV_and_MS[V_str]
     J = CV_and_MS[J_str]
+    if t_str is None:
+        if 't_str' in CV_and_MS:
+            t_str = CV_and_MS['t_str']
+        else:
+            t_str = 'time/s'
 
     #get time variable and plotting indexes
-    t = CV_and_MS['time/s']
+    t = CV_and_MS[t_str]
     if tspan == 0:                  #then use the whole range of overlap
         tspan = CV_and_MS['tspan']
     I_plot = np.array([i for (i,t_i) in enumerate(t) if tspan[0]<t_i and t_i<tspan[1]])
@@ -133,7 +127,8 @@ def plot_vs_potential(CV_and_MS_0,
         elif ((type(colors) is dict and list(colors.keys())[0][0] == 'M') or
               (type(colors) is list and type(colors[0]) is str and colors[0][0] == 'M' ) or
               (type(colors) is str and colors[0]=='M')):
-            print('uncalibrated data to be plotted.')
+            if verbose:
+                print('uncalibrated data to be plotted.')
             masses = colors    
             colors = masses
         else:
@@ -302,7 +297,7 @@ def smooth_data(data_0, points=3, cols=None, verbose=True):
 
 def plot_signal(MS_data,
                 masses = {'M2':'b','M4':'r','M18':'0.5','M28':'g','M32':'k'},
-                tspan=None, ax='new', unit='nA',
+                tspan=None, ax='new', unit='nA', removebackground=False,
                 logplot=True, saveit=False, leg=False, 
                 override=False, verbose=True):
     '''
@@ -324,7 +319,11 @@ def plot_signal(MS_data,
         c = masses
         masses = {}
         for m in c:
-            color = standard_colors[m]
+            try:
+                color = standard_colors[m]
+            except KeyError:
+                print('Waring: no standard color for ' + m + '. Using black.')
+                color = 'k'
             masses[m] = color
 
     for mass, color in masses.items():
@@ -333,6 +332,8 @@ def plot_signal(MS_data,
         try:
             x, y = get_signal(MS_data, mass, unit=unit, tspan=tspan,
                               override=override, verbose=verbose, )
+            if removebackground:
+                y = y - 0.99*min(y)
         except KeyError:
             print('Can\'t get signal for ' + str(mass))
             continue
@@ -341,7 +342,7 @@ def plot_signal(MS_data,
     if leg:
         if type(leg) is not str:
             leg = 'lower right'
-        ax1.legend(loc=leg)
+        ax.legend(loc=leg)
     ax.set_xlabel('time / [s]')
     ax.set_ylabel('MS signal / [' + unit + ']')           
     if logplot: 
@@ -464,7 +465,10 @@ def plot_experiment(EC_and_MS,
         logplot = [logplot, False]
     
     if t_str is None:
-        t_str = 'time/s'
+        if 't_str' in EC_and_MS:
+            t_str = EC_and_MS['t_str']
+        else:
+            t_str = 'time/s'
     if V_str is None or J_str is None or RE_vs_RHE is not None or A_el is not None: 
         V_str_0, J_str_0 = sync_metadata(EC_and_MS, RE_vs_RHE=RE_vs_RHE, A_el=A_el, verbose=verbose) 
         #added 16J27... problem caught 17G26, fixed in sync_metadata
@@ -487,7 +491,8 @@ def plot_experiment(EC_and_MS,
     elif ((type(colors) is dict and list(colors.keys())[0][0] == 'M') or
           (type(colors) is list and type(colors[0]) is str and colors[0][0] == 'M' ) or
           (type(colors) is str and colors[0]=='M')):
-        print('uncalibrated data to be plotted.')
+        if verbose:
+            print('uncalibrated data to be plotted.')
         if masses is None:
             masses = colors
     else:
@@ -535,12 +540,13 @@ def plot_experiment(EC_and_MS,
 #          '\nlen(J) = ' + str(len(J)))
     
     if tspan is not 'all' and plotcurrent or plotpotential:
-        I_keep = [I for (I, t_I) in enumerate(t) if tspan[0]<t_I and t_I<tspan[1]]
-        t = t[I_keep]
+        mask = np.logical_and(tspan[0]<t, t<tspan[-1])
+        t = t[mask]
+        #print(np.where(mask)) #debugging
         if plotpotential:
-            V = V[I_keep]
+            V = V[mask]
         if plotcurrent:
-            J = J[I_keep]
+            J = J[mask]
 
     i_ax = 1
     if plotpotential:
@@ -574,7 +580,7 @@ def plot_experiment(EC_and_MS,
         ax[i_ax].tick_params(axis='both', direction='in') #17K28  
         
     if plotcurrent or plotpotential:
-        ax[1].set_xlabel('time / [s]')
+        ax[1].set_xlabel(t_str)
         ax[1].set_xlim(tspan)
     
     if saveit:
@@ -600,10 +606,23 @@ def plot_folder(folder_name,
     Will probably only be used to get an overview.
     Could add text showing starts of the data files
     '''
+    from .Data_Importing import import_folder
     Datasets = import_folder(folder_name)
     Combined_data = synchronize(Datasets, t_zero='first')
     sync_metadata(Combined_data, RE_vs_RHE, A_el)
     return plot_experiment(Combined_data, colors=colors)
+
+
+
+def plot_lines_x(values, ax='new', ylims=None, **kwargs):
+    if ax=='new':
+        fig, ax = plt.subplots()
+    if ylims is None:
+        ylims = ax.get_ylim()
+        ax.set_ylim(ylims)
+    for v in values:
+        ax.plot([v, v], ylims, **kwargs)
+    return ax
 
 
 def plot_datapoints(integrals, colors, ax='new', label='', X=None, X_str='V',
@@ -812,34 +831,6 @@ def set_figparams(figwidth=8,aspect=4/3,fontsize=7,figpad=0.15,figgap=0.08):
     
     mpl.rc('savefig', dpi=250*2.54*figwidth/realfigwidth)
 
-    
-if __name__ == '__main__':
-    import os
-    from Data_Importing import import_data
-    from EC import select_cycles, remove_delay
-    
-    plt.close('all')
-    
-    importrawdata = 1
-    if importrawdata:
-        default_directory = os.path.abspath(os.path.join(os.getcwd(), os.pardir)) 
-        CV_data_0 = import_data(default_directory + os.sep, # + '18_CO_dose_and_strip_C01.mpt', data_type='EC')
-                                data_type='EC')        
-        MS_data_0 = import_data(default_directory + os.sep,# + 'QMS_16I27_18h35m30.txt'
-                                data_type='MS')
-    
-    CV_data = select_cycles(CV_data_0,[1,2])    
-    CV_data = remove_delay(CV_data)
-    CV_and_MS = synchronize([CV_data, MS_data_0])
-    CV_and_MS['RE_vs_RHE'] = 0.553
-    CV_and_MS['A_el'] = 0.2
-    
-    
-    colors = {'M2':'b','M44':'r','M32':'k'}
-    (ax1,ax2,ax3,) = plot_masses_and_I(CV_and_MS, colors=colors, tspan=CV_and_MS['tspan_2'], leg=0)
-    (ax4,ax5,CV_and_MS_1) = plot_vs_potential(CV_and_MS, colors=colors, leg=0)
-    
-    
     
     
     

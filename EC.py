@@ -16,15 +16,10 @@ from __future__ import division
 
 from matplotlib import pyplot as plt
 import numpy as np
-import os
+#import os
 
-if os.path.split(os.getcwd())[1] == 'EC_MS':      
-                                #then we're running from inside the package
-    from Combining import timestamp_to_seconds, is_time, cut 
-    from Combining import cut_dataset#, get_time_col
-else:                           #then we use relative import
-    from .Combining import timestamp_to_seconds, is_time, cut 
-    from .Combining import cut_dataset#, get_time_col
+from .Data_Importing import epoch_time_to_timestamp    
+from .Combining import cut_dataset, is_EC_data, get_timecol, is_time, get_type
 
 
 E_string_list = ['Ewe/V', '<Ewe>/V', '|Ewe|/V']
@@ -33,7 +28,19 @@ I_string_list = ['I/mA', '<I>/mA', '|EI|/mA']
 J_string_default = 'J / [mA/cm^2]'
 
 
-def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True, cycle_str=None, cutMS=True, data_type='CV', override=False):
+EC_cols_0 = ['mode', 'ox/red', 'error', 'control changes', 'time/s', 'control/V', 
+           'Ewe/V', '<I>/mA', '(Q-Qo)/C', 'P/W', 'loop number', 'I/mA', 'control/mA',
+           'Ns changes', 'counter inc.', 'cycle number', 'Ns', '(Q-Qo)/mA.h', 
+           'dQ/C', 'Q charge/discharge/mA.h', 'half cycle', 'Capacitance charge/µF', 
+           'Capacitance discharge/µF', 'dq/mA.h', 'Q discharge/mA.h', 'Q charge/mA.h', 
+           'Capacity/mA.h', 'file number', 'file_number', 'Ece/V', 
+           'Ewe-Ece/V', '<Ece>/V', 'Energy charge/W.h', 'Energy discharge/W.h',
+           'Efficiency/%', 'Rcmp/Ohm', 'time/s*',
+           V_string_default, J_string_default]
+
+
+def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True, 
+                  cycle_str=None, cutMS=True, data_type='CV', override=False):
     ''' 
     This function selects one or more cycles from EC_data_0.
     Use this before synchronizing!
@@ -57,24 +64,19 @@ def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True, cycle_str=None
             cycle_str = 'Ns'
         else:
             print('no cycle numbers detected!')
-    
-    if verbose:
-        print('selecting based on ' + cycle_str)
 
     cycle_numbers = EC_data[cycle_str]
 
 
-    N = len(cycle_numbers)
+    #N = len(cycle_numbers) #unneeded
     if type(cycles)==int:
         cycles = [cycles]
-    mask = np.array([cycle_numbers[I] in cycles for I in range(N)])
+    mask = np.any(np.array([cycle_numbers == c for c in cycles]), axis=0)
     #list comprehension is awesome.
 
     for col in EC_data['data_cols']:
         try:
-            if not (col[0] == 'M' and col[-2:] in ['-x', '-y']):  
-                if verbose:
-                    print(col + ' is EC data. Cutting based on ' + cycle_str)
+            if not get_type(col) in ['MS','cinfdata']:  
                 #then we're dealing with EC data
                 try:
                     EC_data[col] = EC_data[col].copy()[mask]
@@ -84,22 +86,23 @@ def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True, cycle_str=None
             print('trouble selecting cycle ' + str(cycles) + ' of ' + col + '\n' +
                     'type(mask) = ' + str(type(mask)))
             good = False
-    t0 = timestamp_to_seconds(EC_data['timestamp'])
+    t0 = EC_data['tstamp']
     tspan = np.array([min(EC_data['time/s']), max(EC_data['time/s'])])
-    EC_data['tspan'] = tspan
-    EC_data['tspan_2'] = tspan
-    EC_data['tspan_0'] = tspan + t0
-    EC_data['data_type'] += ' selected'   
     
     if cutMS:
+        time_masks = {}
         for col in EC_data['data_cols']:
-            #print(col)
-            if col[0] == 'M' and col[-2:] == '-x': #then we've got a QMS time variable
-                if verbose:
-                    print(col + 'is MS data. Cutting based on tspan = ' + str(tspan))
-                y_col = col[:-2] + '-y'
-                #print('select cycles is cutting in MS data ' + col )
-                EC_data[col], EC_data[y_col] = cut(EC_data[col], EC_data[y_col], tspan, override=override)       
+            if not is_EC_data(col): #then we've got a QMS or synchrotron variable
+                timecol = get_timecol(col)
+                print(col + '  ' + timecol) #debugging
+                if timecol in time_masks:
+                    mask = time_masks[timecol]
+                else:
+                    mask = np.logical_and(tspan[0] < EC_data[timecol], EC_data[timecol] < tspan[-1])   
+                    # I want to do this vectorized from now on!
+                    time_masks[timecol] = mask
+                #if not is_time(col):
+                EC_data[col] = EC_data[col][mask]     
 
     if t_zero is not None:
         if verbose:
@@ -122,13 +125,19 @@ def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True, cycle_str=None
                 
         for col in EC_data['data_cols']:
             if is_time(col):
-                EC_data[col] = EC_data[col].copy() - t_zero
+                EC_data[col] = EC_data[col] - t_zero
 
-        EC_data['tspan'] = tspan - t_zero #fixed from tspan - tspan[0] - t_zero 17H09
-        EC_data['tspan_2'] = EC_data['tspan']
-        
+        tspan = tspan - t_zero
+        t0 = t0 + t_zero	
+        EC_data['tstamp'] = t0
+    EC_data['timestamp'] = epoch_time_to_timestamp(t0)
+    EC_data['tspan'] = tspan 
+    EC_data['tspan_2'] = tspan
+    EC_data['tspan_0'] = tspan + t0
+    EC_data['data_type'] += ' selected'           
     EC_data['good'] = good
     return EC_data
+
 
 
 def remove_delay(CV_data):
@@ -153,6 +162,13 @@ def CV_difference(cycles_data, redox=1, Vspan=[0.5, 1.0],
     This will calculate the difference in area between two cycles in a CV, 
     written for CO stripping 16J26. If ax is given, the difference will be
     filled in with color.
+        # Colors in the area between two cycles in the specified
+        # potential range (Vspan) and direction (redox=1 for 
+        # anodic.)
+        # Returns (dQ, data), where dQ is the difference in 
+        # charge passed during that region, and data=[t, V, J_diff]
+        # has columns for the time, potential, and difference in
+        # current for the specified region.
     '''
     if verbose:
         print('\n\nfunction \'CV_difference\' at your service!\n')  
@@ -203,7 +219,7 @@ def CV_difference(cycles_data, redox=1, Vspan=[0.5, 1.0],
             A_el = cycle_data['A_el']
         except KeyError:
             A_el = 1
-            print('didn''t find A_el.')
+            print('didn''t find A_el. Using A_el=1')
         if A_el is None:
             A_el = 1
         print('difference in charge passed: a = ' + str(dQ) + ' C\n' + 
@@ -572,92 +588,6 @@ def sync_metadata(data, RE_vs_RHE=None, A_el=None,
     return V_str, J_str        
         
     
-
-
-def sync_metadata_old(EC_data, RE_vs_RHE=None, A_el=None, verbose=True):
-    '''
-    Deal with all the annoying RE and J vs I vs <I> stuff once and for all here.
-    After this has been called, all plotting methods need only to utilize
-    EC_data['V_str'] and EC_data['J_str']
-    
-    This function desparately needs to be deleted and rewritten from the bottom up.
-    I can not find my way around it's logic, and I wrote it. It should be simple!!!
-    
-    Rewritten 17L21, see sync_metadata above. This is now antiquated.
-    '''    
-    if verbose:
-        print('\nsyncing metadata for ' + EC_data['title'] + '\n')
-    
-    if RE_vs_RHE is None and A_el is None and 'J_str' in EC_data.keys() and 'V_str' in EC_data.keys():
-        #added 17G26 so that plot_experiment would stop rewriting data[V_str] and data[J_str]
-        if verbose:
-            print('... already sync\'d! \n\n')
-        return EC_data['V_str'], EC_data['J_str'] 
-    
-    if RE_vs_RHE is not None:
-        EC_data['RE_vs_RHE'] = RE_vs_RHE
-    elif 'RE_vs_RHE' in EC_data:
-        RE_vs_RHE = EC_data['RE_vs_RHE']
-    else:
-        EC_data['RE_vs_RHE'] = None
-        
-    try:
-        E_str = [s for s in ['Ewe/V', '<Ewe>/V', '|Ewe|/V'] if s in EC_data['data_cols']][0] 
-    except IndexError:
-        print('data doesn\'t include Ewe!')  
-        E_str = None
-        V_str = None
-        
-    if 'V_str' in EC_data.keys() and RE_vs_RHE is not None: #added 17J12
-        V_str = EC_data['V_str']
-    else:
-        if RE_vs_RHE is None:
-            V_str = E_str
-        elif E_str is not None:
-            V_str = 'U vs RHE / [V]' #changed from E to U 17E21
-            EC_data[V_str] = EC_data[E_str] + RE_vs_RHE
-    
-    if A_el is not None:
-        EC_data['A_el'] = A_el
-    elif 'A_el' in EC_data:
-        A_el = EC_data['A_el']
-    else:
-        EC_data['A_el'] = None
-
-    try:
-        I_str = [s for s in ['I/mA', '<I>/mA', '|EI|/mA'] if s in EC_data['data_cols']][0] 
-    except IndexError:
-        print('data doesn\'t include I!')
-        I_str = None
-        J_str = None
-    
-    if 'J_str' in EC_data.keys() and A_el is not None: #added 17J12
-        J_str = EC_data['J_str']
-    else:
-        if A_el is None:
-            J_str = I_str
-        elif I_str is not None:
-            J_str = 'J / [mA/cm^2]'
-            EC_data[J_str] = EC_data[I_str] / A_el
-
-    EC_data['E_str'] = E_str 
-    EC_data['V_str'] = V_str   
-    EC_data['J_str'] = J_str
-    EC_data['I_str'] = I_str
-    
-    EC_data['data_cols'] = EC_data['data_cols'].copy() #17B02
-    for col in [V_str, J_str]:
-        if col not in EC_data['data_cols'] and col is not None:
-            EC_data['data_cols'] += [col]
-            if verbose:
-                print('added ' + col + ' to data_cols')
-        
-    return V_str, J_str
-    
-
-
-
-
 def plot_CV_cycles(CV_data, cycles=[0], RE_vs_RHE=None, A_el=None, ax='new',
                    cycle_str='cycle number',
                    saveit=0, title='default', leg=0, verbose=1, colors=None):
@@ -707,26 +637,167 @@ def plot_CV_cycles(CV_data, cycles=[0], RE_vs_RHE=None, A_el=None, ax='new',
     return data_to_return, ax
 
 
-if __name__ == '__main__':
-    from Data_Importing import import_data
 
-    plt.close('all')    
+
+
     
-    import_raw_data = 0
-    if import_raw_data:
-        EC_directory = ('/home/soren/Dropbox (Soren Scott Inc)' +
-            '/Sniffer_Experiments/03_Pt_Sputtered/Data/16I28_for_Hawaii/')
-        EC_file =  '03_HER_OER_C01.mpt'
-        
-        EC_data_0 = import_data(EC_directory + EC_file, data_type='EC')
+
+def get_through_sweep(data=None, t_str=None, V_str=None, t=None, V=None, t_i=0,
+                      Vspan=[0.4, 0.6], edge=0.01, redox=True, verbose=True):
+    '''
+    Return i_start and i_finish, the indeces corresponding to the first 
+    complete anodic(redox=True) or cathodic (redox=False) sweep through V_span 
+    starting after t_i. t and V can be given directly, or 
+    V_str and J_str can point to the corresponding columns in data.
+    '''
+    # parse inputs:
+    if t is None:
+        if t_str is None:
+            t_str = data['t_str']
+        t = data[t_str]
+    if V is None:
+        if V_str is None:
+            V_str = data['V_str']
+        V = data[V_str]
     
-    sync_metadata(EC_data_0, RE_vs_RHE=0.535, A_el=0.196)
+    # define some things to generalize between anodic and cathodic    
+    def before(a, b): 
+        if redox:
+        # before means more cathodic if we want the anodic sweep
+            return a < b
+        else:
+        # and more anodic if we want the cathodic sweep
+            return a > b
+    if redox:
+        # we start with the lower limit of V_span if we want the anodic sweep
+        Vspan = np.sort(np.array(Vspan))
+        Vspan_wide = [Vspan[0]-edge, Vspan[-1]+edge]
+    else:
+        # and with the upper limit of V_span if we want the cathodic sweep
+        Vspan = - np.sort(-np.array(Vspan))
+        Vspan_wide = [Vspan[0]+edge, Vspan[-1]-edge]
+ 
+    t_out = t[np.argmax(np.logical_and(t > t_i, 
+                                       before(V, Vspan_wide[0])
+                                       ) # True if after t_i and comfortably out on start side
+                        ) #first index for which V is comfortably out on start side
+             ] #corresponding time
+    #print(str(len(t>t_out)) + ' ' + str(len(before(Vspan[0], V)))) #debugging
+    i_start = np.argmax(np.logical_and(t>t_out, before(Vspan[0], V))) 
+    # ^ first index of full sweep through range
+    i_finish = np.argmax(np.logical_and(t>t_out, before(Vspan[1], V))) - 1  
+    # ^ last index of full sweep through range
+    if verbose:
+        print('first scan from ' + str(Vspan[0]) + ' --> ' + 
+              str(Vspan[1]) + ' occurs between indeces ' + str(i_start) + 
+              ' and ' + str(i_finish))
+    return i_start, i_finish
     
-    EC_data_1 = select_cycles(EC_data_0, [1,2], tzero='start')
-    [ax1, ax2] = plot_vs_time(EC_data_1, colors=['r','k'])
+
+def get_shunt_current_line(data, V_DL, t_i=0, 
+                           t_str=None, V_str=None, I_str=None, N=100, ax=None,
+                           verbose=True):
+    '''
     
-    EC_data_2 = select_cycles(EC_data_0, [3,4], tzero='start')
-    plot_vs_time(EC_data_2, colors=['r--','k--'], axes=[ax1, ax2])
+    '''
+    if t_str is None:
+        t_str = data['t_str']
+    if V_str is None:
+        V_str = data['V_str']
+    if I_str is None:
+        I_str = data['I_str'] # I don't want to deal with area normalization.
+
+    if 'RE_vs_RHE' in data:
+        V_unit = 'V vs RHE'
+    else:
+        V_unit = 'V'
     
+    V = data[V_str]
+    I = data[I_str]
+    t = data[t_str]
     
+    an_start, an_finish = get_through_sweep(t=t, V=V, Vspan=V_DL, redox=True)
+    cat_start, cat_finish = get_through_sweep(t=t, V=V, Vspan=V_DL, redox=False)        
+    
+    V_an = V[an_start:an_finish]
+    I_an = I[an_start:an_finish]
+
+    V_cat = V[cat_start:cat_finish]
+    I_cat = I[cat_start:cat_finish]
+    
+    Vspan = [max(min(V_an), min(V_cat)), min(max(V_an), max(V_cat))]
+    V_interp = np.arange(N)/N * (Vspan[-1] - Vspan[0]) + Vspan[0]
+    
+    I_an_interp = np.interp(V_interp, V_an, I_an)
+    fixcat = np.argsort(V_cat)
+    I_cat_interp = np.interp(V_interp, V_cat[fixcat], I_cat[fixcat])
+    
+    I_avg = (I_an_interp + I_cat_interp) / 2
+    
+    pfit = np.polyfit(I_avg, V_interp, deg=1)
+    
+    t_f = t[max(an_finish, cat_finish) + 1]
+    
+    if verbose:
+        print('function \'get_shunt_current_line\' calculates R_shunt = ' + 
+              str(pfit[0]) + ' kOhm, with potential of zero shunt = ' + 
+              str(pfit[1]) + ' ' + V_unit)
+    if ax is not None:
+        if ax == 'new':
+            fig, ax = plt.subplots()
+        ax.plot(V_interp, I_avg, 'r')
+        ax.plot(V_an, I_an, 'k')
+        ax.plot(V_cat, I_cat, 'k')
+        ax.plot(V_interp, I_an_interp, 'k--')
+        ax.plot(V_interp, I_cat_interp, 'k--')
+        x = [np.min(V_interp), np.max(V_interp)]
+        y = (x - pfit[1])/pfit[0] 
+        ax.plot(x, y, 'g')
+        ax.set_xlabel(V_str)
+        ax.set_ylabel(I_str)
+    return pfit, t_f
+    
+
+def correct_shunt(data, tspan='all', R_shunt=None, V_intercept=None, pfit=None,
+                  t_str=None, V_str=None, I_str=None, J_str=None):
+    '''
+    '''
+    if R_shunt is None:
+        R_shunt = pfit[0]  # CE-ground shunt resistance in kOhm
+    if V_intercept is None: 
+        V_intercept = pfit[1] # potential vs RHE of zero shunt current
+    if t_str is None:
+        t_str = data['t_str']
+    if V_str is None:
+        V_str = data['V_str']
+    if I_str is None:
+        I_str = data['I_str']
+    if J_str is None:
+        J_str = data['J_str']
+    
+    t = data[t_str]
+    V = data[V_str]
+    I = data[I_str]
+    J = data[J_str]
+    A_el = data['A_el']
+    
+    t = data[t_str]
+    if tspan is None or tspan=='all':
+        mask = np.tile(True, np.shape(t))
+    else:
+        mask = np.logical_and(tspan[0]<t, t<tspan[-1])
+    
+    I_shunt = 1/R_shunt * (V[mask] - V_intercept)
+    I[mask] = I[mask] - I_shunt
+    J[mask] = J[mask] - I_shunt/A_el
+    
+    I_str += '*'
+    J_str += '*'
+    
+    data[I_str] = I
+    data[J_str] = J
+    if I_str not in data['data_cols']:
+        data['data_cols'] += [I_str]
+    if J_str not in data['data_cols']:
+        data['data_cols'] += [J_str]
     

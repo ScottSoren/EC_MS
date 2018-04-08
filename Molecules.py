@@ -51,7 +51,7 @@ class Molecule:
             self.attr_status['formula'] = 0 #so that it asks me for a formula when initializing the file.
             self.attr_status['M'] = 0
             self.formula = name #but just put the name for now.
-            self.M = Chem.Mass(self.formula)
+            self.M = Chem.get_mass(self.formula)
         else:
             self.formula = formula
         # 0 for undefined, 1 for loaded from file, 2 for set by function
@@ -81,7 +81,7 @@ class Molecule:
         os.chdir(cwd)
         
         if self.M == 0:
-            self.M = Chem.Mass(self.formula)
+            self.M = Chem.get_mass(self.formula)
             
         def T(M):
             return M
