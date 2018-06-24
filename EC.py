@@ -35,7 +35,7 @@ EC_cols_0 = ['mode', 'ox/red', 'error', 'control changes', 'time/s', 'control/V'
            'Capacitance discharge/µF', 'dq/mA.h', 'Q discharge/mA.h', 'Q charge/mA.h', 
            'Capacity/mA.h', 'file number', 'file_number', 'Ece/V', 
            'Ewe-Ece/V', '<Ece>/V', 'Energy charge/W.h', 'Energy discharge/W.h',
-           'Efficiency/%', 'Rcmp/Ohm', 'time/s*',
+           'Efficiency/%', 'Rcmp/Ohm', 'time/s*', 'selector', 'j / [A/mg]',
            V_string_default, J_string_default]
 
 
@@ -54,6 +54,8 @@ def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True,
     
     good = True    
     EC_data = EC_data_0.copy()
+    EC_data['data_cols'] = EC_data['data_cols'].copy() 
+    # ^ otherwise this gives me a problem elsewehre
     
     #it looks like I actually want Ns for CA's and cycle number for CV's.
     #How to determine which
@@ -94,7 +96,7 @@ def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True,
         for col in EC_data['data_cols']:
             if not is_EC_data(col): #then we've got a QMS or synchrotron variable
                 timecol = get_timecol(col)
-                print(col + '  ' + timecol) #debugging
+                #print(col + '  ' + timecol) #debugging
                 if timecol in time_masks:
                     mask = time_masks[timecol]
                 else:
@@ -643,7 +645,7 @@ def plot_CV_cycles(CV_data, cycles=[0], RE_vs_RHE=None, A_el=None, ax='new',
     
 
 def get_through_sweep(data=None, t_str=None, V_str=None, t=None, V=None, t_i=0,
-                      Vspan=[0.4, 0.6], edge=0.01, redox=True, verbose=True):
+                      Vspan=[0.4, 0.6], edge=0.01, redox=None, verbose=True):
     '''
     Return i_start and i_finish, the indeces corresponding to the first 
     complete anodic(redox=True) or cathodic (redox=False) sweep through V_span 
@@ -659,6 +661,9 @@ def get_through_sweep(data=None, t_str=None, V_str=None, t=None, V=None, t_i=0,
         if V_str is None:
             V_str = data['V_str']
         V = data[V_str]
+    if redox is None: #then assume they gave it in the order of Vspan.
+        redox = Vspan[0] < Vspan[-1]
+    #print(redox) #debugging
     
     # define some things to generalize between anodic and cathodic    
     def before(a, b): 
@@ -676,7 +681,9 @@ def get_through_sweep(data=None, t_str=None, V_str=None, t=None, V=None, t_i=0,
         # and with the upper limit of V_span if we want the cathodic sweep
         Vspan = - np.sort(-np.array(Vspan))
         Vspan_wide = [Vspan[0]+edge, Vspan[-1]-edge]
- 
+    
+    #print('len(t) = ' + str(len(t))) # debugging
+    #print('len(V) = ' + str(len(V))) # debugging
     t_out = t[np.argmax(np.logical_and(t > t_i, 
                                        before(V, Vspan_wide[0])
                                        ) # True if after t_i and comfortably out on start side
@@ -715,6 +722,7 @@ def get_shunt_current_line(data, V_DL, t_i=0,
     V = data[V_str]
     I = data[I_str]
     t = data[t_str]
+    #print('t_str = ' + t_str + ', V_str = ' + V_str) # debugging
     
     an_start, an_finish = get_through_sweep(t=t, V=V, Vspan=V_DL, redox=True)
     cat_start, cat_finish = get_through_sweep(t=t, V=V, Vspan=V_DL, redox=False)        
@@ -759,13 +767,22 @@ def get_shunt_current_line(data, V_DL, t_i=0,
     
 
 def correct_shunt(data, tspan='all', R_shunt=None, V_intercept=None, pfit=None,
-                  t_str=None, V_str=None, I_str=None, J_str=None):
+                  t_str=None, V_str=None, I_str=None, J_str=None, verbose=True,
+                  **kwargs):
     '''
     '''
+    if verbose:
+        print('correcting shunt!')
+    if pfit is None and R_shunt is None and V_intercept is None:
+        #print(I_str)  #debugging
+        pfit, t_f = get_shunt_current_line(data,
+                                      t_str=t_str, V_str=V_str, I_str=I_str,
+                                      verbose=verbose, **kwargs)
     if R_shunt is None:
         R_shunt = pfit[0]  # CE-ground shunt resistance in kOhm
     if V_intercept is None: 
         V_intercept = pfit[1] # potential vs RHE of zero shunt current
+    
     if t_str is None:
         t_str = data['t_str']
     if V_str is None:
@@ -777,8 +794,8 @@ def correct_shunt(data, tspan='all', R_shunt=None, V_intercept=None, pfit=None,
     
     t = data[t_str]
     V = data[V_str]
-    I = data[I_str]
-    J = data[J_str]
+    I = data[I_str].copy() #preserve the un-corrected originals
+    J = data[J_str].copy()
     A_el = data['A_el']
     
     t = data[t_str]
@@ -793,11 +810,17 @@ def correct_shunt(data, tspan='all', R_shunt=None, V_intercept=None, pfit=None,
     
     I_str += '*'
     J_str += '*'
-    
+    if verbose:
+        print('saving corrected data as ' + J_str + ' (normalized current) and ' +
+              I_str + ' (raw current) + ')
     data[I_str] = I
     data[J_str] = J
+    data['I_str'] = I_str
+    data['J_str'] = J_str
     if I_str not in data['data_cols']:
         data['data_cols'] += [I_str]
     if J_str not in data['data_cols']:
         data['data_cols'] += [J_str]
+    
+    return pfit
     

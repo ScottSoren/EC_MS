@@ -1,0 +1,7 @@
+#cleaned up 17I23
+name: propene
+formula: C3H6
+sigma_100eV	=	8.736
+primary: M41
+
+

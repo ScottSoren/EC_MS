@@ -11,21 +11,13 @@ import numpy as np
 from matplotlib import pyplot as plt
 from scipy.optimize import curve_fit
 
-if os.path.split(os.getcwd())[1] == 'EC_MS':   
-                                #then we're running from inside the package
-    from Molecules import Molecule
-    from Combining import cut
-    from Object_Files import lines_to_dictionary, date_scott
-    from EC import sync_metadata
-    import Chem
-    data_directory = os.getcwd() + os.sep + 'data' + os.sep
-else:
-    from .Molecules import Molecule
-    from .Combining import cut
-    from .Object_Files import lines_to_dictionary, date_scott
-    from .EC import sync_metadata
-    from . import Chem
-    data_directory = os.getcwd() + os.sep + 'EC_MS' + os.sep + 'data' + os.sep
+
+from .Molecules import Molecule
+from .Combining import cut
+from .Object_Files import lines_to_dictionary, date_scott
+from .EC import sync_metadata
+from . import Chem
+data_directory = os.path.expanduser('~/Dropbox/python_master/EC_MS/data/')
 
 
 preferencedir = os.path.dirname(os.path.realpath(__file__)) + os.sep + 'preferences' 
@@ -35,7 +27,8 @@ with open(preferencedir + os.sep + 'standard_colors.txt','r') as f:
 
 
 def rewrite_spectra(NIST_file='default', RSF_file='default', mols='all',
-                    writesigma=False, writespectra=False, writeRSF=False):
+                    writesigma=False, overwrite=False, writespectra=False, 
+                    writeRSF=False):
     '''
     Reformats NIST data copied to a text file given by 'file', and writes it to 
     the molecule files in data_directory
@@ -53,6 +46,9 @@ def rewrite_spectra(NIST_file='default', RSF_file='default', mols='all',
             if not (mols == 'all' or mol in mols):
                 continue
             m = Molecule(mol)
+            if hasattr(m, 'sigma') and m.sigma is not None:
+                if not overwrite:
+                    continue
             l = ('sigma_100eV', sigma)
             m.write(l)
     if writespectra:
@@ -60,9 +56,12 @@ def rewrite_spectra(NIST_file='default', RSF_file='default', mols='all',
             if not (mols == 'all' or mol in mols):
                 continue
             m = Molecule(mol)
+            if hasattr(m, 'spectrum') and m.spectrum is not None and len(m.spectrum)>0:
+                if not overwrite:
+                    continue
             masses = []
             rel_vals = []        
-            spectrum = {'Title': 'NIST_16L14'}
+            spectrum = {'Title': 'NIST_18D10'}
             for spec in specline.split(' '):
                 (mz, v) = spec.split(',')
                 masses += ['M' + mz]
@@ -366,57 +365,22 @@ def get_signal(MS_data, mass, tspan='tspan', removebackground=False,
     return [x, y]
 
 
-def get_flux(MS_data, mol, tspan='tspan',  
-             unit='pmol/s', verbose=True, override=False,
-             removebackground=False, background='constant', endpoints=3):
+def get_flux(MS_data, mol, **kwargs):
     '''
     returns [x, y] where x is the t corresponding to the primary mass of the
     molecule in 'mol' and y is the molecular flux in nmol/s, calculated from 
     the MS_data for its primary mass and the value of F_cal read from the 
     molecule's text file.
+    
+    Now moved to inside the class Molecules.Molecule
     '''    
+        
     if type(mol) is str:
         m = Molecule(mol, verbose=False)
     else:
         m = mol
-    if verbose:
-        print('calculating flux of ' + m.name)
-    
-    mass = m.primary
-    F_cal = m.F_cal
-    x = MS_data[mass + '-x']
-    y = MS_data[mass + '-y'] / F_cal # units: [A]/[C/mol]=[mol/s]
-    if 'nmol' in unit:
-        y = y * 1e9
-    elif 'pmol' in unit:
-        y = y * 1e12
-    if 'cm^2' in unit:
-        y = y / MS_data['A_el']
-    
-    if tspan is None:
-        tspan = 'tspan'
-    if type(tspan) is str and not tspan=='all':
-        tspan = MS_data[tspan]
-    if not tspan == 'all':
-        x, y = cut(x, y, tspan, override=override) 
-    
-    if removebackground:
-        if background=='constant':
-            if type(removebackground) is float:
-                background = removebackground * min(y)
-            else:
-                background = min(y)
-        elif type(background) is float:
-            #background = background
-            pass
-        elif background=='linear':
-            x_end = [np.average(x[:endpoints]), np.average(x[-endpoints:])]
-            y_end = [np.average(y[:endpoints]), np.average(y[-endpoints:])]
-            background = np.interp(x, x_end, y_end) 
-        
-        y = y - 0.99*background #so that we don't break the log scale.
-        #I should get rid of this and assume the caller knows what they're doing.
-    return [x,y]    
+
+    return m.get_flux(MS_data, **kwargs) 
 
 
 def get_current(EC_data, tspan='tspan', unit='A'):

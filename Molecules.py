@@ -469,6 +469,69 @@ class Molecule:
         pass
 
 
+    def get_flux(self, MS_data, tspan='tspan', density=5,
+                 unit='pmol/s', verbose=True, override=False, x=None,
+                 removebackground=False, background='constant', endpoints=3):
+        '''
+        returns [x, y] where x is the t corresponding to the primary mass of the
+        molecule in 'mol' and y is the molecular flux in nmol/s, calculated from 
+        the MS_data for its primary mass and the value of F_cal read from the 
+        molecule's text file.
+        '''
+        if verbose:
+            print('calculating flux of ' + self.name)
+        
+        if hasattr(self, 'F_mat'):
+            F_mat = self.F_mat
+        else:
+            print('no F_mat! using self.primary and self.F_cal instead.')
+            F_cal = self.F_cal
+            mass = self.primary
+            F_mat = {mass:F_cal}
+
+        if tspan is None:
+            tspan = 'tspan'
+        if type(tspan) is str and not tspan=='all':
+            tspan = MS_data[tspan]
+
+        if x is None:
+            x = np.linspace(tspan[0], tspan[-1], density*np.floor(tspan[-1] - tspan[0])) 
+            # ^ approx 5 datapoints a second
+
+        y = 0
+        for mass, F in F_mat.items():
+            x0 = MS_data[mass + '-x']
+            s0 = MS_data[mass + '-y'] 
+            s = np.interp(x, x0, s0)
+            y += s/F # units: [A]/[C/mol]=[mol/s] 
+    
+        if 'nmol' in unit:
+            y = y * 1e9
+        elif 'pmol' in unit:
+            y = y * 1e12
+        if 'cm^2' in unit:
+            y = y / MS_data['A_el']
+        
+        if removebackground:
+            if background=='constant':
+                if type(removebackground) is float:
+                    background = removebackground * min(y)
+                else:
+                    background = min(y)
+            elif type(background) is float:
+                #background = background
+                pass
+            elif background=='linear':
+                x_end = [np.average(x[:endpoints]), np.average(x[-endpoints:])]
+                y_end = [np.average(y[:endpoints]), np.average(y[-endpoints:])]
+                background = np.interp(x, x_end, y_end) 
+            
+            y = y - 0.99*background #so that we don't break the log scale.
+            #I should get rid of this and assume the caller knows what they're doing.
+        return x, y
+
+
+
 
 
 def reset_datafiles(mols, attrs, mdict={}):

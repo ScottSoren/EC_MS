@@ -12,7 +12,10 @@ import numpy as np
 float_match = '[-]?\d+[\.]?\d*(e[-]?\d+)?'     #matches floats like '-3.54e4' or '7' or '245.13' or '1e-15'
 #note, no white space included on the ends! Seems to work fine.
 timestamp_match = '([0-9]{2}:){2}[0-9]{2}'     #matches timestamps like '14:23:01'
-date_match = '([0-9]{2}[/-]){2}[0-9]{4}'          #matches dates like '01/15/2018' or '09-07-2016'
+date_match = '([0-9]{2}[/-]){2}[0-9]{4}'          #matches dates like '01/15/2018' or '09-07-2016' 
+#^  mm/dd/yyyy, as EC lab does
+date_match_2 = '[0-9]{4}([/-][0-9]{2}){2}'          #matches dates like '01/15/2018' or '09-07-2016' 
+#^  yyyy/mm/dd, as cinfdata does
 # older EC-Lab seems to have dashes in date, and newer has slashes. 
 # Both seem to save month before day, regardless of where the data was taken or .mpt exported.
 
@@ -69,8 +72,8 @@ def timestamp_to_epoch_time(timestamp, date='today', tz=None, verbose=True):
                   'Returning the corresponding epoch time.')
     elif type(timestamp) is not str:
         if verbose:
-            print('timestamp_to_unix_time\' didn\'t receive a string. Returning' + 
-                  ' the argument.')
+            print('timestamp_to_unix_time\' didn\'t receive a string. ' + 
+                  'Received:\n' + str(timestamp) + ' \nReturning the argument.')
         return timestamp
     if len(timestamp) > 8 and date=='today':
         if verbose:
@@ -425,6 +428,8 @@ def text_to_data(file_lines, title='get_from_file',
     if verbose:
         print('\n\nfunction \'text_to_data\' at your service!\n')
     
+    from .Combining import get_timecol
+    
     #disect header
     N_lines = len(file_lines)        #number of header lines
     N_head = N_lines                 #this will change when I find the line that tells me how ling the header is
@@ -446,6 +451,7 @@ def text_to_data(file_lines, title='get_from_file',
     if sep is None:  #EC, XAS, and MS data all work with '\t'
         sep = '\t'
 
+    n_blank = 0
     for nl, line in enumerate(file_lines):
         l = line.strip()        
         if nl < N_head - 1:            #we're in the header
@@ -508,6 +514,34 @@ def text_to_data(file_lines, title='get_from_file',
                     tstamp = timestamp_to_epoch_time(l, tz=tz, verbose=verbose) #the XAS data is saved with time.ctime()
                     if verbose:
                         print('timestamp \'' + timestamp + '\' found in line ' + str(nl)) 
+                header_string = header_string + line      
+        
+            elif data_type == 'MS':
+                if len(line.strip())==0:
+                    n_blank += 1
+                    if n_blank>N_blank and len(file_lines[nl+1].strip())>0:
+                        N_head = nl+2
+                else:
+                    n_blank = 0    
+                    if title == 'get_from_file':
+                        object1 = re.search(r'"Comment"[\s]*"[^"]*',line)
+                        if object1:
+                            string1 = object1.group()
+                            title_object = re.search(r'[\S]*\Z',string1.strip())
+                            title = title_object.group()[1:]
+                            if verbose:
+                                print('name \'' + title + '\' found in line ' + str(nl))
+                    object2 = re.search(r'"Recorded at"[\s]*"[^"]*',line)
+                    if object2:
+                        string2 = object2.group()
+                        timestamp_object = re.search(timestamp_match, string2.strip())
+                        timestamp = timestamp_object.group()
+                        date_object = re.search(date_match_2, string2.strip())
+                        date = date_object.group()
+                        date = date[5:7] + '/' + date[-2:] + '/' + date[:4] 
+                        # ^convert yyyy-mm-dd to dd-mm-yyyy
+                        if verbose:
+                            print('timestamp \'' + timestamp + '\' found in line ' + str(nl))                 
                 header_string = header_string + line                
             
         elif nl == N_head - 1:      #then it is the column-header line
@@ -527,14 +561,13 @@ def text_to_data(file_lines, title='get_from_file',
         else:                   # data, baby!
             line_data = [dat.strip() for dat in l.split(sep=sep)]
             if not len(line_data) == len(col_headers):
-                if verbose:
-                    print(list(zip(col_headers,line_data)))
-                    print('Mismatch between col_headers and data on line ' + str(nl) + ' of ' + title)
-                if nl == N_lines - 1 and data_type=='MS':    # this is usually not useful!
-                    print('mismatch due to an incomplete last line of ' + title + '. I will discard the last line.')
-                    break
+                #print('Mismatch between col_headers and data on line ' + str(nl) + ' of ' + title) #debugging
+                pass
             for col, data in zip(col_headers, line_data):
-                if col in dataset['data_cols']:
+                if col in dataset['data_cols']:  #why would it not?
+                    if get_timecol(col) not in col_headers:
+                        print('Missing time column ' + get_timecol(col) + 
+                              ' on line ' + str(nl) + '. Dropping ' + col)
                     try:
                         data = float(data)
                     except ValueError:
@@ -585,6 +618,10 @@ def text_to_data(file_lines, title='get_from_file',
     return dataset
 
 
+def import_data(*args, **kwargs):
+    print('\'import_data\' is now called \'load_from_file\'!\n' + 
+          'Remember that next time, goof.')
+    return load_from_file(*args, **kwargs)
 
 def load_from_file(full_path_name='current', title='file', tstamp=None, timestamp=None,
                  data_type='EC', N_blank=10, tz=None, verbose=True):
@@ -657,8 +694,10 @@ def download_cinfdata_set(group_id, grouping_column='time'):
     
     try:
         cinfd = Cinfdata('sniffer', grouping_column=grouping_column, 
+                         allow_wildcards=True,
                          label_column='mass_label')
     except:
+        raise  #untill I know exactly which error I'm trying to catch.
         print('couldn\'t connect. You should run gstm')
         #os.system('gstm')
         raise RuntimeError('Couldn\'t connect to cinfdata!')
@@ -812,3 +851,85 @@ def import_set(directory, MS_file='QMS.txt', MS_data=None, t_zero='start',
     if verbose:
          print('\nfunction import_set finished!\n\n')       
     return data
+
+def save_as_text(filename, dataset, cols=[], mols=[], tspan='all', header=None, 
+                 N_chars=None, timecols={}, **kwargs):
+    '''
+    kwargs is fed directly to Molecule.get_flux()
+    '''
+    from .Combining import get_timecol, cut
+    
+    lines = []
+    if type(header) is list:
+        lines += header
+    elif type(header) is str:
+        lines += [header]
+
+    if N_chars is None:
+        N_chars = max([len(col) for col in cols])
+    
+    col_header = ''
+    i_col = 0
+    columns = []
+    datas = {}
+    for col in cols:
+        if col in timecols:
+            tcol = timecols[col]
+        else:
+            tcol = get_timecol(col)
+        if tcol in dataset and tcol not in columns: # don't want same tcol twice
+            col_header += ('{0:>' + str(N_chars) + 's},\t').format(tcol)
+            columns += [tcol]
+            i_col += 1
+        if col in dataset and col not in columns: # don't want same tcol twice
+            col_header += ('{0:>' + str(N_chars) + 's},\t').format(col)
+            columns += [col]
+            i_col += 1
+        else:
+            print(col + ' not in dataset. ignoring it.')
+            continue
+        if tcol in columns:
+            x, y = dataset[tcol].copy(), dataset[col].copy()
+            if tspan is not False and not tspan=='all':
+                x, y = cut(x, y, tspan=tspan)
+            datas[tcol], datas[col] = x, y
+        else:
+            print('timecol \'' + tcol + '\' for col \'' + col + 
+                  '\' is not in dataset, so can\'t cut it.')
+            datas[col] = dataset[col].copy()
+        
+    for mol in mols:
+        tcol = mol.name + '_' + mol.primary + '_x'
+        col = mol.name + '_' + mol.primary + '_y'
+        x, y = mol.get_flux(dataset, tspan=tspan, **kwargs)
+        datas[tcol] = x
+        datas[col] = y
+        col_header += ('{0:>' + str(N_chars) + 's},\t').format(tcol)
+        columns += [tcol] 
+        col_header += ('{0:>' + str(N_chars) + 's},\t').format(col)
+        columns += [col]
+    
+    lines += [col_header + '\n']
+        
+    i_data = 0
+    finished = False
+    while not finished:
+        N_unfinished = 0
+        line = ''
+        for col in columns:
+            try:
+                d = datas[col][i_data]
+                line += ('{0:>' + str(N_chars) + '.6g},\t').format(d)
+                N_unfinished += 1
+            except IndexError:
+                line += ' '*N_chars + ',\t'
+        if N_unfinished == 0:
+            finished = True
+        else:
+            lines += [line + '\n']
+            i_data += 1
+    
+    with open(filename, 'w') as f:
+        f.writelines(lines)
+
+

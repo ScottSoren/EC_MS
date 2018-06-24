@@ -1,0 +1,7 @@
+#cleaned up 17I23
+name: propane
+formula: C3H8
+sigma_100eV	=	8.392
+primary: M29
+
+

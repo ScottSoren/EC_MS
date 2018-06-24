@@ -46,7 +46,7 @@ def fit_exponential(t,y):
 
     def exp_fun(x, tau, y0, y1):
         z = y0 + (y1 - y0) * np.exp(-x / tau)
-#        print([tau,y0,y1]) #for dianosin curve_fit problems
+#        print([tau,y0,y1]) #for diagnosing curve_fit problems
         return z
 
     pars, pcov = curve_fit(exp_fun, t, y, p0=pars_i)

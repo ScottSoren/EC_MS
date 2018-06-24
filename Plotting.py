@@ -27,6 +27,11 @@ with open(preferencedir + os.sep + 'standard_colors.txt','r') as f:
 def get_standard_colors():
     return standard_colors
 
+def colorax (ax, color, lr='right'):
+    ax.spines[lr].set_color(color)     
+    ax.tick_params(axis='y', colors=color)
+    ax.yaxis.label.set_color(color)
+
 
 def plot_vs_potential(CV_and_MS_0, 
                       colors={'M2':'b','M4':'m','M18':'y','M28':'0.5','M32':'k'},
@@ -34,7 +39,11 @@ def plot_vs_potential(CV_and_MS_0,
                       ax1='new', ax2='new', ax=None, #spec='k-',
                       overlay=0, logplot = [1,0], leg=False,
                       verbose=True, removebackground = None,
-                      masses=None, mols=None, unit=None,
+                      masses=None, masses_left=None, masses_right=None,
+                      mols=None, mols_left=None, mols_right=None,
+                      unit=None,
+                      emphasis='MS',
+                      J_str=None, V_str=None,
                       fig=None, spec={}, t_str=None):
     '''
     This will plot current and select MS signals vs E_we, as is the 
@@ -53,7 +62,7 @@ def plot_vs_potential(CV_and_MS_0,
     CV_and_MS = CV_and_MS_0.copy() #17C01
     if not cycles == 'all':
         CV_and_MS = select_cycles(CV_and_MS, cycles, verbose=verbose)
-
+    
     if ax == 'new':
         ax1 = 'new'
         ax2 = 'new'
@@ -76,10 +85,26 @@ def plot_vs_potential(CV_and_MS_0,
             ax2 = ax1.twinx()
     else:
         if ax1=='new':
-            gs = gridspec.GridSpec(3, 1)
-            #gs.update(hspace=0.025)
-            ax1 = plt.subplot(gs[0:2, 0])
-            ax2 = plt.subplot(gs[2, 0])
+            if emphasis == 'MS':
+                gs = gridspec.GridSpec(3, 1)
+                #gs.update(hspace=0.025)
+                ax1 = plt.subplot(gs[0:2, 0])
+                ax2 = plt.subplot(gs[2, 0])
+            elif emphasis == 'ms':
+                gs = gridspec.GridSpec(5, 1)
+                #gs.update(hspace=0.025)
+                ax1 = plt.subplot(gs[0:3, 0])
+                ax2 = plt.subplot(gs[3:5, 0])           
+            elif emphasis == 'EC':
+                gs = gridspec.GridSpec(3, 1)
+                #gs.update(hspace=0.025)
+                ax1 = plt.subplot(gs[0, 0])
+                ax2 = plt.subplot(gs[1:3, 0])    
+            else:
+                gs = gridspec.GridSpec(2, 1)
+                #gs.update(hspace=0.025)
+                ax1 = plt.subplot(gs[0, 0])
+                ax2 = plt.subplot(gs[1, 0])  
     if type(logplot) is int:
         logplot = [logplot,logplot]
     if logplot[0]:
@@ -88,7 +113,9 @@ def plot_vs_potential(CV_and_MS_0,
         ax2.set_yscale('log')
             
     # get EC data
-    V_str, J_str = sync_metadata(CV_and_MS, RE_vs_RHE=RE_vs_RHE, A_el=A_el)
+    V_str, J_str = sync_metadata(CV_and_MS, RE_vs_RHE=RE_vs_RHE, A_el=A_el, 
+                                 V_str=V_str, J_str=J_str)
+
     V = CV_and_MS[V_str]
     J = CV_and_MS[J_str]
     if t_str is None:
@@ -112,31 +139,62 @@ def plot_vs_potential(CV_and_MS_0,
             #maybe I should use EC.plot_cycles to have different cycles be different colors. Or rewrite that code here.
         ax2.set_xlabel(V_str)
         ax2.set_ylabel(J_str)
+
+    axes = [ax1, ax2]    
     
+    
+    # ---- parse inputs for (evt. calibrated) mass spectrometer to plot ------ 
+    try:
+        if type(mols[0]) in (list, tuple):
+            mols_left = mols[0]
+            mols_right = mols[1]
+            mols = None
+    except (IndexError, TypeError):
+        pass
+    try:
+        if type(masses[0]) in (list, tuple):
+            masses_left = masses[0]
+            masses_right = masses[1]
+            masses = None
+    except (IndexError, TypeError):
+        pass
 #    print(masses)
+    colors_right = None
+    colors_left = None
     if ax1 is not None: #option of skipping an axis added 17C01
         #check if we're going to plot signals or fluxes:
         quantified = False      #added 16L15
         if mols is not None:
             quantified = True
-            colors = mols  #added 17H11  
+            colors_left = mols  #added 17H11  
+        elif mols_left or mols_right is not None:
+            quantified = True
+            colors_left = mols_left
+            colors_right = mols_right
         elif masses is not None:
 #            print('masses specified')
             quantified = False
-            colors = masses
+            colors_left = masses
+        elif masses_left or masses_right is not None:
+            quantified = False
+            colors_left = masses_left
+            colors_right = masses_right
         elif ((type(colors) is dict and list(colors.keys())[0][0] == 'M') or
               (type(colors) is list and type(colors[0]) is str and colors[0][0] == 'M' ) or
               (type(colors) is str and colors[0]=='M')):
             if verbose:
                 print('uncalibrated data to be plotted.')
             masses = colors    
-            colors = masses
+            colors_left = masses
         else:
             quantified = True
             mols = colors
-        if type(colors) is not list and type(colors) is not dict:
-            colors = [colors]        
-        
+        if (colors_left is not None and type(colors_left) is not list 
+            and type(colors_left) is not dict):
+            colors_left = [colors_left]        
+        if (colors_right is not None and type(colors_right) is not list 
+            and type(colors_right) is not dict):
+            colors_right = [colors_right]          
 #        print(type(colors))
         
         if unit is None:
@@ -144,65 +202,73 @@ def plot_vs_potential(CV_and_MS_0,
                 unit = 'pmol/s'
             else:
                 unit = 'nA'
-        if type(colors) is list:
-            c = colors.copy()
-            colors = {}
-            for m in c:
-                print(str(m))
-                if quantified:
-                    if type(m) is str:
-                        mol = Molecule(m, verbose=False)
-                    else:
-                        mol = m  
-                    color = standard_colors[mol.primary]
-                    colors[mol] = color
-                else:
-                    color = standard_colors[m]
-                    colors[m] = color                
     
     #then do it.
-
-        for (key, color) in colors.items():
+        if colors_right is not None:
+            axes += [axes[0].twinx()]
+        
+        for colors, ax in [(colors_left, axes[0]), (colors_right, axes[-1])]:
+            if colors is None:
+                continue
+            if type(colors) is list:
+                c = colors.copy()
+                colors = {}
+                for m in c:
+                    print(str(m))
+                    if quantified:
+                        if type(m) is str:
+                            mol = Molecule(m, verbose=False)
+                        else:
+                            mol = m  
+                        color = standard_colors[mol.primary]
+                        colors[mol] = color
+                    else:
+                        color = standard_colors[m]
+                        colors[m] = color     
+            for (key, color) in colors.items():
+                if quantified:
+                    (x,y) = get_flux(CV_and_MS, mol=key, tspan=tspan, 
+                    removebackground=removebackground, unit=unit, verbose=True)
+                    if type(key) is not str:
+                        key = str(key) # in case key had been a Molecule object
+                    Y_str = key + '_' + unit
+                else:   
+    
+                    Y_str = key + '_' + unit    #        
+                    x, y = get_signal(CV_and_MS, mass=key, tspan=tspan, unit=unit)
+    
+                try:
+                    Y = np.interp(t, x, y)  #obs! np.interp has a has a different argument order than Matlab's interp1
+                except ValueError:
+                    print('x ' + str(x) + '\ny ' + str(y) + '\nt ' + str(t))
+                CV_and_MS[Y_str] = Y    #add the interpolated value to the dictionary for future use 
+                                            #17C01: but not outside of this function.
+                ms_spec = spec.copy()
+                if 'color' not in ms_spec.keys():
+                    ms_spec['color'] = color
+                ax.plot(V[I_plot], Y[I_plot], label=Y_str, **ms_spec)
             if quantified:
-                (x,y) = get_flux(CV_and_MS, mol=key, tspan=tspan, 
-                removebackground=removebackground, unit=unit, verbose=True)
-                if type(key) is not str:
-                    key = str(key) # in case key had been a Molecule object
-                Y_str = key + '_' + unit
-            else:   
-
-                Y_str = key + '_' + unit    #        
-                x, y = get_signal(CV_and_MS, mass=key, tspan=tspan, unit=unit)
-
-            try:
-                Y = np.interp(t, x, y)  #obs! np.interp has a has a different argument order than Matlab's interp1
-            except ValueError:
-                print('x ' + str(x) + '\ny ' + str(y) + '\nt ' + str(t))
-            CV_and_MS[Y_str] = Y    #add the interpolated value to the dictionary for future use 
-                                        #17C01: but not outside of this function.
-            ms_spec = spec.copy()
-            if 'color' not in ms_spec.keys():
-                ms_spec['color'] = color
-            ax1.plot(V[I_plot], Y[I_plot], label=Y_str, **ms_spec)
-        if quantified:
-            M_str = 'cal. signal / [' + unit + ']'
-        else:
-            M_str = 'MS signal / [' + unit + ']'
-        #ax1.set_xlabel(V_str)
-        ax1.xaxis.tick_top()
-        ax1.set_ylabel(M_str)
-        if leg:
-            ax1.legend()
+                M_str = 'cal. signal / [' + unit + ']'
+            else:
+                M_str = 'MS signal / [' + unit + ']'
+            #ax1.set_xlabel(V_str)
+            ax.xaxis.tick_top()
+            ax.set_ylabel(M_str)
+            if leg:
+                ax1.legend()
+    
+    #if colors_right is not None:
+    #    ax[0].set_xlim(ax[1].get_xlim())
     
     if verbose:
         print('\nfunction \'plot_vs_potential\' finished!\n\n')
     
-    for ax in [ax1, ax2]:    
+    for ax in axes:    
         if ax is not None:
             ax.tick_params(axis='both', direction='in') #17K28  
         
         #parameter order of np.interp is different than Matlab's interp1
-    return [ax1, ax2]    
+    return axes  
 
 
 def plot_vs_time(Dataset, cols_1='input', cols_2='input', verbose=1):
@@ -424,10 +490,12 @@ def plot_flux(MS_data, mols={'H2':'b', 'CH4':'r', 'C2H4':'g', 'O2':'k'},
 def plot_experiment(EC_and_MS,
                     colors={'M2':'b','M4':'m','M18':'y','M28':'0.5','M32':'k'},
                     tspan=None, overlay=False, logplot=[True,False], verbose=True,   
-                    plotpotential=True, plotcurrent=True, ax='new',
+                    plotpotential=True, plotcurrent=True, ax='new', emphasis='MS',
                     RE_vs_RHE=None, A_el=None, removebackground=True,
-                    saveit=False, title=None, leg=False, unit='pmol/s',
-                    masses=None, mols=None, #mols will overide masses will overide colors
+                    saveit=False, title=None, leg=False, unit=None,
+                    masses=None, masses_left=None, masses_right=None,
+                    mols=None, mols_left=None, mols_right=None,
+                    #mols will overide masses will overide colors
                     V_color='k', J_color='0.5', V_label=None, J_label=None,
                     fig=None, t_str=None, J_str=None, V_str=None,
                     override=False
@@ -449,11 +517,27 @@ def plot_experiment(EC_and_MS,
             ax = [figure1.add_subplot(111)]
             ax += [ax[0].twinx()]                     
         else:
-            gs = gridspec.GridSpec(3, 1)
-            #gs.update(hspace=0.025)
-            #gs.update(hspace=0.05)
-            ax = [plt.subplot(gs[0:2, 0])]
-            ax += [plt.subplot(gs[2, 0])]
+            if emphasis == 'MS':
+                gs = gridspec.GridSpec(3, 1)
+                #gs.update(hspace=0.025)
+                #gs.update(hspace=0.05)
+                ax = [plt.subplot(gs[0:2, 0])]
+                ax += [plt.subplot(gs[2, 0])]
+            elif emphasis == 'ms':
+                gs = gridspec.GridSpec(5, 1)
+                #gs.update(hspace=0.025)
+                ax = [plt.subplot(gs[0:3, 0])]
+                ax += [plt.subplot(gs[3:5, 0])]          
+            elif emphasis == 'EC':
+                gs = gridspec.GridSpec(3, 1)
+                #gs.update(hspace=0.025)
+                ax = [plt.subplot(gs[0, 0])]
+                ax += [plt.subplot(gs[1:3, 0])]
+            else:
+                gs = gridspec.GridSpec(2, 1)
+                #gs.update(hspace=0.025)
+                ax = [plt.subplot(gs[0, 0])]
+                ax += [plt.subplot(gs[1, 0])]
             if plotcurrent and plotpotential:
                 ax += [ax[1].twinx()]
         
@@ -482,6 +566,27 @@ def plot_experiment(EC_and_MS,
     else:
         A_el = 1
 
+
+    # ----------- parse input on which masses / fluxes to plot ------- #
+    try:
+        if type(mols[0]) in (list, tuple):
+            mols_left = mols[0]
+            mols_right = mols[1]
+            mols = mols_left
+    except (IndexError, TypeError):
+        pass
+    if mols_left is not None and mols is None:
+        mols = mols_left
+    try:
+        if type(masses[0]) in (list, tuple):
+            masses_left = masses[0]
+            masses_right = masses[1]
+            masses = masses_left
+    except (IndexError, TypeError):
+        pass
+    if masses_left is not None and masses is None:
+        masses = masses_left
+#    print(masses)
     quantified = False      #added 16L15
     #print(type(colors))
     #if type(colors) is list and type(colors[0]) is not str:
@@ -499,23 +604,42 @@ def plot_experiment(EC_and_MS,
         quantified = True
         mols = colors
     
+    
+    # ----------- and plot the MS signals! -------------
     if quantified:
+        if unit is None:
+            unit = 'pmol/s'
         plot_flux(EC_and_MS, mols=mols, tspan=tspan, A_el=A_el,
                   ax=ax[0], leg=leg, logplot=logplot[0], unit=unit, 
                   removebackground=removebackground, 
                   override=override, verbose=verbose)
+        if mols_right is not None:
+            ax += [ax[0].twinx()]
+            plot_flux(EC_and_MS, mols=mols_right, tspan=tspan, A_el=A_el,
+                      ax=ax[-1], leg=leg, logplot=logplot[0], unit=unit, 
+                      removebackground=removebackground, 
+                      override=override, verbose=verbose)            
+            
     else:
+        if unit is None:
+            unit = 'pA'
         plot_signal(EC_and_MS, masses=masses, tspan=tspan,
-                    ax=ax[0], leg=leg, logplot=logplot[0], 
+                    ax=ax[0], leg=leg, logplot=logplot[0], unit=unit,
                     override=override, verbose=verbose)
+        if masses_right is not None:
+            ax += [ax[0].twinx()]
+            plot_signal(EC_and_MS, masses=masses_right, tspan=tspan,
+                        ax=ax[-1], leg=leg, logplot=logplot[0],  unit=unit,
+                        override=override, verbose=verbose)
     if not overlay:
         ax[0].set_xlabel('')
         ax[0].xaxis.tick_top()  
     
-    ax[0].set_xlim(tspan)
+    if tspan is not None and not tspan == 'all':
+        ax[0].set_xlim(tspan)
     
-    if title is not None:
-            plt.title(title)
+    
+    # ---------- get ready to plot electrochemistry data ---------
     
     try:
         t = EC_and_MS[t_str]       
@@ -538,8 +662,8 @@ def plot_experiment(EC_and_MS,
 #    print('len(t) = ' + str(len(t)) + 
 #          '\nlen(V) = ' + str(len(V)) + 
 #          '\nlen(J) = ' + str(len(J)))
-    
-    if tspan is not 'all' and plotcurrent or plotpotential:
+    print(tspan) # debugging
+    if not tspan == 'all' and (plotcurrent or plotpotential):
         mask = np.logical_and(tspan[0]<t, t<tspan[-1])
         t = t[mask]
         #print(np.where(mask)) #debugging
@@ -557,9 +681,7 @@ def plot_experiment(EC_and_MS,
                 ax[i_ax].set_yscale('log')
         xlim = ax[i_ax-1].get_xlim()
         ax[i_ax].set_xlim(xlim)
-        ax[i_ax].yaxis.label.set_color(V_color)
-        ax[i_ax].tick_params(axis='y', colors=V_color)
-        ax[i_ax].spines['left'].set_color(V_color)
+        colorax(ax[i_ax], V_color, 'left')
         ax[i_ax].tick_params(axis='both', direction='in') #17K28  
         i_ax += 1
         
@@ -571,23 +693,29 @@ def plot_experiment(EC_and_MS,
         ax[i_ax].set_xlim(xlim)
         if logplot[1]: 
             ax[i_ax].set_yscale('log')
-        ax[i_ax].yaxis.label.set_color(J_color)
-        ax[i_ax].tick_params(axis='y', colors=J_color)
+            
         if i_ax == 2:
-            ax[i_ax].spines['right'].set_color(J_color)
+            colorax(ax[i_ax], J_color, 'right')
         else:
-            ax[i_ax].spines['left'].set_color(J_color)
+            colorax(ax[i_ax], J_color, 'left')
         ax[i_ax].tick_params(axis='both', direction='in') #17K28  
         
     if plotcurrent or plotpotential:
         ax[1].set_xlabel(t_str)
-        ax[1].set_xlim(tspan)
+        if tspan is not None and not tspan == 'all':
+            ax[1].set_xlim(tspan)
     
     if saveit:
         if title == 'default':
             title == EC_and_MS['title'] + '.png'
         figure1.savefig(title)
         
+    #if colors_right is not None:
+    #    ax[0].set_xlim(ax[1].get_xlim())   # probably not necessary
+     
+    if title is not None:
+            plt.title(title)    
+            
     if verbose:
         print('function \'plot_experiment\' finished!\n\n')
     
@@ -792,8 +920,10 @@ def plot_operation(cc=None, t=None, j=None, z=None, tspan=None, results=None,
         print('\nfunction \'plot_operation\' finished!\n\n')
     return axes
 
-def set_figparams(figwidth=8,aspect=4/3,fontsize=7,figpad=0.15,figgap=0.08):
+def set_figparams(figwidth=8,aspect=4/3,fontsize=7,figpad=0.15,figgap=0.08, style=None):
     import matplotlib as mpl
+    if style is not None:
+        mpl.style.use(style)
     
     #figwidth=8  #figwidth in cm width 20.32cm = 8inches being standard and thesis textwidth being 12.
     #aspect=4/3  #standard is 4/3

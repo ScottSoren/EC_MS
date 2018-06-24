@@ -167,7 +167,7 @@ def synchronize(data_objects, t_zero='start', append=None, file_number_type='EC'
         t_f = 0             # will increase to the latest finish of time data in the dataset
         
         for col in dataset['data_cols']:
-            #print('col = ' + str(col))
+            #print('col = ' + str(col)) # debugging
             if is_time(col):
                 try:
                     t_s = min(t_s, t_0 + dataset[col][0])   
@@ -379,7 +379,7 @@ def synchronize(data_objects, t_zero='start', append=None, file_number_type='EC'
             if col[0] == '_': #let's keep it to one level of '_', and nest dictionaries
                 #print(col)
                 if col in combined_data: 
-                    if nd in combined_data[col] and verbose:
+                    if nd in combined_data[col] and vverbose:
                         print('overwriting ' + col + '[' + str(nd) + '] with nested metadata.')
                     combined_data[col][nd] = value
                 else:
@@ -401,7 +401,7 @@ def synchronize(data_objects, t_zero='start', append=None, file_number_type='EC'
                     combined_data[col][nd] = value
             else:
                 # I expect to arrive here only once, so good place for output
-                if verbose:
+                if vverbose:
                     print('metadata from original files stored as ' + col)
                 combined_data[col] = {nd: value}
 
@@ -420,6 +420,10 @@ def synchronize(data_objects, t_zero='start', append=None, file_number_type='EC'
     # add 'file number' to data_cols
     if 'file number' in combined_data.keys() and 'file number' not in combined_data['data_cols']:    
         combined_data['data_cols'].append('file number') #for new code
+    
+    # add 't_str' to the data set (don't know where else to do it)
+    if 'time/s' in combined_data.keys():
+        combined_data['t_str'] = 'time/s'
 
     # check that there's actually data in the result of all this        
     if len(combined_data['data_cols']) == 0:
@@ -472,27 +476,25 @@ def cut_dataset(dataset_0, tspan=None):
     '''
     print('\n\nfunction \'cut dataset\' at your service!\n') 
     dataset = dataset_0.copy()
+    dataset['data_cols'] = dataset['data_cols'].copy()
     if tspan is None:
         return dataset
     #print(dataset['title'])
-    # I need to cunt non-time variables irst
-    indeces = {} #I imagine storing indeces improves performance
+    time_masks = {} #I imagine storing indeces improves performance
     for col in dataset['data_cols']:
-        #print(col + ', length = ' + str(len(dataset[col])))
-        if is_time(col): #I actually don't need this. 
-            continue #yes I do, otherwise it cuts it twice.
         timecol = get_timecol(col)
-        #print(timecol + ', timecol length = ' + str(len(dataset[timecol])))
-        if timecol in indeces.keys():
-            #print('already got indeces, len = ' + str(len(indeces[timecol])))
-            
-            dataset[col] = dataset[col].copy()[indeces[timecol]]
+        #print(col + ', length = ' + str(len(dataset[col]))) # debugging  
+        if timecol in time_masks.keys():
+            #print('already got indeces, len = ' + str(len(indeces[timecol]))) #debugging
+            mask = time_masks[timecol]
         else:
-            #print('about to cut!')
-            dataset[timecol], dataset[col], indeces[timecol] = (
-             cut(dataset[timecol], dataset[col], 
-                 tspan=tspan, returnindeces=True) 
-             )
+            #print(timecol + ', length = ' + str(len(dataset[timecol]))) #debugging  
+            t = dataset[timecol]
+            mask = np.logical_and(tspan[0]<t, t<tspan[-1])
+            time_masks[timecol] = mask
+#        print('about to cut!') # debugging
+        dataset[col] = dataset[col].copy()[mask]
+
     print('\nfunction \'cut dataset\' finsihed!\n\n') 
     return dataset
 
@@ -540,6 +542,8 @@ def is_EC_data(col):
     if col in EC_cols_0:
     #this list should be extended as needed
         return True
+    if col is None:
+        return False
     if col[-1] == '*' and col[:-1] in EC_cols_0:
         return True
     return False
@@ -558,6 +562,8 @@ def get_type(col):
         return 'MS'
     elif col[-2:] in ['-x', '-y']:
         return 'cinfdata' #it's cinfdata but not from a mass channel
+    if col is None:
+        return None
     return 'Xray' # to be refined later...
 
 def get_timecol(col=None, data_type=None, verbose=False):
@@ -643,11 +649,11 @@ def sort_time(dataset, data_type='EC', verbose=False, vverbose=False):
                 indeces = sort_indeces[timecol]
             else:
                 if verbose:
-                    print('getting indeces to sort ' + timecol)
+                    print('getting indeces to sort based on ' + timecol)
                 indeces = np.argsort(dataset[timecol])
                 sort_indeces[timecol] = indeces
             if len(data) != len(indeces):
-                if verbose:
+                if vverbose:
                     print(col + ' is not the same length as its time variable!\n' +
                           col + ' will not be included in the time-sorted dataset.')
             else:
@@ -983,9 +989,9 @@ def trigger_cal(data, triggers=None, pseudotimecol=None, pt_str=None,
     
     data['t_str'] = timecol
     data['pt_str'] = pseudotimecol
-    if t_str not in data['data_cols']:
+    if timecol not in data['data_cols']:
         data['data_cols'] += [t_str]
-    if pt_str not in data['data_cols']:
+    if pseudotimecol not in data['data_cols']:
         data['data_cols'] += [pt_str]
     if verbose:
         print('\nfunction \'trigger cal\' finished!\n\n')
