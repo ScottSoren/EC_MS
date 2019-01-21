@@ -1,4 +1,4 @@
-#cleaned up 17I23
+#cleaned up 18I21
 name: ethanol
 formula: C2H6O
 M	=	46.069
@@ -30,8 +30,3 @@ spectrum
 	M45	=	51.495149515
 	M46	=	21.6321632163
 	M47	=	0.730073007301
-primary: M31
-#the folowing rsf is calculated for M31 on 17I23
-rsf	=	1.14759138882
-#the following F_cal value is for M31, extrapolated from trusted values based on RSF from NIST on 17I23
-F_cal	=	[ 5.94155506]

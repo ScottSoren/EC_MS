@@ -59,10 +59,14 @@ def add_datapoint(source, target, index=None, add_key=True):
         if index is None:
             v = value
         else:
-            v = value[index]
-
+            #print(f'key={key}, value={value}, index={index}') # debugging
+            try:
+                v = value[index]
+            except IndexError:
+                v = value
         if key in target.keys():
-
+            #print('key in target.keys()') # debugging
+            #print(f'target={target}') # debugging
             if type(target[key]) is np.ndarray:
                 target[key] = np.append(target[key], v)
             elif hasattr(v, '__iter__'):
@@ -71,6 +75,7 @@ def add_datapoint(source, target, index=None, add_key=True):
                 target[key] += [v]
 #                print('adding ' + str(value[index]) + ' to ' + str(key))
         elif add_key:
+           # print('adding key') # debugging
             if hasattr(v, '__iter__'):
                 target[key] = v.copy() #this .copy() is important
             else:
@@ -90,30 +95,35 @@ def datapoints_to_values(datapoints, X='all', X_str='V', rnd=2, avoid='blank', v
     if type(avoid) is str:
         avoid = [avoid]
     empty = get_empty(list(datapoints.values())[0]) 
-    if type(X) is list:
-        values = dict([(x, get_empty(empty)) for x in X]) 
-        #.copy here is not good enough to avoid linking!
-    elif X == 'all':
-        values = {}
+    
+    values = {}
+        
     
     for (name, data) in datapoints.items():
-        if len([a for a in avoid if a in name])>0:
+        if type(name)==type(avoid) and len([a for a in avoid if a in name])>0:
             continue
         if verbose:
-            print('adding ' + name + ' to values based on ' + X_str)
-        for i, x in enumerate(data[X_str]):
-            if rnd is not None:
+            print(f'adding {name} to values based on ' + X_str)
+        try:
+            x_vec = data[X_str]
+            x_vec[0]
+        except IndexError:
+            x_vec = [data[X_str]]
+        for i, x in enumerate(x_vec):
+            if rnd is None:
+                x_round = x
+            else:
                 try:
                     x_round = float(np.round(x, rnd))
                 except TypeError: #if it's not a numerical value, just move on.
                     x_round = x
-
-            if x_round not in X:       
-                if X == 'all':
+            print(X) # debugging
+            if X=='all':
+                if x_round not in values:       
                     values[x_round] = get_empty(empty)
+            elif x_round not in X:
                 print(str(x_round) + ' not in potentials')
                 continue
-
             add_datapoint(source=data, target=values[x_round], index=i)
     if verbose:
         print('\nfunction \'points_to_values\' finished!\n\n')
@@ -171,8 +181,15 @@ def values_to_stats(values, logmean=False):
 
     
 def get_mlu(stat, logmean=False): # mlu stands for for: mean, [lower, upper]
-    if type(stat) is not list:
+    try:
+        if len(stat)<2:
+            return stat, None
+    except TypeError:
+        print('function \'get_mlu\' sayd: stat must be iterable.')
         return stat, None
+    
+    if stat[1]==0:
+        return stat[0], None
     elif len(stat) == 2:
         mean = stat[0]
         std = stat[1]
@@ -200,29 +217,52 @@ def plot_errorbar(xstat, ystat,
                   #This was generating the blank figure!!! 
                   #Don't put plt.gca() in a function default! 
                   ax='current', #do it the normal way instead :)
-                  logmean=False,
-                  spec='.', color='k', markersize=None):
-    if markersize is None:
-        if spec == '.':
-            markersize = 15
-        else:
-            markersize = 5
+                  logmean=False, 
+                  marker='.', color='k', markersize=None, 
+                  xfactor=1, yfactor=1,
+                  specs={}, linespecs={}):
     if ax == 'current':
         ax = plt.gca()
     elif ax == 'new':
         ax = plt.figure().add_subplot(111)
     x, x_lu = get_mlu(xstat, logmean)
     y, y_lu = get_mlu(ystat, logmean)   
-    ax.plot(x, y, spec, markersize=markersize, color=color)
+    print(f'x_lu={x_lu}, y_lu={y_lu}')     # debugging
+    if marker is None and 'marker' in specs:
+        marker = specs.pop('marker')
+    elif x_lu is None and y_lu is None:
+        #marker = '.'
+        specs={}
+    if markersize is None:
+        if marker == '.':
+            markersize = 10
+        else:
+            markersize = 5
+    #print(f'x={x}, y={y}') # debugging
+    #print(f'marker = {marker}, specs={specs}') # debugging
+    ax.plot(x*xfactor, y*yfactor, marker=marker, markersize=markersize, color=color, **specs)
+    
     if x_lu is not None:
-        ax.plot([x_lu[0], x_lu[1]], [y, y], '|-', color=color)
+        ax.plot([x_lu[0], x_lu[1]], [y*yfactor, y*yfactor], '|-', color=color, **linespecs)
     if y_lu is not None:
-        ax.plot([x, x], [y_lu[0], y_lu[1]], '_-', color=color)    
+        ax.plot([x, x], [y_lu[0]*yfactor, y_lu[1]*yfactor], '_-', color=color, **linespecs)    
+
+
+def plot_errorbars_y(stats, colors, ax='new', marker=None, factor=1, specs={}):
+    if ax=='new':
+        fig, ax = plt.subplots()
+    for x, stat in stats.items():
+        for key, color in colors.items():
+            ystat = stat[key]
+            plot_errorbar(ax=ax, xstat=x, ystat=ystat, color=color, 
+                          marker=marker, yfactor=factor, specs=specs)
+    return ax
+        
 
         
-def plot_errorbars_y(stats, x='outer', ax='new', label='', logmean=False,
+def plot_errorbars_y_old(stats, x='outer', ax='new', label='', logmean=False,
                      Xrange=None, verbose=True, outercall=True,
-                     color='k', colors=None, specs=None):
+                     color='k', colors=None, specs=None, factor=1):
     if verbose and outercall:
         print('\n\nfunction \'plot_errorbars_y\' at your service!\n')    
     if ax == 'new':
@@ -231,7 +271,7 @@ def plot_errorbars_y(stats, x='outer', ax='new', label='', logmean=False,
 #    print(type(stats))
     if type(stats) is not dict:
         if Xrange is None or Xrange[0] <= x <= Xrange[1]:
-            plot_errorbar(x, stats, ax=ax, color=colors, logmean=logmean)
+            plot_errorbar(x, stats, ax=ax, color=colors, logmean=logmean, yfactor=factor)
 #        print('I should have just plotted something.')
         return ax
     
@@ -269,7 +309,8 @@ def plot_errorbars_y(stats, x='outer', ax='new', label='', logmean=False,
             Xrange_val = Xrange[key]
 
         plot_errorbars_y(val, x=x_val, ax=ax, colors=color_val, Xrange=Xrange_val, 
-                         label=label+str(key) + '_', outercall=False, logmean=logmean)
+                         label=label+str(key) + '_', outercall=False, 
+                         logmean=logmean, factor=factor, specs=specs,)
     if verbose and outercall:
         print('\nfunction \'plot_errorbars_y\' finished!\n\n')        
     return ax  

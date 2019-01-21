@@ -25,45 +25,79 @@ from math import gcd
 from .PhysCon import R, Far
 from .MolarMasses import get_elements
 
+
+dfH0 = { # standard enthalpies of formation / [kJ/mol]
+        'H2O(g)': -241.82 ,'H2O(l)': -285.8, 
+        'CH3CH2OH(g)':-234.8,  #Langes Handbook
+        'CH3CH2OH(l)':-277,
+        'CH3CH2CH2OH(g)':-256, #NIST
+        'CH3CH2CHO(g)':-188.7 , #NIST
+        'C2H6(g)':-84.0, #NIST
+        'HCOOH(g)':-378.6, #NIST
+        'CH4(g)':-74.9, #NIST
+        'CH3CHO(g)':-166.1, 'CH3OH(g)':-201.2, #Langes Handbook, John A Dean, 15th edition
+        'CO(g)':-110.5, 'C2H4(g)':52.4,#NIST
+        'C(s)':0, 'O2(g)':0, 'H2(g)':0,
+        
+        'Cu2O(s)':-170.71, #NIST
+        'CuO(s)':-156.06, #NIST
+        'Cu(OH)2(s)':-450.37, #NIST
+        'CO2(g)':-393.5,
+        }
 S0 = { # standard entropy / [J/(mol*K)]
-      'H2O(g)':188.72, 'H2O(l)':69.940, 
-      'CH3CH2OH(g)':282, 'CH3CH2OH(l)':161,
+      'H2O(g)':188.72, 'H2O(l)':69.940, 'CO2(g)':213.8,
+      'CH3CH2OH(g)':281.6,  # Langes Handbook
+      'CH3CH2OH(l)':161,
       'CH3CH2CH2OH(g)':322.49, #NIST
-      'CH3CH2CHO(g)':-188.7, #NIST
+      'CH3CH2CHO(g)':304.4, #NIST
+      'HCOOH(g)':248.7, #NIST
+      'CO(g)':197.7, 'C2H4(g)':219.3, #NIST
       'H2(g)':130.68, #NIST
       'C(s)':5.6,  #NIST
       'N2(g)':191.61, #NIST
       'O2(g)':205.15, #NIST
-      'C2H6(g)':229.5, #http://bilbo.chm.uri.edu/CHM112/tables/thermtable.htm
+      #'C2H6(g)':229.5, #http://bilbo.chm.uri.edu/CHM112/tables/thermtable.htm
+      'CH4(g)':186.7, #NIST
+      'CH3CHO(g)':263.8, 'CH3OH(g)':126.8, #Langes Handbook, John A Dean, 15th edition
+      'Cu(s)':33.17, #NIST
+      'Cu2O(s)':92.37, #NIST
+      'CuO(s)':42.59, #NIST
+      'Cu(OH)2(s)':108.43, #NIST
       }
-dfH0 = { # standard enthalpies of formation / [kJ/mol]
-        'H2O(g)': -241.82 ,'H2O(l)': -285.8, 
-        'CH3CH2OH(g)':-235.3, 'CH3CH2OH(l)':-277,
-        'CH3CH2CH2OH(g)':-256, #NIST
-        'CH3CH2CHO(g)':-304.4, #NIST
-        'C2H6(g)':-84.0, #NIST
-        }
 dfG0 = { # standard free energies of formation / [kJ/mol] 
         # I need to find a way to querry a reliable database, i.e., NIST.
         # Most of these standard energies are from 
+        ''' Commented out because the source is no longer accessible.
         # bilbo.chm.uri.edu/CHM112/tables/thermtable.htm
-        'H2(g)':0,'O2(g)':0,'H2O(l)':-237.2,'CO2(g)':-394.4,'HCOOH(l)':-346,
-        'CO(g)':-137.2,'CH3OH(g)': -162.3,'CH4(g)':-50.75,
-	    'CH3COOH(l)':-389.9,'CH3CHO(g)':-133.4,'CH3CH2OH(g)':-167.9,
+        'H2O':-237.1,
+        'H2(g)':0,'O2(g)':0, 'Cu':0, 'C(s)':0,
+        'H2O(l)':-237.2,'CO2(g)':-394.4,'HCOOH(l)':-346,
+        'CO(g)':-137.2,'CH3OH(g)': -162.3,#'CH4(g)':-50.75,
+	     'CH3COOH(l)':-389.9,'CH3CHO(g)':-133.4,'CH3CH2OH(g)':-167.9,
         'C2H4(g)':68.12,'C3H8O(g)':-163.0,'C2H2O4(g)':-662.7,
-        'CO2(aq)':-386.2, 'HCOOH(aq)':-356, 'CH3COOH(aq)':-396.6, 
+        'CO2(aq)':-386.2, 
+        'HCOOH(aq)':-356, 
+        'CH3COOH(aq)':-396.6, 
         'C2H2O4(aq)':-697.0, 'CH3OH(l)':-166.4, 'CH3CH2OH(l)':-174.9,
+        '''
+        # http://www2.ucdsb.on.ca/tiss/stretton/database/organic_thermo.htm:
+        'C3H6':62.0, # 74.7 , ... can't find a reliable one.
+        'C3H8':-23.4,
+        
+        'Cu(s)':0,
+        'Cu2(OH)2CO3(s)': -894.00, # Kiseleva1992, https://link.springer.com/content/pdf/10.1007%2FBF00204009.pdf
+        
         'e-':0, 'H+':0, #defining standard state in electrochemistry
         '':0, #anticipating the unanticipated
         }	
 
 # standard pure substance states for formation energies
-pure_states = {'H':'H2(g)', 'C':'C(s)', 'N':'N2(g)', 'O':'O2(g)', 
+pure_states = {'H':'H2(g)', 'C':'C(s)', 'N':'N2(g)', 'O':'O2(g)', 'Cu':'Cu(s)',
                }
 
 standard_states = dict([(mol, 'g') for mol in ['H2','CO','CO2','CH4','C2H4','O2']] + 
                        [(mol, 'l') for mol in ['H2O', 'HCOOH','CH3OH','CH3COOH',
-                                               'CH3CH2OH','CH3CHO','C3H8O','C2H2O4']]
+                                               'CH3CH2OH','CH3CH2CH2OH','CH3CHO','C2H2O4']]
                        + [('e-', '')])
 
 standard_redox = {'H':+1, 'O':-2, 'N':-3, 'F':-1, 'Cl':-1, 'Br':-1, 'I':-1,
@@ -83,9 +117,15 @@ kH0 = { #Henry's Law constant of volatility in bar*l/mol
        'Cl2': 10.411, 'CO': 1078.33, 'C2H4': 213.187, 'C2H6': 52.553,
        'CH3CHO': 0.0714, 'Ar': 728.80, 'O2': 768.464, 'CH4': 713.928,
        'He': 2726.81, 'H2': 1289.037, 
-       'CH3OH':0.00455, 'CH3CH2CHO':0.0769, 'CH3CH2CH2OH':0.00667
-        }   #all from Sander1999, I think.
+       'CH3OH':0.00455, 'CH3CH2CHO':0.0769, 'CH3CH2CH2OH':0.00667,
+       'HCOOH':1.78e-4, 
+        }   #all from Sander1999, I think. NIST WebBook quotes these values
 
+aka = { # dictionary of pseudonyms
+       'C3H8O':'CH3CH2CH2OH', 
+       'CH3CH2CH2OH(l)':'CH3CH2CH2OH(aq)', 'CH3CHO(l)':'CH3CHO(aq)',
+       # ^ the standard states are liquid, but I have data for the aqueous
+       'CO1':'CO'} 
        
        
 def nu_to_rxn(nu, arrow='-->'):
@@ -99,6 +139,8 @@ def nu_to_rxn(nu, arrow='-->'):
     '''
     rxn = arrow
     for mol, n in nu.items():
+        if type(n) is not int:
+            n = np.round(n, decimals=2)
         if n > 0:
             if not rxn[-len(arrow):] == arrow:
                 rxn = rxn + ' +'
@@ -162,7 +204,10 @@ def get_formation_reaction(comp, out='nu', verbose=False):
     for atom, n in elements.items():
         ss = pure_states[atom]
         n_atom = get_elements(ss)[atom]
-        nu[ss] = - n/n_atom
+        if ss in nu:
+            nu[ss] += - n/n_atom
+        else:
+            nu[ss] = - n/n_atom
     rxn = nu_to_rxn(nu)
     if verbose:
         print(rxn)
@@ -272,7 +317,7 @@ def get_dfH(comp, T=None, verbose=True):
             return None
     return dfH 
 
-def get_dfG(comp, T=None, dfG={}, states={}, T0=298.15, trycs=True,
+def get_dfG(comp, T=None, dfG={}, states={}, T0=298.15, trycs=True, tryaka=True,
             verbose=True, vverbose=False):
     '''
     Returns formation free energy of a compound in the specified state in kJ/mol
@@ -328,7 +373,9 @@ def get_dfG(comp, T=None, dfG={}, states={}, T0=298.15, trycs=True,
     c, s = read_state(comp)    
     if s=='aq':
         cs_g = get_cs(c=c, s='g')
-        dfGc_g = get_dfG(cs_g)
+        dfGc_g = get_dfG(cs_g, T=T, dfG=dfG, states=states, T0=T0, 
+                           trycs=trycs, tryaka=tryaka, 
+                           verbose=verbose, vverbose=vverbose)
         if dfGc_g is not None: #then use the Henry's-law constant!
             kH = get_kH(c, tryG=False) #tryG = False prevents the
             # infinite recursion that results  if it tries to get kH from dfG, that
@@ -342,10 +389,19 @@ def get_dfG(comp, T=None, dfG={}, states={}, T0=298.15, trycs=True,
 
     print('couldn\'t get dfG for ' + comp + '.')
     
+    if tryaka:
+        if comp in aka:
+            print(comp + ' is also known as ' + aka[comp])
+            return get_dfG(aka[comp], T=T, dfG=dfG, states=states, T0=T0, 
+                           trycs=trycs, tryaka=False, 
+                           verbose=verbose, vverbose=vverbose)
+    
     if trycs and s is None:  # likely, the input just forgot the state
         c, s = get_standard_state(comp, states=states, out='both', verbose=vverbose)
         cs = get_cs(c, s)  
-        return get_dfG(cs, T=T, trycs=False)
+        return get_dfG(cs, T=T, dfG=dfG, states=states, T0=T0, 
+                       trycs=False, tryaka=tryaka, 
+                       verbose=verbose, vverbose=vverbose)
 
     print('Returning None.')
     return None
@@ -538,6 +594,21 @@ def get_rxn_cell(rxn_an, rxn_cat, out='string'):
         return rxn
     return nu
 
+def get_rxn_c(reactant='CH4', product='CO2', atom='C', redox_states={},
+               extra=['H+','H2O'], out='string'):
+    '''
+    Returns the combustion reaction for a product.
+    '''
+    
+    nu_cat = get_rxn_EC(product='H2O', reactant='O2', atom='O', out='nu')
+    nu_an = get_rxn_EC(product=product, reactant=reactant, redox_states=redox_states,
+                       extra=extra, out='nu')
+    nu_c = get_rxn_cell(nu_an, nu_cat, out='nu')
+    if out == 'string':
+        return nu_to_rxn(nu_c)
+    else:
+        return nu_c
+
 def get_standard_potential(nu, pH=0, T=298.15, states={}, dfG={}, verbose=True):
     '''
     returns equilibrium potential in [V] on SHE scale for a reaction given
@@ -555,4 +626,11 @@ def get_standard_potential(nu, pH=0, T=298.15, states={}, dfG={}, verbose=True):
         E0 = E0 - n_H/n_el * np.log(10)*R*T/Far * pH
     return E0
 
-    
+def get_dcG(reactant='CH4', product='CO2', atom='C', redox_states={},
+               extra=['H+','H2O'], states={}, dfG={}, verbose=True):
+    nu = get_rxn_c(product=product, reactant=reactant, redox_states=redox_states,
+                       extra=extra, out='nu')
+    dcG =  get_drG(nu, states=states, dfG=dfG, verbose=verbose)
+    if not nu[reactant] == -1:
+        dcG = - dcG / nu[reactant]
+    return dcG

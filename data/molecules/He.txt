@@ -1,4 +1,4 @@
-#cleaned up 17I23
+#cleaned up 18I21
 name: He
 formula: He
 M: 4.002
@@ -9,17 +9,3 @@ spectrum
 	Title: NIST_16L14
 	M4	=	100.0
 RSF_Hiden	=	('M4', 0.39)
-molecule_mass	=	6.6483186e-27
-molecule_diameter	=	2.15e-10
-dynamic_viscosity	=	1.9900000000000003e-05
-density_RTP	=	0.1786
-D_gas_RTP	=	6.97e-05
-primary: M4
-#the folowing rsf is calculated for M4 on 17I23
-rsf	=	0.428736964079
-##the following F_cal value is for M4, trusted on 17I23
-#F_cal	=	2.8496814936
-##the following F_cal value is for M4, extrapolated from trusted values based on RSF from NIST on 17I23
-#F_cal	=	2.8496814936
-#I got this one from .../Sniffer_Experiments/08_CO_and_isotopes/Analysis/18B13_Scott_18A07_Choong1/fig3_Ir.py
-F_cal	=	4.144998980188261

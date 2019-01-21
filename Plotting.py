@@ -22,16 +22,30 @@ from .Molecules import Molecule
 preferencedir = os.path.dirname(os.path.realpath(__file__)) + os.sep + 'preferences' 
 with open(preferencedir + os.sep + 'standard_colors.txt','r') as f:
     lines = f.readlines()
-    standard_colors = lines_to_dictionary(lines)['standard colors']
+    standard_colors = lines_to_dictionary(lines, removecomments=False)['standard colors']
 
 def get_standard_colors():
     return standard_colors
 
-def colorax (ax, color, lr='right'):
-    ax.spines[lr].set_color(color)     
-    ax.tick_params(axis='y', colors=color)
-    ax.yaxis.label.set_color(color)
+def colorax(ax, color, lr='right', xy='y'):
+    ax.spines[lr].set_color(color)
+    ax.tick_params(axis=xy, color=color)
+    ax.tick_params(axis=xy, labelcolor=color)
+    if xy == 'y':
+        ax.yaxis.label.set_color(color)
+    if xy == 'x':
+        ax.xaxis.label.set_color(color)
 
+def align_zero(ax, ax_ref, xy='y'):
+    ylim0 = ax.get_ylim()
+    ylim_ref = ax_ref.get_ylim()
+    A = ylim_ref[-1] / ylim_ref[0]
+    B = ylim0[-1] - ylim0[0]
+    a = B/(A-1)
+    b = A*B/(A-1)
+    ylim = [a, b]
+    ax.set_ylim(ylim)
+    return ylim
 
 def plot_vs_potential(CV_and_MS_0, 
                       colors={'M2':'b','M4':'m','M18':'y','M28':'0.5','M32':'k'},
@@ -205,7 +219,10 @@ def plot_vs_potential(CV_and_MS_0,
     
     #then do it.
         if colors_right is not None:
-            axes += [axes[0].twinx()]
+            if ax is None or len(ax)<3: # so I can reuse right axis
+                axes += [axes[0].twinx()]
+            else:
+                axes += [ax[-1]]
         
         for colors, ax in [(colors_left, axes[0]), (colors_right, axes[-1])]:
             if colors is None:
@@ -351,14 +368,15 @@ def smooth_data(data_0, points=3, cols=None, verbose=True):
             print('smoothening \'' + col + '\' with a ' + str(points) + '-point moving average')
         x = data[col]
         c = np.array([1] * points) / points
-        #print(str(len(c)))
-        #data[col] = 0 #somehow this doesn't come through, 17G25
-        data[col] = np.convolve(x, c, mode='same')
-        #print('len = ' + str(len(x)))
-        #x = None
-
-    data['test'] = None #This does make it through. 
-    #data['U vs RHE / [V]'] = None #this doesn't make it through either.
+        #print(str(len(c))) # debugging
+        X = np.convolve(x, c, mode='same')
+        for n in range(points):
+            X[n] = np.mean(x[0:n+1])
+            if n>0:
+                X[-n] = np.mean(x[-n:])
+        data[col] = X
+        #print('len = ' + str(len(x))) # debugging
+        
     return data    
 
 def plot_signal(MS_data,
@@ -397,9 +415,8 @@ def plot_signal(MS_data,
             print('plotting: ' + mass)
         try:
             x, y = get_signal(MS_data, mass, unit=unit, tspan=tspan,
-                              override=override, verbose=verbose, )
-            if removebackground:
-                y = y - 0.99*min(y)
+                              override=override, verbose=verbose, 
+                              removebackground=removebackground)
         except KeyError:
             print('Can\'t get signal for ' + str(mass))
             continue
@@ -423,8 +440,11 @@ def plot_masses(*args, **kwargs):
     return plot_signal(*args, **kwargs)
     
 def plot_flux(MS_data, mols={'H2':'b', 'CH4':'r', 'C2H4':'g', 'O2':'k'},
-            tspan='tspan_2', ax='new', removebackground=True, A_el=None,
-            logplot=True, leg=False, unit='nmol/s', override=False, verbose=True):
+            tspan='tspan_2', ax='new', 
+            removebackground=True, background='constant',
+            A_el=None, unit='nmol/s', 
+            logplot=True, leg=False, 
+            override=False, verbose=True):
     '''
     Plots the molecular flux to QMS in nmol/s for each of the molecules in
     'fluxes.keys()', using the primary mass and the F_cal value read from
@@ -451,24 +471,22 @@ def plot_flux(MS_data, mols={'H2':'b', 'CH4':'r', 'C2H4':'g', 'O2':'k'},
                 mol = m  #this function should accept a list of Molecule instances!
             color = standard_colors[mol.primary]
             mols[mol] = color
+            print(f'mol={mol.name}, primary={mol.primary}, color={color}')
     
     for (mol, color) in mols.items():
         try:
             [x,y] = get_flux(MS_data, mol, unit=unit, tspan=tspan,
+                             removebackground=removebackground, background=background,
                              override=override, verbose=verbose)
         except KeyError:
             print('Can\'t get signal for ' + str(mol))
             continue
-        if removebackground:
-            try:
-                y = y - 0.99 * min(y) #0.99 to avoid issues when log plotting.
-            except ValueError:
-                print(y)
         if type(mol) is str:
             l = mol
         else:
             l = mol.name
-        ax.plot(x, y, color, label=l)
+        print(f'color={color}') # debugging
+        ax.plot(x, y, color=color, label=l)
     if leg:
         if type(leg) is not str:
             leg = 'lower right'
@@ -491,14 +509,16 @@ def plot_experiment(EC_and_MS,
                     colors={'M2':'b','M4':'m','M18':'y','M28':'0.5','M32':'k'},
                     tspan=None, overlay=False, logplot=[True,False], verbose=True,   
                     plotpotential=True, plotcurrent=True, ax='new', emphasis='MS',
-                    RE_vs_RHE=None, A_el=None, removebackground=True,
+                    RE_vs_RHE=None, A_el=None, 
+                    removebackground=None, background='constant',
                     saveit=False, title=None, leg=False, unit=None,
                     masses=None, masses_left=None, masses_right=None,
                     mols=None, mols_left=None, mols_right=None,
                     #mols will overide masses will overide colors
                     V_color='k', J_color='0.5', V_label=None, J_label=None,
-                    fig=None, t_str=None, J_str=None, V_str=None,
-                    override=False
+                    t_str=None, J_str=None, V_str=None,
+                    fig=None, return_fig=False,
+                    override=False,
                     ): 
     '''
     this plots signals or fluxes on one axis and current and potential on other axesaxis
@@ -540,6 +560,8 @@ def plot_experiment(EC_and_MS,
                 ax += [plt.subplot(gs[1, 0])]
             if plotcurrent and plotpotential:
                 ax += [ax[1].twinx()]
+                ax[1].set_zorder(ax[2].get_zorder()+1) #doesn't work
+                ax[1].patch.set_visible(False) # hide the 'canvas' 
         
     if tspan is None:                  #then use the range of overlap                     
         tspan = EC_and_MS['tspan'] #changed from 'tspan_2' 17H09
@@ -568,24 +590,7 @@ def plot_experiment(EC_and_MS,
 
 
     # ----------- parse input on which masses / fluxes to plot ------- #
-    try:
-        if type(mols[0]) in (list, tuple):
-            mols_left = mols[0]
-            mols_right = mols[1]
-            mols = mols_left
-    except (IndexError, TypeError):
-        pass
-    if mols_left is not None and mols is None:
-        mols = mols_left
-    try:
-        if type(masses[0]) in (list, tuple):
-            masses_left = masses[0]
-            masses_right = masses[1]
-            masses = masses_left
-    except (IndexError, TypeError):
-        pass
-    if masses_left is not None and masses is None:
-        masses = masses_left
+        
 #    print(masses)
     quantified = False      #added 16L15
     #print(type(colors))
@@ -603,6 +608,36 @@ def plot_experiment(EC_and_MS,
     else:
         quantified = True
         mols = colors
+
+    try:
+        if type(mols[0]) in (list, tuple):
+            mols_left = mols[0]
+            mols_right = mols[1]
+            mols = mols_left
+    except (IndexError, TypeError):
+        pass
+    if mols_left is not None and mols is None:
+        mols = mols_left
+    try:
+        if type(masses[0]) in (list, tuple):
+            masses_left = masses[0]
+            masses_right = masses[1]
+            masses = masses_left
+    except (IndexError, TypeError):
+        pass
+    if removebackground is None:
+        removebackground = quantified
+    if masses_left is not None and masses is None:
+        masses = masses_left
+    if removebackground == 'right':
+        removebackground_right = True
+        removebackground_left = False
+    elif removebackground == 'left':
+        removebackground_left = True
+        removebackground_right = False
+    else:
+        removebackground_left = removebackground
+        removebackground_right = removebackground
     
     
     # ----------- and plot the MS signals! -------------
@@ -611,13 +646,13 @@ def plot_experiment(EC_and_MS,
             unit = 'pmol/s'
         plot_flux(EC_and_MS, mols=mols, tspan=tspan, A_el=A_el,
                   ax=ax[0], leg=leg, logplot=logplot[0], unit=unit, 
-                  removebackground=removebackground, 
+                  removebackground=removebackground_left, background=background,
                   override=override, verbose=verbose)
         if mols_right is not None:
             ax += [ax[0].twinx()]
             plot_flux(EC_and_MS, mols=mols_right, tspan=tspan, A_el=A_el,
                       ax=ax[-1], leg=leg, logplot=logplot[0], unit=unit, 
-                      removebackground=removebackground, 
+                      removebackground=removebackground_right, background=background,
                       override=override, verbose=verbose)            
             
     else:
@@ -625,12 +660,14 @@ def plot_experiment(EC_and_MS,
             unit = 'pA'
         plot_signal(EC_and_MS, masses=masses, tspan=tspan,
                     ax=ax[0], leg=leg, logplot=logplot[0], unit=unit,
-                    override=override, verbose=verbose)
+                    override=override, verbose=verbose, 
+                    removebackground=removebackground_left)
         if masses_right is not None:
             ax += [ax[0].twinx()]
             plot_signal(EC_and_MS, masses=masses_right, tspan=tspan,
                         ax=ax[-1], leg=leg, logplot=logplot[0],  unit=unit,
-                        override=override, verbose=verbose)
+                        override=override, verbose=verbose,
+                        removebackground=removebackground_right)
     if not overlay:
         ax[0].set_xlabel('')
         ax[0].xaxis.tick_top()  
@@ -671,21 +708,12 @@ def plot_experiment(EC_and_MS,
             V = V[mask]
         if plotcurrent:
             J = J[mask]
-
-    i_ax = 1
-    if plotpotential:
-        ax[i_ax].plot(t, V, color=V_color, label=V_label)
-        ax[i_ax].set_ylabel(V_str)
-        if len(logplot) >2:
-            if logplot[2]:
-                ax[i_ax].set_yscale('log')
-        xlim = ax[i_ax-1].get_xlim()
-        ax[i_ax].set_xlim(xlim)
-        colorax(ax[i_ax], V_color, 'left')
-        ax[i_ax].tick_params(axis='both', direction='in') #17K28  
-        i_ax += 1
         
     if plotcurrent:
+        if plotpotential:
+            i_ax = 2
+        else:
+            i_ax = 1
         ax[i_ax].plot(t, J, color=J_color, label=J_label)
         ax[i_ax].set_ylabel(J_str)
         ax[i_ax].set_xlabel('time / [s]')
@@ -698,6 +726,18 @@ def plot_experiment(EC_and_MS,
             colorax(ax[i_ax], J_color, 'right')
         else:
             colorax(ax[i_ax], J_color, 'left')
+        ax[i_ax].tick_params(axis='both', direction='in') #17K28  
+
+    if plotpotential:
+        i_ax = 1
+        ax[i_ax].plot(t, V, color=V_color, label=V_label)
+        ax[i_ax].set_ylabel(V_str)
+        if len(logplot) >2:
+            if logplot[2]:
+                ax[i_ax].set_yscale('log')
+        xlim = ax[i_ax-1].get_xlim()
+        ax[i_ax].set_xlim(xlim)
+        colorax(ax[i_ax], V_color, 'left')
         ax[i_ax].tick_params(axis='both', direction='in') #17K28  
         
     if plotcurrent or plotpotential:
@@ -715,11 +755,15 @@ def plot_experiment(EC_and_MS,
      
     if title is not None:
             plt.title(title)    
-            
+    
+    if return_fig and (fig is None):
+        fig = ax[0].get_figure()        
     if verbose:
         print('function \'plot_experiment\' finished!\n\n')
-    
-    return ax
+    if return_fig:
+        return fig, ax
+    else:
+        return ax
     
 def plot_masses_and_I(*args, **kwargs):
     print('\n\n\'plot_masses_and_I\' has been renamed \'plot_experiment\'. Remember that next time!')
@@ -810,8 +854,8 @@ def plot_datapoints(integrals, colors, ax='new', label='', X=None, X_str='V',
 
 
 def plot_operation(cc=None, t=None, j=None, z=None, tspan=None, results=None,
-                   plot_type='heat', ax='new', colormap='plasma', aspect='auto', 
-                   unit='pmol/s', dimensions=None, verbose=True):
+                   plot_type='heat', ax='new', colormap='inferno', aspect='auto', 
+                   unit='pmol/s', color='g', dimensions=None, verbose=True):
     if verbose:
         print('\n\nfunction \'plot_operation\' at your service!\n')
     # and plot! 
@@ -905,7 +949,7 @@ def plot_operation(cc=None, t=None, j=None, z=None, tspan=None, results=None,
             else:
                 ax2 = ax1.twinx()
             ax2.set_ylabel('flux / [' + unit + ']')
-            ax2.plot(t, j, 'k-')
+            ax2.plot(t, j, '-', color=color)
             cbar.remove()
             ax3 = img.figure.add_axes([0.85, 0.1, 0.03, 0.8])
             cbar = plt.colorbar(img, cax=ax3)

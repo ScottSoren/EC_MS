@@ -1,4 +1,4 @@
-#cleaned up 17I23
+#cleaned up 18I21
 name: O2
 formula: O2
 M	=	31.998
@@ -10,17 +10,3 @@ spectrum
 	M16	=	21.802180218
 	M32	=	100.0
 RSF_Hiden	=	('M32', 0.86)
-molecule_mass	=	5.314867800000001e-26
-molecule_diameter	=	3.55e-10
-dynamic_viscosity	=	2.0700000000000002e-05
-density_RTP	=	1.429
-D_gas_RTP	=	7.23e-05
-primary: M32
-#the folowing rsf is calculated for M32 on 17I23
-rsf	=	0.881568715103
-##the following F_cal value is for M32, trusted on 17I23
-#F_cal	=	4.71353361413
-##the following F_cal value is for M32, extrapolated from trusted values based on RSF from NIST on 17I23
-#F_cal	=	4.71353361413
-#I got this one from .../Sniffer_Experiments/08_CO_and_isotopes/Analysis/18B13_Scott_18A07_Choong1/fig3_Ir.py
-F_cal	=	4.287674192514675

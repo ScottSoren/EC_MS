@@ -19,7 +19,7 @@ import numpy as np
 
 
 def synchronize(data_objects, t_zero='start', append=None, file_number_type='EC',
-                cutit=False, override=None, update=True, tz=None,
+                cutit=False, cut_buffer=60, override=None, update=True, tz=None,
                 verbose=True, vverbose=False):
     '''
     'synchronize' is the most important function of electropy/ECpy/EC_MS/EC_Xray
@@ -29,9 +29,9 @@ def synchronize(data_objects, t_zero='start', append=None, file_number_type='EC'
     If cutit=True, data will be retained in the interval of overlap. Otherwise,
     all data will be retained, but with t=0 at the start of the overlap,
     unless t_zero is specified (details below). 
-    If append=1, data columns of the same name will be joined and filled with
+    If append=True, data columns of the same name will be joined and filled with
     zeros for sets that don't have them so that all columns remain the same length
-    as their time columns, and a data_column 'file number' will be added to 
+    as their time columns, and a data column 'file number' will be added to 
     keep track of where the data comes from. 
     
     ----  inputs -----
@@ -295,7 +295,8 @@ def synchronize(data_objects, t_zero='start', append=None, file_number_type='EC'
                     if verbose:
                         print('preparing mask to cut according to timecol ' + col)
                     t = dataset[col]
-                    masks[col] = np.logical_and((t_start - t_0) < t, t < (t_finish - t_0))
+                    masks[col] = np.logical_and((t_start - t_0 - cut_buffer) < t, 
+                                                 t < (t_finish - t_0 + cut_buffer))
                     
         # Check how many rows will be needed for relevant data types when appending data,
         #and append to in the 'file number' column
@@ -333,7 +334,10 @@ def synchronize(data_objects, t_zero='start', append=None, file_number_type='EC'
             # processing: cutting
             if cutit:           #cut data to only return where it overlaps
                 #print('cutting ' + col) # for debugging
-                data = data[masks[get_timecol(col)]]  
+                try:
+                    data = data[masks[get_timecol(col)]]  
+                except KeyError:
+                    print('')
             # processing: offsetting 
             if is_time(col):
                 data = data + offset
@@ -350,7 +354,13 @@ def synchronize(data_objects, t_zero='start', append=None, file_number_type='EC'
                 #print('col = ' + col) #debugging
                 timecol = get_timecol(col)
                 #print('timecol = ' + str(timecol)) #debugging
-                l0 = oldcollength[timecol] + collength[timecol] 
+                try:
+                    l0 = oldcollength[timecol] + collength[timecol] 
+                except KeyError:
+                    print(col + ' should have timecol ' + timecol + ' but this is ' + 
+                          ' not in dataset. Removing ' + col + ' from data_cols.')
+                    dataset['data_cols'].remove(col)
+                    continue
                 # ^ I had to get these lengths before because I'm not sure whether 
                 #timecol will have been processed first or not...
                 if l0 > l1: #this is the case if the previous dataset was missing col but not timecol
@@ -412,7 +422,11 @@ def synchronize(data_objects, t_zero='start', append=None, file_number_type='EC'
     for col in combined_data['data_cols']:
         l1 = len(combined_data[col])
         timecol = get_timecol(col)
-        l0 = len(combined_data[timecol])
+        #print('about to cut ' + col + ' according to timecol ' + timecol) # debugging
+        try:
+            l0 = len(combined_data[timecol])
+        except KeyError:
+            print(f'can\'t find timecol for {col}. skipping.')
         if l0 > l1:
             filler = np.array([0] * (l0 - l1))
             combined_data[col] = np.append(combined_data[col], filler)
@@ -469,12 +483,29 @@ def cut(x, y, tspan=None, returnindeces=False, override=False):
     return x, y
 
 
-def cut_dataset(dataset_0, tspan=None):
+def timeshift(dataset, t_zero='start'):
+    if t_zero is None:
+        t0 = 0
+    elif t_zero == 'start':
+        t0 = dataset['tspan'][0]
+    else:
+        t0 = t_zero
+    for col in dataset['data_cols']:
+        if is_time(col):
+            #print(f'{col},\n{dataset[col]},\nt0 = {t0}') # debugging
+            dataset[col] -= t0
+    tspan = dataset['tspan']
+    dataset['tspan'] = [tspan[0]-t0, tspan[-1]-t0]
+    return dataset
+
+
+def cut_dataset(dataset_0, tspan=None, t_zero=None, verbose=True):
     '''
     Makes a time-cut of a dataset. Written 17H09.
     Unlike time_cut, does not ensure all MS data columns are the same length.
     '''
-    print('\n\nfunction \'cut dataset\' at your service!\n') 
+    if verbose:
+        print('\n\nfunction \'cut dataset\' at your service!\n') 
     dataset = dataset_0.copy()
     dataset['data_cols'] = dataset['data_cols'].copy()
     if tspan is None:
@@ -494,8 +525,10 @@ def cut_dataset(dataset_0, tspan=None):
             time_masks[timecol] = mask
 #        print('about to cut!') # debugging
         dataset[col] = dataset[col].copy()[mask]
-
-    print('\nfunction \'cut dataset\' finsihed!\n\n') 
+    dataset['tspan'] = tspan
+    timeshift(dataset, t_zero)
+    if verbose:
+        print('\nfunction \'cut dataset\' finsihed!\n\n') 
     return dataset
 
 
@@ -793,12 +826,17 @@ def time_cal(data, ref_data=None, points=[(0,0)], point_type=['time', 'time'],
         print('\nfunction \'time_cal\' finished!\n\n')
     return data
 
-def trigger_times(x, y, threshhold=2.5):
+def trigger_times(x, y, threshhold=2.5, triggergap=True):
     '''
     '''
     trigger_on = y > threshhold
     trigger_on_down = np.append(False, trigger_on[0:-1])
     trigger_start = np.logical_and(trigger_on, np.logical_not(trigger_on_down))
+    
+    if triggergap: # September 2018, noticed that MS isn't logging while trigger is on, leaving a gap.
+        x_up = np.append(x[1:], x[-1])
+        gap_start = x < x_up - 2
+        trigger_start = np.logical_or(trigger_start, gap_start)
     times = x[trigger_start]
     return times
 
@@ -876,6 +914,8 @@ def trigger_cal(data, triggers=None, pseudotimecol=None, pt_str=None,
             timecol = pseudotimecol + '*'
             
     if triggers is None:
+        if 'triggers' not in data:
+            get_trigger_times(data)
         triggers = data['triggers']
     
     if type(triggers) is not np.ndarray:
@@ -884,15 +924,12 @@ def trigger_cal(data, triggers=None, pseudotimecol=None, pt_str=None,
         else:
             triggers = np.array([triggers])
     
-    pt = data[pseudotimecol]
+    pt = data[pseudotimecol].copy()
     
     # set up the selector column to use for shift data
     if shiftcol == 'selector' and 'selector' not in data:
-        data['selector'] = np.tile(0, np.shape(pt))
-        for col, weight in [('loop number', 1), ('file number', 0.11)]:
-            if col in data:
-                #print(col + ' ' + str(data[col]))  #debugging
-                data['selector'] = data['selector'] + weight*data[col] 
+        from .EC import make_selector
+        make_selector(data)
     
     # ---- check if there are triggers in the set and in the time interval ----
     if len(triggers) == 0:
@@ -932,6 +969,7 @@ def trigger_cal(data, triggers=None, pseudotimecol=None, pt_str=None,
     shiftvalue = data[shiftcol]
     shiftvalue_down = np.append(shiftvalue[0]-1, shiftvalue[:-1])
     shiftmask = np.logical_not(shiftvalue == shiftvalue_down)
+    print('shiftmask.shape = \n' + str(shiftmask.shape) + '\npt.shape = \n' + str(pt.shape)) # debugging
     shifttimes = pt[shiftmask]        
     
     # ----- get vectors of trigger times and corresponding shift times -----

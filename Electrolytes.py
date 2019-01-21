@@ -210,7 +210,7 @@ class Electrolyte:
                 print('Error, can\'t equilibrate: no function appropriate to use.\n' +
                       ' got the following: ' + str(done))
                 return
-#            print('calling function ' + str(fun))
+            print('calling function ' + str(fun)) # debugging
             fun()
 #            print('names = ' + str(names) + ', vals = ' + 
 #                str([getattr(self, names[0]), getattr(self, names[1])]) + ', a = ' + str(fun()))
@@ -465,7 +465,7 @@ class Electrolyte:
         
         x = np.power(10.0, -pH)
         bufvec = self.buffer_vec(pH)
-        sc = Kw/x - x - np.dot(bufvec, self.z) / sum(bufvec) # spectator charge
+        sc = Kw/x - x - F*np.dot(bufvec, self.z) / sum(bufvec) # spectator charge
         s = sc / self.charge[self.spectator] 
         self.s = s
         return s

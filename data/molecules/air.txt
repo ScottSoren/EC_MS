@@ -1,9 +1,4 @@
-#cleaned up 17I23
+#cleaned up 18I21
 name: air
 formula: air
 M	=	28.96
-molecule_mass	=	4.8119170000000003e-26
-molecule_diameter	=	3.66e-10
-dynamic_viscosity	=	1.8500000000000002e-05
-density_RTP	=	1.1839
-D_gas_RTP	=	6.98e-05

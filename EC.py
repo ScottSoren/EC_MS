@@ -33,10 +33,12 @@ EC_cols_0 = ['mode', 'ox/red', 'error', 'control changes', 'time/s', 'control/V'
            'Ns changes', 'counter inc.', 'cycle number', 'Ns', '(Q-Qo)/mA.h', 
            'dQ/C', 'Q charge/discharge/mA.h', 'half cycle', 'Capacitance charge/µF', 
            'Capacitance discharge/µF', 'dq/mA.h', 'Q discharge/mA.h', 'Q charge/mA.h', 
-           'Capacity/mA.h', 'file number', 'file_number', 'Ece/V', 
-           'Ewe-Ece/V', '<Ece>/V', 'Energy charge/W.h', 'Energy discharge/W.h',
+           'Capacity/mA.h', 'file number', 'file_number', 'Ece/V',
+           'Ewe-Ece/V', '<Ece>/V', '<Ewe>/V', 'Energy charge/W.h', 'Energy discharge/W.h',
            'Efficiency/%', 'Rcmp/Ohm', 'time/s*', 'selector', 'j / [A/mg]',
-           V_string_default, J_string_default]
+           V_string_default, J_string_default,
+           'I/ECSA / [mA/m^2]'
+           ] # exotic J_str's. I need to change how this works!]
 
 
 def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True, 
@@ -96,7 +98,7 @@ def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True,
         for col in EC_data['data_cols']:
             if not is_EC_data(col): #then we've got a QMS or synchrotron variable
                 timecol = get_timecol(col)
-                #print(col + '  ' + timecol) #debugging
+                print(col + '  ' + timecol) #debugging
                 if timecol in time_masks:
                     mask = time_masks[timecol]
                 else:
@@ -190,8 +192,9 @@ def CV_difference(cycles_data, redox=1, Vspan=[0.5, 1.0],
     JV = []
     ts = []
     for cycle_data in cycles_data:
-        #print(type(cycles_data))
+        #print(type(cycles_data)) # debugging
         V_str, J_str = sync_metadata(cycle_data, verbose=verbose)
+        print(V_str + ', ' + J_str) # debugging
         V = cycle_data[V_str]
         J = cycle_data[J_str]
         t = cycle_data['time/s']
@@ -256,7 +259,7 @@ def CV_difference(cycles_data, redox=1, Vspan=[0.5, 1.0],
 
 
 def clip_cycles(dataset, cycles=1, V_clip=0, redox=1, V_str=None, t_str='time/s',
-                redox_str='ox/red', verbose=True, closecycle=False):
+                t_i=0, redox_str='ox/red', verbose=True, closecycle=False):
     '''
     puts the clip at a specified potential (or other data column given 
     by V_str) V_clip, and returns a subset given by indeces in cycles. By
@@ -289,9 +292,9 @@ def clip_cycles(dataset, cycles=1, V_clip=0, redox=1, V_str=None, t_str='time/s'
             return V[I] < V_clip and ro[I] == 0
     n = 0
 
-    I_start = 0 #so that I get point 0 in the first cycle.
-    I_finish = 1
-    I_next = 1
+    I_start = np.argmax(t>t_i) #so that I get point 0 in the first cycle.
+    I_finish = I_start + 1
+    I_next = I_start + 1
     cyclesets = []
     endit = False
     while n < max(cycles) + 1:
@@ -427,7 +430,19 @@ def plot_vs_time(EC_data, axes='new', y_strings='default', colors=None,
         
     return axes
 
+    
 
+def make_selector(data, sel_str='selector'):
+    changes = np.tile(False, data['time/s'].shape)
+    for col in ['cycle number', 'loop number', 'file number']:
+        if col in data:
+            n = data[col]
+            n_up = np.append(n[1:], n[-1])
+            changes = np.logical_or(changes, n_up>n)
+    selector = np.cumsum(changes)
+    data[sel_str] = selector
+    return sel_str
+    
 
 def sync_metadata(data, RE_vs_RHE=None, A_el=None, 
                   V_str=None, J_str=None, E_str=None, I_str=None,
@@ -640,8 +655,6 @@ def plot_CV_cycles(CV_data, cycles=[0], RE_vs_RHE=None, A_el=None, ax='new',
 
 
 
-
-
     
 
 def get_through_sweep(data=None, t_str=None, V_str=None, t=None, V=None, t_i=0,
@@ -684,12 +697,14 @@ def get_through_sweep(data=None, t_str=None, V_str=None, t=None, V=None, t_i=0,
     
     #print('len(t) = ' + str(len(t))) # debugging
     #print('len(V) = ' + str(len(V))) # debugging
+    #print(str(len(t>t_i)) + ' ' + str(len(before(Vspan[0], V)))) #debugging
+    
     t_out = t[np.argmax(np.logical_and(t > t_i, 
                                        before(V, Vspan_wide[0])
                                        ) # True if after t_i and comfortably out on start side
                         ) #first index for which V is comfortably out on start side
              ] #corresponding time
-    #print(str(len(t>t_out)) + ' ' + str(len(before(Vspan[0], V)))) #debugging
+    #print(f't_i = {t_i}, t_out = {t_out}, t={t}') # debugging
     i_start = np.argmax(np.logical_and(t>t_out, before(Vspan[0], V))) 
     # ^ first index of full sweep through range
     i_finish = np.argmax(np.logical_and(t>t_out, before(Vspan[1], V))) - 1  
@@ -708,7 +723,10 @@ def get_shunt_current_line(data, V_DL, t_i=0,
     
     '''
     if t_str is None:
-        t_str = data['t_str']
+        try:
+            t_str = data['t_str']
+        except KeyError:
+            t_str = 'time/s'
     if V_str is None:
         V_str = data['V_str']
     if I_str is None:
@@ -724,8 +742,8 @@ def get_shunt_current_line(data, V_DL, t_i=0,
     t = data[t_str]
     #print('t_str = ' + t_str + ', V_str = ' + V_str) # debugging
     
-    an_start, an_finish = get_through_sweep(t=t, V=V, Vspan=V_DL, redox=True)
-    cat_start, cat_finish = get_through_sweep(t=t, V=V, Vspan=V_DL, redox=False)        
+    an_start, an_finish = get_through_sweep(t=t, V=V, Vspan=V_DL, redox=True, t_i=t_i)
+    cat_start, cat_finish = get_through_sweep(t=t, V=V, Vspan=V_DL, redox=False, t_i=t_i)        
     
     V_an = V[an_start:an_finish]
     I_an = I[an_start:an_finish]
@@ -751,20 +769,27 @@ def get_shunt_current_line(data, V_DL, t_i=0,
               str(pfit[0]) + ' kOhm, with potential of zero shunt = ' + 
               str(pfit[1]) + ' ' + V_unit)
     if ax is not None:
+        try:
+            A_el = data['A_el']
+            J_str = data['J_str']
+        except KeyError:
+            A_el = 1
+            J_str = I_str
         if ax == 'new':
             fig, ax = plt.subplots()
-        ax.plot(V_interp, I_avg, 'r')
-        ax.plot(V_an, I_an, 'k')
-        ax.plot(V_cat, I_cat, 'k')
-        ax.plot(V_interp, I_an_interp, 'k--')
-        ax.plot(V_interp, I_cat_interp, 'k--')
+        ax.plot(V_interp, I_avg/A_el, 'r')
+        ax.plot(V_an, I_an/A_el, 'k')
+        ax.plot(V_cat, I_cat/A_el, 'k')
+        ax.plot(V_interp, I_an_interp/A_el, 'k--')
+        ax.plot(V_interp, I_cat_interp/A_el, 'k--')
         x = [np.min(V_interp), np.max(V_interp)]
         y = (x - pfit[1])/pfit[0] 
-        ax.plot(x, y, 'g')
+        ax.plot(x, y/A_el, 'g')
         ax.set_xlabel(V_str)
-        ax.set_ylabel(I_str)
+        ax.set_ylabel(J_str)
     return pfit, t_f
-    
+
+
 
 def correct_shunt(data, tspan='all', R_shunt=None, V_intercept=None, pfit=None,
                   t_str=None, V_str=None, I_str=None, J_str=None, verbose=True,
@@ -784,7 +809,10 @@ def correct_shunt(data, tspan='all', R_shunt=None, V_intercept=None, pfit=None,
         V_intercept = pfit[1] # potential vs RHE of zero shunt current
     
     if t_str is None:
-        t_str = data['t_str']
+        try:
+            t_str = data['t_str']
+        except KeyError:
+            t_str = 'time/s'
     if V_str is None:
         V_str = data['V_str']
     if I_str is None:
@@ -824,3 +852,33 @@ def correct_shunt(data, tspan='all', R_shunt=None, V_intercept=None, pfit=None,
     
     return pfit
     
+def get_capacitance(data, V_DL=[0.3, 0.6], V_str=None, J_str=None, t_i=0):
+    if V_str is None or J_str is None:
+        V_str_1, J_str_1 = sync_metadata(data)
+    if V_str is None:
+        V_str = V_str_1
+    if J_str is None:
+        J_str = J_str_1
+    t_str = 'time/s'
+    
+    t, V, J = data[t_str], data[V_str], data[J_str]
+    
+    I_start_an, I_finish_an = get_through_sweep(data, Vspan=V_DL, t_i=t_i, redox=1)
+    J_an = np.mean(J[I_start_an:I_finish_an])
+    scan_rate = (V[I_finish_an] - V[I_start_an])/(t[I_finish_an] - t[I_start_an])
+    
+    I_start_cat, I_finish_cat = get_through_sweep(data, Vspan=V_DL, t_i=t_i, redox=0)
+    J_cat = np.mean(J[I_start_cat:I_finish_cat])
+    cap = (J_an - J_cat) / scan_rate # [mA/cm^2] / [mV/s] = [C/V /cm^2]
+    return cap
+
+def correct_ohmic_drop(data, R_ohm=0):
+    V_str, J_str = sync_metadata(data)
+    I_str = data['I_str']
+    V, I = data[V_str].copy(), data[I_str].copy()
+    V -= R_ohm * I*1e-3
+    if not V_str[-1] == '*':
+        V_str = V_str + '*'
+    data[V_str] = V
+    data['V_str'] = V_str
+    return V_str

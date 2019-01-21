@@ -21,8 +21,8 @@ ourcolors_0 = {'M2':'b','M4':'m', 'M18':'y', 'M28':'0.5', 'M32':'k', 'M40':'c', 
              'M34':'r', 'M36':'g',  # if there's no risk of M15 or M26, whatever.
              'M46':'purple', 'M48':'darkslategray', #CO2 isotopes
              'M20':'slateblue', 'M16':'steelblue', 'M19':'teal', 'M17':'chocolate', # HO2 isotopes
-             'M41':'r', 'M42':'olive', 'M29':'g',#propene and propane
-             'M70':'purple', 'M3':'palevioletred' #exotic stuff
+             'M41':'#FF2E2E', 'M42':'olive', 'M29':'#001146',#propene and propane
+             'M70':'purple', 'M3':'orange' #exotic stuff
              }  
 
 

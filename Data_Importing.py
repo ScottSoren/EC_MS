@@ -611,7 +611,10 @@ def text_to_data(file_lines, title='get_from_file',
     if data_type == 'EC':           #so that synchronize can combine current data from different EC-lab techniques
         if '<I>/mA' in dataset['data_cols'] and 'I/mA' not in dataset['data_cols']:
             dataset['data_cols'].append('I/mA')
-            dataset['I/mA'] = dataset['<I>/mA']
+            dataset['I/mA'] = dataset['<I>/mA'] #so that synchronize can combine current data from different EC-lab techniques
+        if '<Ewe>/V' in dataset['data_cols'] and 'Ewe/V' not in dataset['data_cols']:
+            dataset['data_cols'].append('Ewe/V')
+            dataset['Ewe/V'] = dataset['<Ewe>/V']
 
     if verbose:
         print('\nfunction \'text_to_data\' finished!\n\n')    
@@ -682,8 +685,11 @@ def load_EC_set(directory, EC_file=None, tag='01',
     return EC_data
 
 
-def download_cinfdata_set(group_id, grouping_column='time'):
+def download_cinfdata_set(group_id=None, grouping_column=None, **kwargs):
 
+    if grouping_column is None:
+        grouping_column, group_id = kwargs.popitem()    
+    
     from .Combining import synchronize
     
     try:
@@ -817,7 +823,8 @@ def only_while_increasing(x=None, y=None):
 
 def import_set(directory, MS_file='QMS.txt', MS_data=None, t_zero='start',
                EC_file=None, tag='01', 
-               cutit=False, verbose=True, override=False): 
+               cutit=False, cut_buffer=60, 
+               verbose=True, override=False): 
     from .Combining import synchronize, sort_time
     
     if verbose:
@@ -847,7 +854,7 @@ def import_set(directory, MS_file='QMS.txt', MS_data=None, t_zero='start',
         sort_time(EC_data, verbose=verbose) #note, sort_time no longer returns!
         
     data = synchronize([MS_data, EC_data], t_zero=t_zero, verbose=verbose, 
-                       override=override, cutit=cutit)
+                       override=override, cutit=cutit, cut_buffer=cut_buffer)
     if verbose:
          print('\nfunction import_set finished!\n\n')       
     return data
@@ -899,8 +906,8 @@ def save_as_text(filename, dataset, cols=[], mols=[], tspan='all', header=None,
             datas[col] = dataset[col].copy()
         
     for mol in mols:
-        tcol = mol.name + '_' + mol.primary + '_x'
-        col = mol.name + '_' + mol.primary + '_y'
+        tcol = mol.name + '_' + mol.primary + '-x'
+        col = mol.name + '_' + mol.primary + '-y'
         x, y = mol.get_flux(dataset, tspan=tspan, **kwargs)
         datas[tcol] = x
         datas[col] = y

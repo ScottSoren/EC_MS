@@ -469,9 +469,10 @@ class Molecule:
         pass
 
 
-    def get_flux(self, MS_data, tspan='tspan', density=5,
+    def get_flux(self, MS_data, tspan='tspan', density=None,
                  unit='pmol/s', verbose=True, override=False, x=None,
-                 removebackground=False, background='constant', endpoints=3):
+                 removebackground=False, background='constant', t_bg=None,
+                 endpoints=5):
         '''
         returns [x, y] where x is the t corresponding to the primary mass of the
         molecule in 'mol' and y is the molecular flux in nmol/s, calculated from 
@@ -495,7 +496,12 @@ class Molecule:
             tspan = MS_data[tspan]
 
         if x is None:
-            x = np.linspace(tspan[0], tspan[-1], density*np.floor(tspan[-1] - tspan[0])) 
+            if density is None:
+                x = MS_data[self.primary + '-x']
+                mask = np.logical_and(tspan[0]<x, x<tspan[-1])
+                x = x[mask]
+            else:    
+                x = np.linspace(tspan[0], tspan[-1], density*np.floor(tspan[-1] - tspan[0])) 
             # ^ approx 5 datapoints a second
 
         y = 0
@@ -513,9 +519,19 @@ class Molecule:
             y = y / MS_data['A_el']
         
         if removebackground:
-            if background=='constant':
+            if background=='start':
+                background = y[0]
+            elif background=='finish':
+                background = y[-1]
+            elif background=='constant':
                 if type(removebackground) is float:
                     background = removebackground * min(y)
+                elif t_bg is not None:
+                    try:
+                        mask = np.logical_and(t_bg[0]<x, x<t_bg[-1])
+                        background = np.mean(y[mask])
+                    except TypeError:
+                        background = np.interp(t_bg, x, y)
                 else:
                     background = min(y)
             elif type(background) is float:

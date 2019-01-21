@@ -1,4 +1,4 @@
-#cleaned up 17I23
+#cleaned up 18I21
 name: H2O
 formula: H2O
 M	=	18.015
@@ -13,15 +13,3 @@ spectrum
 	M19	=	0.500050005001
 	M20	=	0.300030003
 RSF_Hiden	=	('M18', 0.95)
-molecule_mass	=	2.9922915000000004e-26
-molecule_diameter	=	2.7799999999999997e-10
-dynamic_viscosity	=	9.800000000000001e-06
-density_RTP	=	0.804
-D_gas_RTP	=	2.4200000000000002e-05
-primary: M18
-#the folowing rsf is calculated for M18 on 17I23
-rsf	=	1.04339893639
-#the following F_cal value is for M18, trusted on 17I23
-F_cal	=	6.27902846688
-#the following F_cal value is for M18, extrapolated from trusted values based on RSF from NIST on 17I23
-F_cal	=	6.27902846688

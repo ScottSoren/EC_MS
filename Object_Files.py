@@ -170,21 +170,21 @@ def grouped_lines_to_structure(lines, indent='\t'):
     return structure
 
 
-def lines_to_structure(lines, indent='\t'):
+def lines_to_structure(lines, indent='\t', removecomments=True):
     '''
     Have to group lines seperately to not mess up with recursion.
     This function includes both steps.
     '''
 #    print('lines:\n ' + str(lines))
-    grouped_lines = group_lines(lines, indent)
+    grouped_lines = group_lines(lines, indent, removecomments=removecomments)
         #this is necessary for it to treat the file as a single structure
 #    print('grouped lines:\n ' + str(grouped_lines))
     return grouped_lines_to_structure(grouped_lines, indent)
 
 
-def lines_to_dictionary(lines, indent='\t'):
+def lines_to_dictionary(lines, indent='\t', removecomments=True):
     lines = ['<dictionary>\n'] + lines
-    structure = lines_to_structure(lines)
+    structure = lines_to_structure(lines, removecomments=removecomments)
     dictionary = structure[1] #structure[0] being '<dictionary>'
         #this is necessary for it to treat the file as a single structure
 #    print('grouped lines:\n ' + str(grouped_lines))

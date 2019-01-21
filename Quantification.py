@@ -327,8 +327,11 @@ def line_through_zero(x,y):
     return a
 
 
-def get_signal(MS_data, mass, tspan='tspan', removebackground=False, 
-             unit='A', verbose=True, override=False):
+def get_signal(MS_data, mass, tspan='tspan',
+             removebackground=None, background=None, t_bg=None,
+             endpoints=5, fillcolor=None,
+             unit='A', verbose=True, override=False,
+             plotit=False, ax='new', return_bg=False):
     '''
     Returns [x, y] where x is the time and y is QMS signal.
     A bit trivial, but I like having this function to work in parrallel 
@@ -356,13 +359,52 @@ def get_signal(MS_data, mass, tspan='tspan', removebackground=False,
     if not tspan == 'all':
         x, y = cut(x,y,tspan, override=override)  
     
+    if removebackground is None:
+        removebackground = not (background is None)
+    
     if removebackground:
-        if type(removebackground) is float:
-            background = removebackground * min(y)
-        else:
-            background = min(y)
-        y = y - 0.99*background #Removing the entire background would fuck with log scales.
-    return [x, y]
+        if background is None:
+            background = 'constant'
+        if background=='start':
+            background = y[0]
+        elif background=='constant':
+            if type(removebackground) is float:
+                background = removebackground * min(y)
+            elif t_bg is not None:
+                try:
+                    mask = np.logical_and(t_bg[0]<x, x<t_bg[-1])
+                    background = np.mean(y[mask])
+                except TypeError:
+                    background = np.interp(t_bg, x, y)
+            else:
+                background = min(y)
+        elif type(background) is float:
+            #background = background
+            pass
+        elif background=='linear':
+            x_end = [np.average(x[:endpoints]), np.average(x[-endpoints:])]
+            y_end = [np.average(y[:endpoints]), np.average(y[-endpoints:])]
+            background = np.interp(x, x_end, y_end) 
+            
+    if plotit:
+        if ax=='new':
+            fig, ax = plt.subplots()
+        ax.plot(x, y, 'k')
+        if removebackground:
+            ax.plot(x, background, 'r--')  
+            if fillcolor:
+                ax.fill_between(x, background, y, where=y>background, color=fillcolor)
+        #ax.set_title(mass)
+    
+    if removebackground:
+        #y = y - 0.99 * background #so that we don't break the log scale.
+        y = y - background
+        #I should get rid of this and assume the caller knows what they're doing.
+
+    if return_bg:
+        return [x, y, background]
+    else:
+        return [x, y]
 
 
 def get_flux(MS_data, mol, **kwargs):
