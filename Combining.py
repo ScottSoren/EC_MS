@@ -426,7 +426,7 @@ def synchronize(data_objects, t_zero='start', append=None, file_number_type='EC'
         try:
             l0 = len(combined_data[timecol])
         except KeyError:
-            print(f'can\'t find timecol for {col}. skipping.')
+            print('can\'t find timecol for {}. skipping.'.format(col))
         if l0 > l1:
             filler = np.array([0] * (l0 - l1))
             combined_data[col] = np.append(combined_data[col], filler)

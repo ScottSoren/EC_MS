@@ -103,7 +103,7 @@ def datapoints_to_values(datapoints, X='all', X_str='V', rnd=2, avoid='blank', v
         if type(name)==type(avoid) and len([a for a in avoid if a in name])>0:
             continue
         if verbose:
-            print(f'adding {name} to values based on ' + X_str)
+            print('adding {} to values based on '.format(name) + X_str)
         try:
             x_vec = data[X_str]
             x_vec[0]
@@ -227,7 +227,7 @@ def plot_errorbar(xstat, ystat,
         ax = plt.figure().add_subplot(111)
     x, x_lu = get_mlu(xstat, logmean)
     y, y_lu = get_mlu(ystat, logmean)   
-    print(f'x_lu={x_lu}, y_lu={y_lu}')     # debugging
+    print('x_lu={}, y_lu={}'.format(x_lu, y_lu))     # debugging
     if marker is None and 'marker' in specs:
         marker = specs.pop('marker')
     elif x_lu is None and y_lu is None:

@@ -471,7 +471,7 @@ def plot_flux(MS_data, mols={'H2':'b', 'CH4':'r', 'C2H4':'g', 'O2':'k'},
                 mol = m  #this function should accept a list of Molecule instances!
             color = standard_colors[mol.primary]
             mols[mol] = color
-            print(f'mol={mol.name}, primary={mol.primary}, color={color}')
+            print('mol={}, primary={}, color={}'.format(mol.name, mol.primary, color))
     
     for (mol, color) in mols.items():
         try:
@@ -485,7 +485,7 @@ def plot_flux(MS_data, mols={'H2':'b', 'CH4':'r', 'C2H4':'g', 'O2':'k'},
             l = mol
         else:
             l = mol.name
-        print(f'color={color}') # debugging
+        print('color={}'.format(color)) # debugging
         ax.plot(x, y, color=color, label=l)
     if leg:
         if type(leg) is not str:
