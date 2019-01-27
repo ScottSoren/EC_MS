@@ -874,7 +874,7 @@ def get_trigger_times(data, xcol=None, ycol=None, label='Analog In', threshhold=
 
 
 def trigger_cal(data, triggers=None, pseudotimecol=None, pt_str=None,
-                t_str=None, timecol=None, shiftcol='selector', edge=2,
+                t_str=None, timecol=None, shiftcol='selector', edge=5,
                 verbose=True):
     '''
     data is the only required argument, given that the trigger times are
@@ -1007,8 +1007,11 @@ def trigger_cal(data, triggers=None, pseudotimecol=None, pt_str=None,
         index = np.argmin(err)
         pt_point = shifttimes[index]
         if err[index]>edge and verbose:
-            print('Large offset between matched trigger at ' + str(trigger) +
+            print('Large offset (dt>' + str(edge) +
+                  ') between matched trigger at ' + str(trigger) +
                   ' and ' + shiftcol + ' change at ' + str(pt_point) + '!')
+            print('I\'ll ignore that match.')
+            continue
         #Check if that shift_time has already been linked to a trigger
         if index in pt_indeces:
             if verbose:
