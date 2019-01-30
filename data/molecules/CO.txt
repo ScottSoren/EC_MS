@@ -1,4 +1,4 @@
-#cleaned up 18I21
+#cleaned up 19A27
 name: CO
 formula: CO
 M	=	28.009999999999998
@@ -12,3 +12,9 @@ spectrum
 	M28	=	100.0
 	M29	=	1.200120012
 RSF_Hiden	=	('M28', 0.98)
+molecule_mass	=	4.6524610000000005e-26
+molecule_diameter	=	3.76e-10
+dynamic_viscosity	=	1.7800000000000002e-05
+density_RTP	=	1.145
+D_gas_RTP	=	6.98e-05
+primary: M28

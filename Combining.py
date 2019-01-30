@@ -184,10 +184,12 @@ def synchronize(data_objects, t_zero='start', append=None, file_number_type='EC'
                     t_f = max(t_f, t_0 + dataset[col][-1])
                     # ^ latest finish of time data in dataset in epoch time
                 except IndexError:  #if dataset['data_cols'] points to nonexisting data, something went wrong.
+                    print('index error in col ' + col + ':')
                     print(dataset['title'] + ' may be an empty file.')
                     hasdata[nd] = False # files that are empty after the header are caught here
 
         if not hasdata[nd]:  # move on from empty files
+            recstarts += [-1] # otherwise we end up skipping something we didn't mean to skip
             continue
         recstarts += [t_s]               #first recorded time
 
@@ -290,7 +292,7 @@ def synchronize(data_objects, t_zero='start', append=None, file_number_type='EC'
 
     # ... And loop again to synchronize the data and put it into the combined dictionary.
     if verbose:
-        print('---------- syncrhonize entering second loop -----------')
+        print('\n\n---------- syncrhonize entering second loop -----------\n')
 
     for i, dataset in enumerate(datasets):
         nd = dataset['combining_number']
@@ -524,18 +526,24 @@ def timeshift(dataset, t_zero='start'):
     return dataset
 
 
-def cut_dataset(dataset_0, tspan=None, t_zero=None, verbose=True):
+def cut_dataset(dataset_0, tspan=None, tspan_0=None, t_zero=None, verbose=True):
     '''
     Makes a time-cut of a dataset. Written 17H09.
     Unlike time_cut, does not ensure all MS data columns are the same length.
+    if tspan_0 is used, it is interpreted as unix time
     '''
     if verbose:
         print('\n\nfunction \'cut dataset\' at your service!\n')
     dataset = dataset_0.copy()
     dataset['data_cols'] = dataset['data_cols'].copy()
-    if tspan is None:
+    if tspan is None and tspan_0 is None:
         return dataset
     #print(dataset['title'])
+
+    if tspan is None and tspan_0 is not None:
+        t0 = dataset['tstamp']
+        tspan = [tspan_0[0] - t0, tspan_0[-1] - t0]
+
     time_masks = {} #I imagine storing indeces improves performance
     for col in dataset['data_cols']:
         timecol = get_timecol(col)
@@ -545,7 +553,11 @@ def cut_dataset(dataset_0, tspan=None, t_zero=None, verbose=True):
             mask = time_masks[timecol]
         else:
             #print(timecol + ', length = ' + str(len(dataset[timecol]))) #debugging
-            t = dataset[timecol]
+            try:
+                t = dataset[timecol]
+            except KeyError:
+                print('can\'t cut ' + col + ' because dataset doesn\'t have timecol ' + timecol)
+                continue
             mask = np.logical_and(tspan[0]<t, t<tspan[-1])
             time_masks[timecol] = mask
 #        print('about to cut!') # debugging

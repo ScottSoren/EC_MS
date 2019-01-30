@@ -1,4 +1,4 @@
-#cleaned up 18I21
+#cleaned up 19A27
 name: C2H4
 formula: C2H4
 M	=	28.054
@@ -20,3 +20,4 @@ spectrum
 	M29	=	2.300230023
 	M30	=	0.100010001
 RSF_Hiden	=	('M28', 1.02)
+primary: M28

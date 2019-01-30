@@ -1,4 +1,4 @@
-#cleaned up 18I21
+#cleaned up 19A27
 name: Ar
 formula: Ar
 M	=	39.948
@@ -12,3 +12,9 @@ spectrum
 	M38	=	0.0500050005001
 	M40	=	100.0
 RSF_Hiden	=	('M40', 1.27)
+molecule_mass	=	6.6353628e-26
+molecule_diameter	=	3.58e-10
+dynamic_viscosity	=	2.2700000000000003e-05
+density_RTP	=	1.784
+D_gas_RTP	=	7.26e-05
+primary: M40

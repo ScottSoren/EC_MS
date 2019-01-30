@@ -1,4 +1,4 @@
-#cleaned up 18I21
+#cleaned up 19A27
 name: H2O
 formula: H2O
 M	=	18.015
@@ -13,3 +13,9 @@ spectrum
 	M19	=	0.500050005001
 	M20	=	0.300030003
 RSF_Hiden	=	('M18', 0.95)
+molecule_mass	=	2.9922915000000004e-26
+molecule_diameter	=	2.7799999999999997e-10
+dynamic_viscosity	=	9.800000000000001e-06
+density_RTP	=	0.804
+D_gas_RTP	=	2.4200000000000002e-05
+primary: M18

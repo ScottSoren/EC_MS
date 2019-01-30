@@ -1,10 +1,9 @@
-#cleaned up 18I21
+#cleaned up 19A27
 name: CO2
 formula: CO2
 M	=	44.009
 D	=	1.92e-09
 kH	=	1.205
-primary: M44
 sigma_100eV	=	3.735
 spectrum
 	Title: NIST_16L14
@@ -17,3 +16,9 @@ spectrum
 	M45	=	1.200120012
 	M46	=	0.400040004
 RSF_Hiden	=	('M44', 1.17)
+molecule_mass	=	7.3098949e-26
+molecule_diameter	=	4.53e-10
+dynamic_viscosity	=	1.5000000000000002e-05
+density_RTP	=	1.977
+D_gas_RTP	=	5.8e-05
+primary: M44

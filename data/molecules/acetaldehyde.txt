@@ -1,4 +1,4 @@
-#cleaned up 18I21
+#cleaned up 19A27
 name: acetaldehyde
 formula: C2H4O
 M	=	44.053

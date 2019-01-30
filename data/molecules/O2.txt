@@ -1,4 +1,4 @@
-#cleaned up 18I21
+#cleaned up 19A27
 name: O2
 formula: O2
 M	=	31.998
@@ -10,3 +10,9 @@ spectrum
 	M16	=	21.802180218
 	M32	=	100.0
 RSF_Hiden	=	('M32', 0.86)
+molecule_mass	=	5.314867800000001e-26
+molecule_diameter	=	3.55e-10
+dynamic_viscosity	=	2.0700000000000002e-05
+density_RTP	=	1.429
+D_gas_RTP	=	7.23e-05
+primary: M32

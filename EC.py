@@ -62,7 +62,7 @@ def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True,
     #it looks like I actually want Ns for CA's and cycle number for CV's.
     #How to determine which
     if cycle_str is None:
-        if data_type == 'CV' and 'cycle number' in EC_data['data_cols']:
+        if 'cycle number' in EC_data['data_cols']:
             cycle_str = 'cycle number'
         elif 'Ns' in EC_data['data_cols']:
             cycle_str = 'Ns'
@@ -102,9 +102,12 @@ def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True,
                 if timecol in time_masks:
                     mask = time_masks[timecol]
                 else:
-                    mask = np.logical_and(tspan[0] < EC_data[timecol], EC_data[timecol] < tspan[-1])
-                    # I want to do this vectorized from now on!
-                    time_masks[timecol] = mask
+                    try:
+                        mask = np.logical_and(tspan[0] < EC_data[timecol], EC_data[timecol] < tspan[-1])
+                        time_masks[timecol] = mask
+                    except KeyError:
+                        print('can\'t cut ' + col + ', don\'t have timecol ' + timecol + '. skipping.')
+                        continue
                 #if not is_time(col):
                 EC_data[col] = EC_data[col][mask]
 

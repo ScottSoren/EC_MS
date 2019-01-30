@@ -1,4 +1,4 @@
-#cleaned up 18I21
+#cleaned up 19A27
 name: Cl2
 formula: Cl2
 M	=	70.906
@@ -12,3 +12,4 @@ spectrum
 	M70	=	100.0
 	M72	=	63.8563856386
 	M74	=	10.201020102
+primary: M70

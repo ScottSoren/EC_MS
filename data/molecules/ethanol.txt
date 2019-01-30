@@ -1,4 +1,4 @@
-#cleaned up 18I21
+#cleaned up 19A27
 name: ethanol
 formula: C2H6O
 M	=	46.069
@@ -30,3 +30,4 @@ spectrum
 	M45	=	51.495149515
 	M46	=	21.6321632163
 	M47	=	0.730073007301
+primary: M31

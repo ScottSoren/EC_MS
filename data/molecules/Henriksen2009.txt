@@ -1,4 +1,9 @@
-#cleaned up 18I21
+#cleaned up 19A27
 name: Henriksen2009
 formula: Henriksen2009
 M	=	0
+molecule_mass	=	4.8099999999999996e-26
+molecule_diameter	=	3.72e-10
+dynamic_viscosity	=	1.7800000000000002e-05
+density_RTP	=	1.1839
+D_gas_RTP	=	0.00014900000000000002

@@ -1,4 +1,4 @@
-#cleaned up 18I21
+#cleaned up 19A27
 name: CH4
 formula: CH4
 M	=	16.043
@@ -14,3 +14,9 @@ spectrum
 	M16	=	100.0
 	M17	=	1.6401640164
 RSF_Hiden	=	('M16', 0.75)
+molecule_mass	=	2.664244e-26
+molecule_diameter	=	3.8e-10
+dynamic_viscosity	=	1.1000000000000001e-05
+density_RTP	=	0.668
+D_gas_RTP	=	6.500000000000001e-05
+primary: M16

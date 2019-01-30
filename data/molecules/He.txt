@@ -1,4 +1,4 @@
-#cleaned up 18I21
+#cleaned up 19A27
 name: He
 formula: He
 M: 4.002
@@ -9,3 +9,9 @@ spectrum
 	Title: NIST_16L14
 	M4	=	100.0
 RSF_Hiden	=	('M4', 0.39)
+molecule_mass	=	6.6483186e-27
+molecule_diameter	=	2.15e-10
+dynamic_viscosity	=	1.9900000000000003e-05
+density_RTP	=	0.1786
+D_gas_RTP	=	6.97e-05
+primary: M4
