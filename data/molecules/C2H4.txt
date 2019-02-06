@@ -21,3 +21,19 @@ spectrum
 	M30	=	0.100010001
 RSF_Hiden	=	('M28', 1.02)
 primary: M28
+#the folowing rsf is calculated for M26 on 19B01
+rsf	=	0.516606057394
+#the following F_cal value is for M26, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	[ 2.52851535]
+#the folowing rsf is calculated for M26 on 19B01
+rsf	=	0.516606057394
+#the following F_cal value is for M26, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	[ 2.52851535]
+#the folowing rsf is calculated for M28 on 19B01
+rsf	=	0.9400647247
+#the following F_cal value is for M28, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	[ 4.60112314]
+#the folowing rsf is calculated for M28 on 19B01
+rsf	=	0.9400647247
+#the following F_cal value is for M28, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	[ 4.60112314]

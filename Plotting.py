@@ -49,7 +49,7 @@ def align_zero(ax, ax_ref, xy='y'):
 
 def plot_vs_potential(CV_and_MS_0,
                       colors={'M2':'b','M4':'m','M18':'y','M28':'0.5','M32':'k'},
-                      tspan=0, RE_vs_RHE=None, A_el=None, cycles='all',
+                      tspan=None, RE_vs_RHE=None, A_el=None, cycles='all',
                       ax1='new', ax2='new', ax=None, #spec='k-',
                       overlay=0, logplot = [1,0], leg=False,
                       verbose=True, removebackground=None, background=None,
@@ -140,16 +140,17 @@ def plot_vs_potential(CV_and_MS_0,
 
     #get time variable and plotting indexes
     t = CV_and_MS[t_str]
-    if tspan == 0:                  #then use the whole range of overlap
+    if tspan is None:                  #then use the whole range of overlap
         tspan = CV_and_MS['tspan']
-    I_plot = np.array([i for (i,t_i) in enumerate(t) if tspan[0]<t_i and t_i<tspan[1]])
+
+    mask = np.logical_and(tspan[0]<t, t<tspan[-1])
 
     if ax2 is not None:
         #plot EC-lab data
         ec_spec = spec.copy()
         if 'color' not in ec_spec.keys():
             ec_spec['color'] = 'k'
-        ax2.plot(V[I_plot],J[I_plot], **ec_spec)
+        ax2.plot(V[mask],J[mask], **ec_spec)
             #maybe I should use EC.plot_cycles to have different cycles be different colors. Or rewrite that code here.
         ax2.set_xlabel(V_str)
         ax2.set_ylabel(J_str)
@@ -215,7 +216,7 @@ def plot_vs_potential(CV_and_MS_0,
             if quantified:
                 unit = 'pmol/s'
             else:
-                unit = 'nA'
+                unit = 'pA'
 
     #then do it.
         if colors_right is not None:

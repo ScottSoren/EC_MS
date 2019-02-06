@@ -689,7 +689,7 @@ def load_EC_set(*args, **kwargs):
     return import_EC_set(*args, **kwargs)
 
 
-def download_cinfdata_set(group_id=None, grouping_column=None, **kwargs):
+def download_cinfdata_set(setup='sniffer', group_id=None, grouping_column=None, **kwargs):
 
     if grouping_column is None:
         grouping_column, group_id = kwargs.popitem()
@@ -703,7 +703,7 @@ def download_cinfdata_set(group_id=None, grouping_column=None, **kwargs):
               'https://github.com/CINF/cinf_database/blob/master/cinfdata.py')
 
     try:
-        cinfd = Cinfdata('sniffer', grouping_column=grouping_column,
+        cinfd = Cinfdata(setup, grouping_column=grouping_column,
                          allow_wildcards=True,
                          label_column='mass_label')
     except:
@@ -714,7 +714,13 @@ def download_cinfdata_set(group_id=None, grouping_column=None, **kwargs):
 
     #obj = cinfd.get_metadata_group('2018-03-30 14:13:17')
 
+    #all_datasets = cinfd.get_metadata_group('%')
+    #the_list = [(ID, d['time'], d['comment']) for ID, d in all_datasets.items()]
+    #print(the_list)
+
     obj = cinfd.get_metadata_group(group_id)
+    #print(str(obj)) #
+
     idlists = {} # keys will be time as string. values will be corresponding id's
 
     for key, value in obj.items():

@@ -15,3 +15,57 @@ dynamic_viscosity	=	1.9900000000000003e-05
 density_RTP	=	0.1786
 D_gas_RTP	=	6.97e-05
 primary: M4
+#the folowing rsf is calculated for M4 on 19B01
+rsf	=	0.428736964079
+#the following F_cal value is for M4, trusted on 19B01
+F_cal	=	2.92092353094
+#the following F_cal value is for M4, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	2.92092353094
+#the folowing rsf is calculated for M4 on 19B01
+rsf	=	0.428736964079
+#the following F_cal value is for M4, trusted on 19B01
+F_cal	=	2.92092353094
+#the following F_cal value is for M4, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	2.92092353094
+#the folowing rsf is calculated for M4 on 19B01
+rsf	=	0.428736964079
+#the following F_cal value is for M4, trusted on 19B01
+F_cal	=	2.92092353094
+#the following F_cal value is for M4, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	2.92092353094
+#the folowing rsf is calculated for M4 on 19B01
+rsf	=	0.428736964079
+#the following F_cal value is for M4, trusted on 19B01
+F_cal	=	2.92092353094
+#the following F_cal value is for M4, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	2.92092353094
+#the folowing rsf is calculated for M4 on 19B01
+rsf	=	0.428736964079
+#the following F_cal value is for M4, trusted on 19B01
+F_cal	=	2.92092353094
+#the following F_cal value is for M4, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	2.92092353094
+#the folowing rsf is calculated for M4 on 19B01
+rsf	=	0.428736964079
+#the following F_cal value is for M4, trusted on 19B01
+F_cal	=	2.92092353094
+#the following F_cal value is for M4, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	2.92092353094
+#the folowing rsf is calculated for M4 on 19B01
+rsf	=	0.428736964079
+#the following F_cal value is for M4, trusted on 19B01
+F_cal	=	1424.8407468
+#the following F_cal value is for M4, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	1424.8407468
+#the folowing rsf is calculated for M4 on 19B01
+rsf	=	0.428736964079
+#the following F_cal value is for M4, trusted on 19B01
+F_cal	=	4.74471968684
+#the following F_cal value is for M4, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	4.74471968684
+#the folowing rsf is calculated for M4 on 19B01
+rsf	=	0.428736964079
+#the following F_cal value is for M4, trusted on 19B01
+F_cal	=	1.4248407468
+#the following F_cal value is for M4, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	1.4248407468

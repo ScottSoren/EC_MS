@@ -18,3 +18,57 @@ dynamic_viscosity	=	2.2700000000000003e-05
 density_RTP	=	1.784
 D_gas_RTP	=	7.26e-05
 primary: M40
+#the folowing rsf is calculated for M40 on 19B01
+rsf	=	0.950400501179
+#the following F_cal value is for M40, trusted on 19B01
+F_cal	=	4.24807058055
+#the following F_cal value is for M40, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	4.24807058055
+#the folowing rsf is calculated for M40 on 19B01
+rsf	=	0.950400501179
+#the following F_cal value is for M40, trusted on 19B01
+F_cal	=	4.24807058055
+#the following F_cal value is for M40, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	4.24807058055
+#the folowing rsf is calculated for M40 on 19B01
+rsf	=	0.950400501179
+#the following F_cal value is for M40, trusted on 19B01
+F_cal	=	4.24807058055
+#the following F_cal value is for M40, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	4.24807058055
+#the folowing rsf is calculated for M40 on 19B01
+rsf	=	0.950400501179
+#the following F_cal value is for M40, trusted on 19B01
+F_cal	=	4.24807058055
+#the following F_cal value is for M40, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	4.24807058055
+#the folowing rsf is calculated for M40 on 19B01
+rsf	=	0.950400501179
+#the following F_cal value is for M40, trusted on 19B01
+F_cal	=	4.24807058055
+#the following F_cal value is for M40, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	4.24807058055
+#the folowing rsf is calculated for M40 on 19B01
+rsf	=	0.950400501179
+#the following F_cal value is for M40, trusted on 19B01
+F_cal	=	4.24807058055
+#the following F_cal value is for M40, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	4.24807058055
+#the folowing rsf is calculated for M40 on 19B01
+rsf	=	0.950400501179
+#the following F_cal value is for M40, trusted on 19B01
+F_cal	=	2072.22955149
+#the following F_cal value is for M40, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	2072.22955149
+#the folowing rsf is calculated for M40 on 19B01
+rsf	=	0.950400501179
+#the following F_cal value is for M40, trusted on 19B01
+F_cal	=	6.90052440646
+#the following F_cal value is for M40, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	6.90052440646
+#the folowing rsf is calculated for M40 on 19B01
+rsf	=	0.950400501179
+#the following F_cal value is for M40, trusted on 19B01
+F_cal	=	2.07222955149
+#the following F_cal value is for M40, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	2.07222955149

@@ -20,3 +20,57 @@ dynamic_viscosity	=	1.1000000000000001e-05
 density_RTP	=	0.668
 D_gas_RTP	=	6.500000000000001e-05
 primary: M16
+#the folowing rsf is calculated for M15 on 19B01
+rsf	=	0.806153438088
+#the following F_cal value is for M15, trusted on 19B01
+F_cal	=	4.75947259112
+#the following F_cal value is for M15, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	4.75947259112
+#the folowing rsf is calculated for M15 on 19B01
+rsf	=	0.806153438088
+#the following F_cal value is for M15, trusted on 19B01
+F_cal	=	4.75947259112
+#the following F_cal value is for M15, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	4.75947259112
+#the folowing rsf is calculated for M15 on 19B01
+rsf	=	0.806153438088
+#the following F_cal value is for M15, trusted on 19B01
+F_cal	=	4.75947259112
+#the following F_cal value is for M15, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	4.75947259112
+#the folowing rsf is calculated for M15 on 19B01
+rsf	=	0.806153438088
+#the following F_cal value is for M15, trusted on 19B01
+F_cal	=	4.75947259112
+#the following F_cal value is for M15, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	4.75947259112
+#the folowing rsf is calculated for M15 on 19B01
+rsf	=	0.806153438088
+#the following F_cal value is for M15, trusted on 19B01
+F_cal	=	4.75947259112
+#the following F_cal value is for M15, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	4.75947259112
+#the folowing rsf is calculated for M15 on 19B01
+rsf	=	0.806153438088
+#the following F_cal value is for M15, trusted on 19B01
+F_cal	=	4.75947259112
+#the following F_cal value is for M15, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	4.75947259112
+#the folowing rsf is calculated for M15 on 19B01
+rsf	=	0.806153438088
+#the following F_cal value is for M15, trusted on 19B01
+F_cal	=	2321.69394689
+#the following F_cal value is for M15, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	2321.69394689
+#the folowing rsf is calculated for M15 on 19B01
+rsf	=	0.806153438088
+#the following F_cal value is for M15, trusted on 19B01
+F_cal	=	7.73124084313
+#the following F_cal value is for M15, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	7.73124084313
+#the folowing rsf is calculated for M15 on 19B01
+rsf	=	0.806153438088
+#the following F_cal value is for M15, trusted on 19B01
+F_cal	=	2.32169394689
+#the following F_cal value is for M15, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	2.32169394689

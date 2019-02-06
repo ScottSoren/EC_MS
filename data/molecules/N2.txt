@@ -17,3 +17,57 @@ dynamic_viscosity	=	1.79e-05
 density_RTP	=	1.251
 D_gas_RTP	=	6.98e-05
 primary: M28
+#the folowing rsf is calculated for M28 on 19B01
+rsf	=	0.999970312087
+#the following F_cal value is for M28, trusted on 19B01
+F_cal	=	5.91777620068
+#the following F_cal value is for M28, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	5.91777620068
+#the folowing rsf is calculated for M28 on 19B01
+rsf	=	0.999970312087
+#the following F_cal value is for M28, trusted on 19B01
+F_cal	=	5.91777620068
+#the following F_cal value is for M28, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	5.91777620068
+#the folowing rsf is calculated for M28 on 19B01
+rsf	=	0.999970312087
+#the following F_cal value is for M28, trusted on 19B01
+F_cal	=	5.91777620068
+#the following F_cal value is for M28, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	5.91777620068
+#the folowing rsf is calculated for M28 on 19B01
+rsf	=	0.999970312087
+#the following F_cal value is for M28, trusted on 19B01
+F_cal	=	5.91777620068
+#the following F_cal value is for M28, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	5.91777620068
+#the folowing rsf is calculated for M28 on 19B01
+rsf	=	0.999970312087
+#the following F_cal value is for M28, trusted on 19B01
+F_cal	=	5.91777620068
+#the following F_cal value is for M28, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	5.91777620068
+#the folowing rsf is calculated for M28 on 19B01
+rsf	=	0.999970312087
+#the following F_cal value is for M28, trusted on 19B01
+F_cal	=	5.91777620068
+#the following F_cal value is for M28, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	5.91777620068
+#the folowing rsf is calculated for M28 on 19B01
+rsf	=	0.999970312087
+#the following F_cal value is for M28, trusted on 19B01
+F_cal	=	2886.72009789
+#the following F_cal value is for M28, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	2886.72009789
+#the folowing rsf is calculated for M28 on 19B01
+rsf	=	0.999970312087
+#the following F_cal value is for M28, trusted on 19B01
+F_cal	=	9.61277792599
+#the following F_cal value is for M28, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	9.61277792599
+#the folowing rsf is calculated for M28 on 19B01
+rsf	=	0.999970312087
+#the following F_cal value is for M28, trusted on 19B01
+F_cal	=	2.88672009789
+#the following F_cal value is for M28, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	2.88672009789

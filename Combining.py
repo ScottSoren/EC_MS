@@ -12,10 +12,9 @@ from __future__ import division
 
 import time
 import re
-import os #, sys
+#import os #, sys
 import numpy as np
-
-
+import warnings
 
 
 def synchronize(data_objects, t_zero='start', append=None, file_number_type='EC',
@@ -175,6 +174,7 @@ def synchronize(data_objects, t_zero='start', append=None, file_number_type='EC'
         t_s = now           # will decrease to the earliest start of time data in the dataset
         t_f = 0             # will increase to the latest finish of time data in the dataset
 
+        hasdata[nd] = False
         for col in dataset['data_cols']:
             #print('col = ' + str(col)) # debugging
             if is_time(col):
@@ -183,10 +183,11 @@ def synchronize(data_objects, t_zero='start', append=None, file_number_type='EC'
                     # ^ earliest start of time data in dataset in epoch time
                     t_f = max(t_f, t_0 + dataset[col][-1])
                     # ^ latest finish of time data in dataset in epoch time
+                    hasdata[nd] = True
                 except IndexError:  #if dataset['data_cols'] points to nonexisting data, something went wrong.
-                    print('index error in col ' + col + ':')
-                    print(dataset['title'] + ' may be an empty file.')
-                    hasdata[nd] = False # files that are empty after the header are caught here
+                    print('Time column ' + col + ' seems to have no data')
+        if not hasdata[nd]:
+            print(dataset['title'] + ' seems to be an empty file, as no time columns have data!')
 
         if not hasdata[nd]:  # move on from empty files
             recstarts += [-1] # otherwise we end up skipping something we didn't mean to skip
@@ -547,7 +548,7 @@ def cut_dataset(dataset_0, tspan=None, tspan_0=None, t_zero=None, verbose=True):
     time_masks = {} #I imagine storing indeces improves performance
     for col in dataset['data_cols']:
         timecol = get_timecol(col)
-        #print(col + ', length = ' + str(len(dataset[col]))) # debugging
+        print(col + ', length = ' + str(len(dataset[col]))) # debugging
         if timecol in time_masks.keys():
             #print('already got indeces, len = ' + str(len(indeces[timecol]))) #debugging
             mask = time_masks[timecol]
@@ -561,7 +562,12 @@ def cut_dataset(dataset_0, tspan=None, tspan_0=None, t_zero=None, verbose=True):
             mask = np.logical_and(tspan[0]<t, t<tspan[-1])
             time_masks[timecol] = mask
 #        print('about to cut!') # debugging
-        dataset[col] = dataset[col].copy()[mask]
+        try:
+            dataset[col] = dataset[col].copy()[mask]
+        except IndexError:
+            print('couldn\'t cut ' + col + ' because IndexError. removing it entirely.')
+            dataset[col] = []
+            dataset['data_cols'].remove(col)
     dataset['tspan'] = tspan
     timeshift(dataset, t_zero)
     if verbose:
@@ -634,7 +640,9 @@ def get_type(col):
         return 'cinfdata' #it's cinfdata but not from a mass channel
     if col is None:
         return None
-    return 'Xray' # to be refined later...
+    warnings.warn(col + ' is not recognized. Assuming type \'EC\'.\n ' +
+                      ' Consider adding to EC_cols_0 in EC.py if so.')
+    return 'EC' #'Xray' # to be refined later...
 
 def get_timecol(col=None, data_type=None, verbose=False):
     if data_type is None:

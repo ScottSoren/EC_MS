@@ -19,3 +19,57 @@ dynamic_viscosity	=	9.800000000000001e-06
 density_RTP	=	0.804
 D_gas_RTP	=	2.4200000000000002e-05
 primary: M18
+#the folowing rsf is calculated for M18 on 19B01
+rsf	=	1.04339893639
+#the following F_cal value is for M18, trusted on 19B01
+F_cal	=	6.43629720979
+#the following F_cal value is for M18, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	6.43629720979
+#the folowing rsf is calculated for M18 on 19B01
+rsf	=	1.04339893639
+#the following F_cal value is for M18, trusted on 19B01
+F_cal	=	6.43629720979
+#the following F_cal value is for M18, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	6.43629720979
+#the folowing rsf is calculated for M18 on 19B01
+rsf	=	1.04339893639
+#the following F_cal value is for M18, trusted on 19B01
+F_cal	=	6.43629720979
+#the following F_cal value is for M18, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	6.43629720979
+#the folowing rsf is calculated for M18 on 19B01
+rsf	=	1.04339893639
+#the following F_cal value is for M18, trusted on 19B01
+F_cal	=	6.43629720979
+#the following F_cal value is for M18, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	6.43629720979
+#the folowing rsf is calculated for M18 on 19B01
+rsf	=	1.04339893639
+#the following F_cal value is for M18, trusted on 19B01
+F_cal	=	6.43629720979
+#the following F_cal value is for M18, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	6.43629720979
+#the folowing rsf is calculated for M18 on 19B01
+rsf	=	1.04339893639
+#the following F_cal value is for M18, trusted on 19B01
+F_cal	=	6.43629720979
+#the following F_cal value is for M18, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	6.43629720979
+#the folowing rsf is calculated for M18 on 19B01
+rsf	=	1.04339893639
+#the following F_cal value is for M18, trusted on 19B01
+F_cal	=	3139.65717551
+#the following F_cal value is for M18, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	3139.65717551
+#the folowing rsf is calculated for M18 on 19B01
+rsf	=	1.04339893639
+#the following F_cal value is for M18, trusted on 19B01
+F_cal	=	10.4550583944
+#the following F_cal value is for M18, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	10.4550583944
+#the folowing rsf is calculated for M18 on 19B01
+rsf	=	1.04339893639
+#the following F_cal value is for M18, trusted on 19B01
+F_cal	=	3.13965717551
+#the following F_cal value is for M18, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	3.13965717551

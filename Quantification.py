@@ -181,7 +181,7 @@ def recalibrate(quantmol = {'H2':'M2', 'He':'M4', 'CH4':'M15', 'H2O':'M18',
     if calibrate == 'external' or calibrate == 'all':
         calmol.update(dict((mol, mdict[mol].primary) for mol in set(external.keys())))
 
-    print(calmol)
+    print('trusted calibrations at: ' + str(calmol))
     #trust = [mdict[mol] for mol in trust] #trust should be molecule objects, not strings. #FALSE
 
     F_cals.update(internal)
@@ -232,6 +232,7 @@ def recalibrate(quantmol = {'H2':'M2', 'He':'M4', 'CH4':'M15', 'H2O':'M18',
 
     RSF_dict = {}
     for (mol, m) in mdict.items():
+        print('\n\n --- working on ' + mol + ' ----')
         if mol in quantmol:
             mass = quantmol[mol]
         elif mol in calmol:
@@ -240,6 +241,7 @@ def recalibrate(quantmol = {'H2':'M2', 'He':'M4', 'CH4':'M15', 'H2O':'M18',
             print('if you include an F_cal in F_cals, make sure to also ' +
                   'include the molecule in quantmols, or it\'s ignored.')
             mass = m.primary
+        color=standard_colors[mass]
 
         rsf = m.get_RSF(RSF_source=RSF_source, transmission_function=T, mass=mass)
         if writeit:
@@ -265,14 +267,17 @@ def recalibrate(quantmol = {'H2':'M2', 'He':'M4', 'CH4':'M15', 'H2O':'M18',
                 print('No value of F_cal to trust for ' + mol + '!')
                 break #becomes blue.
             if mol in internal:
-                ax.plot(rsf, F_cal, 's', color=standard_colors[mass], markersize=10)
+                print('plotting ' + mol + ' as a color=' + color + ' square.')
+                ax.plot(rsf, F_cal, 's', color=color, markersize=10)
             else: #F_cals not given in internal are plotted as if they were external calibrations
+                print('plotting ' + mol + ' as a color=' + color + ' triangle.')
                 ax.plot(rsf, F_cal, '^', color=standard_colors[mass], markersize=10)
             if writeit:
                 m.write('#the following F_cal value is for ' + mass + ', trusted on ' + date_scott())
                 l = ('F_cal', F_cal)
                 m.write(l)
         else:
+            print('plotting ' + mol + ' as a color=' + color + ' dot.')
             F_cal = r * rsf  #the extrapolation!
             ax.plot(rsf, F_cal, '.', color=standard_colors[mass], markersize=10)
         if 'ca' in m.__dict__:

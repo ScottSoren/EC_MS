@@ -16,3 +16,57 @@ dynamic_viscosity	=	2.0700000000000002e-05
 density_RTP	=	1.429
 D_gas_RTP	=	7.23e-05
 primary: M32
+#the folowing rsf is calculated for M32 on 19B01
+rsf	=	0.881568715103
+#the following F_cal value is for M32, trusted on 19B01
+F_cal	=	4.71353361413
+#the following F_cal value is for M32, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	4.71353361413
+#the folowing rsf is calculated for M32 on 19B01
+rsf	=	0.881568715103
+#the following F_cal value is for M32, trusted on 19B01
+F_cal	=	4.71353361413
+#the following F_cal value is for M32, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	4.71353361413
+#the folowing rsf is calculated for M32 on 19B01
+rsf	=	0.881568715103
+#the following F_cal value is for M32, trusted on 19B01
+F_cal	=	4.71353361413
+#the following F_cal value is for M32, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	4.71353361413
+#the folowing rsf is calculated for M32 on 19B01
+rsf	=	0.881568715103
+#the following F_cal value is for M32, trusted on 19B01
+F_cal	=	4.71353361413
+#the following F_cal value is for M32, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	4.71353361413
+#the folowing rsf is calculated for M32 on 19B01
+rsf	=	0.881568715103
+#the following F_cal value is for M32, trusted on 19B01
+F_cal	=	4.71353361413
+#the following F_cal value is for M32, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	4.71353361413
+#the folowing rsf is calculated for M32 on 19B01
+rsf	=	0.881568715103
+#the following F_cal value is for M32, trusted on 19B01
+F_cal	=	4.71353361413
+#the following F_cal value is for M32, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	4.71353361413
+#the folowing rsf is calculated for M32 on 19B01
+rsf	=	0.881568715103
+#the following F_cal value is for M32, trusted on 19B01
+F_cal	=	4.71353361413
+#the following F_cal value is for M32, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	4.71353361413
+#the folowing rsf is calculated for M32 on 19B01
+rsf	=	0.881568715103
+#the following F_cal value is for M32, trusted on 19B01
+F_cal	=	4.71353361413
+#the following F_cal value is for M32, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	4.71353361413
+#the folowing rsf is calculated for M32 on 19B01
+rsf	=	0.881568715103
+#the following F_cal value is for M32, trusted on 19B01
+F_cal	=	4.71353361413
+#the following F_cal value is for M32, extrapolated from trusted values based on RSF from NIST on 19B01
+F_cal	=	4.71353361413
