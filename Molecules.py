@@ -14,6 +14,7 @@ from __future__ import print_function, division
 import os
 import numpy as np
 from matplotlib import pyplot as plt
+from numbers import Number
 
 if os.path.split(os.getcwd())[1] == 'EC_MS':
                                 #then we're running from inside the package
@@ -468,6 +469,11 @@ class Molecule:
         print('The set_temperature function is not implemented yet.')
         pass
 
+    def get_bg(self, *args, **kwargs):
+        x, y = self.get_flux(*args, **kwargs, removebackground=False)
+        background = np.mean(y)
+        self.background = background
+        return background
 
     def get_flux(self, MS_data, tspan='tspan', density=None,
                  unit='pmol/s', verbose=True, override=False, x=None,
@@ -519,9 +525,13 @@ class Molecule:
             y = y / MS_data['A_el']
 
 
+        if (background is None or background is 'preset') and hasattr(self, 'background'):
+            background = self.background
+        elif background == 'preset':
+            background = None
+
         if removebackground is None and background is not None:
             removebackground = True
-
 
         if removebackground:
             if background is None:
@@ -531,6 +541,7 @@ class Molecule:
             elif background in ['finish', 'end', 'last']:
                 background = np.mean(y[-endpoints:])
             elif background=='constant':
+                print('using minimum value as constant background for ' + self.name)
                 if type(removebackground) is float:
                     background = removebackground * min(y)
                 elif t_bg is not None:
@@ -541,13 +552,16 @@ class Molecule:
                         background = np.interp(t_bg, x, y)
                 else:
                     background = min(y)
-            elif type(background) is float:
-                #background = background
-                pass
             elif background=='linear':
                 x_end = [np.average(x[:endpoints]), np.average(x[-endpoints:])]
                 y_end = [np.average(y[:endpoints]), np.average(y[-endpoints:])]
                 background = np.interp(x, x_end, y_end)
+                print('using linear background for ' + self.name)
+            elif isinstance(background, Number):
+                #background = background
+                if verbose:
+                    print('using preset constant background for ' + self.name)
+                pass
 
             y = y - 0.99*background #so that we don't break the log scale.
             #I should get rid of this and assume the caller knows what they're doing.

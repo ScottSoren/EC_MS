@@ -226,12 +226,18 @@ def synchronize(data_objects, t_zero='start', append=None, file_number_type='EC'
 
     if t_zero == 'start':
         t_zero = t_start
+    elif t_zero == 'finish':
+        t_zero = t_finish
+
     elif t_zero == 'first':
         t_zero = t_first
     elif t_zero == 'last':
         t_zero = t_last
-    elif t_zero == 'finish':
-        t_zero = t_finish
+
+    elif t_zero == 'begin':
+        t_zero = t_begin
+    elif t_zero == 'end':
+        t_zero = t_end
 
     # some stuff is now ready to put into combined_data:
 
@@ -527,7 +533,15 @@ def timeshift(dataset, t_zero='start'):
     return dataset
 
 
-def cut_dataset(dataset_0, tspan=None, tspan_0=None, t_zero=None, verbose=True):
+def purge_column(dataset, col, purge=True, verbose=True):
+    if not purge:
+        return
+    print('removing ' + col + ' entirely.')
+    dataset.pop(col)
+    if col in dataset['data_cols']:
+        dataset['data_cols'].remove(col)
+
+def cut_dataset(dataset_0, tspan=None, tspan_0=None, t_zero=None, purge=True, verbose=True):
     '''
     Makes a time-cut of a dataset. Written 17H09.
     Unlike time_cut, does not ensure all MS data columns are the same length.
@@ -548,26 +562,29 @@ def cut_dataset(dataset_0, tspan=None, tspan_0=None, t_zero=None, verbose=True):
     time_masks = {} #I imagine storing indeces improves performance
     for col in dataset['data_cols']:
         timecol = get_timecol(col)
-        print(col + ', length = ' + str(len(dataset[col]))) # debugging
+        #print(col + ', length = ' + str(len(dataset[col]))) # debugging
+        #print(timecol + ', length = ' + str(len(dataset[timecol]))) #debugging
+
         if timecol in time_masks.keys():
             #print('already got indeces, len = ' + str(len(indeces[timecol]))) #debugging
             mask = time_masks[timecol]
         else:
-            #print(timecol + ', length = ' + str(len(dataset[timecol]))) #debugging
             try:
                 t = dataset[timecol]
             except KeyError:
                 print('can\'t cut ' + col + ' because dataset doesn\'t have timecol ' + timecol)
+                purge_column(dataset, col, purge=purge, verbose=verbose)
                 continue
             mask = np.logical_and(tspan[0]<t, t<tspan[-1])
             time_masks[timecol] = mask
 #        print('about to cut!') # debugging
         try:
+            #print('len(mask)=' + str(len(mask))) # debugging
             dataset[col] = dataset[col].copy()[mask]
         except IndexError:
-            print('couldn\'t cut ' + col + ' because IndexError. removing it entirely.')
-            dataset[col] = []
-            dataset['data_cols'].remove(col)
+            print('couldn\'t cut ' + col + ' because IndexError.')
+            purge_column(dataset, col, purge=purge, verbose=verbose)
+
     dataset['tspan'] = tspan
     timeshift(dataset, t_zero)
     if verbose:

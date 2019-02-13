@@ -25,7 +25,7 @@ from .Combining import cut_dataset, is_EC_data, get_timecol, is_time, get_type
 E_string_list = ['Ewe/V', '<Ewe>/V', '|Ewe|/V']
 V_string_default = 'U vs RHE / [V]'
 I_string_list = ['I/mA', '<I>/mA', '|EI|/mA']
-J_string_default = 'J / [mA/cm^2]'
+J_string_default = 'J / [mA cm$^{-2}$]'
 
 
 EC_cols_0 = ['mode', 'ox/red', 'error', 'control changes', 'time/s', 'control/V',
@@ -80,7 +80,7 @@ def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True,
 
     for col in EC_data['data_cols']:
         try:
-            if not get_type(col) in ['MS','cinfdata']:
+            if get_type(col) == 'EC':
                 #then we're dealing with EC data
                 try:
                     EC_data[col] = EC_data[col].copy()[mask]
@@ -96,7 +96,7 @@ def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True,
     if cutMS:
         time_masks = {}
         for col in EC_data['data_cols']:
-            if not is_EC_data(col): #then we've got a QMS or synchrotron variable
+            if not get_type(col) == 'EC': #then we've got a QMS or synchrotron variable
                 timecol = get_timecol(col)
                 print(col + '  ' + timecol) #debugging
                 if timecol in time_masks:

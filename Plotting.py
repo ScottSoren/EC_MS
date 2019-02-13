@@ -47,6 +47,12 @@ def align_zero(ax, ax_ref, xy='y'):
     ax.set_ylim(ylim)
     return ylim
 
+def smooth(y, n_points):
+    smoother = np.ones((n_points,))/n_points
+    y_smooth = np.convolve(y, smoother, mode='same')
+    return y_smooth
+
+
 def plot_vs_potential(CV_and_MS_0,
                       colors={'M2':'b','M4':'m','M18':'y','M28':'0.5','M32':'k'},
                       tspan=None, RE_vs_RHE=None, A_el=None, cycles='all',
@@ -55,7 +61,7 @@ def plot_vs_potential(CV_and_MS_0,
                       verbose=True, removebackground=None, background=None,
                       masses=None, masses_left=None, masses_right=None,
                       mols=None, mols_left=None, mols_right=None,
-                      unit=None,
+                      unit=None, smooth_points=0,
                       emphasis='MS',
                       J_str=None, V_str=None,
                       fig=None, spec={}, t_str=None):
@@ -150,7 +156,12 @@ def plot_vs_potential(CV_and_MS_0,
         ec_spec = spec.copy()
         if 'color' not in ec_spec.keys():
             ec_spec['color'] = 'k'
-        ax2.plot(V[mask],J[mask], **ec_spec)
+        #print('len(data[' + V_str + '] = ' + str(len(V))) # debugging
+        #print('len(data[' + J_str + '] = ' + str(len(J))) # debugging
+        #print('len(mask) = ' + str(len(mask))) # debugging
+
+        t_plot, V_plot, J_plot = t[mask], V[mask], J[mask]
+        ax2.plot(V_plot,J_plot, **ec_spec)
             #maybe I should use EC.plot_cycles to have different cycles be different colors. Or rewrite that code here.
         ax2.set_xlabel(V_str)
         ax2.set_ylabel(J_str)
@@ -257,15 +268,15 @@ def plot_vs_potential(CV_and_MS_0,
                     x, y = get_signal(CV_and_MS, mass=key, tspan=tspan, unit=unit)
 
                 try:
-                    Y = np.interp(t, x, y)  #obs! np.interp has a has a different argument order than Matlab's interp1
+                    y_plot = np.interp(t_plot, x, y)  #obs! np.interp has a has a different argument order than Matlab's interp1
                 except ValueError:
                     print('x ' + str(x) + '\ny ' + str(y) + '\nt ' + str(t))
-                CV_and_MS[Y_str] = Y    #add the interpolated value to the dictionary for future use
+                CV_and_MS[Y_str] = y_plot    #add the interpolated value to the dictionary for future use
                                             #17C01: but not outside of this function.
                 ms_spec = spec.copy()
                 if 'color' not in ms_spec.keys():
                     ms_spec['color'] = color
-                ax.plot(V[I_plot], Y[I_plot], label=Y_str, **ms_spec)
+                ax.plot(V_plot, y_plot, label=Y_str, **ms_spec)
             if quantified:
                 M_str = 'cal. signal / [' + unit + ']'
             else:
@@ -445,7 +456,7 @@ def plot_masses(*args, **kwargs):
 def plot_flux(MS_data, mols={'H2':'b', 'CH4':'r', 'C2H4':'g', 'O2':'k'},
             tspan='tspan_2', ax='new',
             removebackground=True, background='constant',
-            A_el=None, unit='nmol/s',
+            A_el=None, unit='nmol/s', smooth_points=0,
             logplot=True, leg=False,
             override=False, verbose=True):
     '''
@@ -481,6 +492,8 @@ def plot_flux(MS_data, mols={'H2':'b', 'CH4':'r', 'C2H4':'g', 'O2':'k'},
             [x,y] = get_flux(MS_data, mol, unit=unit, tspan=tspan,
                              removebackground=removebackground, background=background,
                              override=override, verbose=verbose)
+            if smooth_points:
+                y = smooth(y, smooth_points)
         except KeyError:
             print('Can\'t get signal for ' + str(mol))
             continue
@@ -520,7 +533,7 @@ def plot_experiment(EC_and_MS,
                     #mols will overide masses will overide colors
                     V_color='k', J_color='0.5', V_label=None, J_label=None,
                     t_str=None, J_str=None, V_str=None,
-                    fig=None, return_fig=False,
+                    fig=None, return_fig=False, smooth_points=0,
                     override=False,
                     ):
     '''
@@ -650,13 +663,13 @@ def plot_experiment(EC_and_MS,
         plot_flux(EC_and_MS, mols=mols, tspan=tspan, A_el=A_el,
                   ax=ax[0], leg=leg, logplot=logplot[0], unit=unit,
                   removebackground=removebackground_left, background=background,
-                  override=override, verbose=verbose)
+                  override=override, smooth_points=smooth_points, verbose=verbose)
         if mols_right is not None:
             ax += [ax[0].twinx()]
             plot_flux(EC_and_MS, mols=mols_right, tspan=tspan, A_el=A_el,
                       ax=ax[-1], leg=leg, logplot=logplot[0], unit=unit,
                       removebackground=removebackground_right, background=background,
-                      override=override, verbose=verbose)
+                      override=override, smooth_points=smooth_points, verbose=verbose)
 
     else:
         if unit is None:
