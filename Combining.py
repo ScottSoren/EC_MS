@@ -132,7 +132,7 @@ def synchronize(data_objects, t_zero='start', append=None, file_number_type='EC'
 
     hasdata = {}              #'combining number' of dataset with False if its empty or True if it has data
 
-    combined_data = {'data_type':'combined', 'data_cols':[]}
+    combined_data = {'data_type':'combined', 'data_cols':[], 'col_types':{}}
     title_combined = ''
 
     #go through once to generate the title and get the start and end times of the files and of the overlap
@@ -177,7 +177,7 @@ def synchronize(data_objects, t_zero='start', append=None, file_number_type='EC'
         hasdata[nd] = False
         for col in dataset['data_cols']:
             #print('col = ' + str(col)) # debugging
-            if is_time(col):
+            if is_time(col, dataset):
                 try:
                     t_s = min(t_s, t_0 + dataset[col][0])
                     # ^ earliest start of time data in dataset in epoch time
@@ -325,7 +325,7 @@ def synchronize(data_objects, t_zero='start', append=None, file_number_type='EC'
         if cutit:
             masks = {}     #will store a mask for each timecol to cut the corresponding cols with
             for col in dataset['data_cols']:
-                if is_time(col):
+                if is_time(col, dataset):
                     if verbose:
                         print('preparing mask to cut according to timecol ' + col)
                     t = dataset[col]
@@ -343,11 +343,11 @@ def synchronize(data_objects, t_zero='start', append=None, file_number_type='EC'
             #all the collumns line up. oldcollength and collength will help with that:
             oldcollength = {} # will store the existing length of each data col
             for col in combined_data['data_cols']:
-                if is_time(col):
+                if is_time(col, combined_data):
                     oldcollength[col] = len(combined_data[col])
             collength = {}  # will store the length to be appended to each data col
             for col in dataset['data_cols']:
-                if is_time(col):
+                if is_time(col, combined_data):
                     collength[col] = len(dataset[col])
                     if col not in oldcollength.keys():
                         oldcollength[col] = 0
@@ -369,11 +369,11 @@ def synchronize(data_objects, t_zero='start', append=None, file_number_type='EC'
             if cutit:           #cut data to only return where it overlaps
                 #print('cutting ' + col) # for debugging
                 try:
-                    data = data[masks[get_timecol(col)]]
+                    data = data[masks[get_timecol(col, data)]]
                 except KeyError:
                     print('')
             # processing: offsetting
-            if is_time(col):
+            if is_time(col, dataset):
                 data = data + offset
             # processing: for appended data
             if append:
@@ -386,7 +386,7 @@ def synchronize(data_objects, t_zero='start', append=None, file_number_type='EC'
                 # proccessing: ensure elignment with timecol for appended data
                 l1 = len(data) + len(olddata)
                 #print('col = ' + col) #debugging
-                timecol = get_timecol(col)
+                timecol = get_timecol(col, data)
                 #print('timecol = ' + str(timecol)) #debugging
                 try:
                     l0 = oldcollength[timecol] + collength[timecol]
@@ -414,6 +414,8 @@ def synchronize(data_objects, t_zero='start', append=None, file_number_type='EC'
             # And make sure it's in data_cols
             if col not in combined_data['data_cols']:
                 combined_data['data_cols'].append(col)
+            # And make sure the dataset knows what type it is:
+            combined_data['col_types'][col] = get_type(col, dataset)
 
 
         #keep the metadata from the original datasets
@@ -450,12 +452,12 @@ def synchronize(data_objects, t_zero='start', append=None, file_number_type='EC'
                 combined_data[col] = {nd: value}
 
     # ----- And now we're out of the loop! --------
-
-    # There's still a column length problem if the last dataset is missing
+    
+    # There's still a column length problem if the last dataset is missing    
     #columns! Fixing that here.
     for col in combined_data['data_cols']:
         l1 = len(combined_data[col])
-        timecol = get_timecol(col)
+        timecol = get_timecol(col, data)
         #print('about to cut ' + col + ' according to timecol ' + timecol) # debugging
         try:
             l0 = len(combined_data[timecol])
@@ -464,6 +466,7 @@ def synchronize(data_objects, t_zero='start', append=None, file_number_type='EC'
         if l0 > l1:
             filler = np.array([0] * (l0 - l1))
             combined_data[col] = np.append(combined_data[col], filler)
+
 
     # add 'file number' to data_cols
     if 'file number' in combined_data.keys() and 'file number' not in combined_data['data_cols']:
@@ -525,7 +528,7 @@ def timeshift(dataset, t_zero='start'):
     else:
         t0 = t_zero
     for col in dataset['data_cols']:
-        if is_time(col):
+        if is_time(col, dataset):
             #print(f'{col},\n{dataset[col]},\nt0 = {t0}') # debugging
             dataset[col] -= t0
     tspan = dataset['tspan']
@@ -561,7 +564,7 @@ def cut_dataset(dataset_0, tspan=None, tspan_0=None, t_zero=None, purge=True, ve
 
     time_masks = {} #I imagine storing indeces improves performance
     for col in dataset['data_cols']:
-        timecol = get_timecol(col)
+        timecol = get_timecol(col, dataset)
         #print(col + ', length = ' + str(len(dataset[col]))) # debugging
         #print(timecol + ', length = ' + str(len(dataset[timecol]))) #debugging
 
@@ -597,14 +600,76 @@ def offerquit():
     if yn == 'n':
         raise SystemExit
 
+def remove_nans(data):
+    masks = {}
+    # First loop will find all the nans
+    for col in data['data_cols']:
+        timecol = get_timecol(col, data)
+        x = data[col]
+        mask = np.logical_not(np.isnan(x))
+        if timecol in masks:
+            masks[timecol] = np.logical_and(masks[timecol], mask)
+        else:
+            masks[timecol] = mask
+    #Second loop will remove them, as well as corresponding data points from other cols with same timecol
+    for col in data['data_cols']:
+        timecol = get_timecol(col, data)
+        #print('len(data[' + col + ']) = ' + str(len(data[col]))) # debugging
+        #print('len(data[' + timecol + ']) = ' + str(len(data[timecol]))) # debugging
+        mask = masks[timecol]
+        data[col] = data[col][mask]
 
-def is_time(col, verbose=False):
+def rename_SI_cols(data, removenans=True):
+    '''
+    names columns of Spectro Inlets data like EC-Lab and PyExpLabSys+cinfdata name them.
+    
+    '''
+    for col_0 in data['data_cols']:
+        col = 'test'
+        if not get_type(col_0, data) == 'SI':
+            continue
+        if col_0[0:2] == 'C0':
+            try:    
+                mass = re.search(r'M[0-9]+', col_0).group()
+            except AttributeError:
+                print('Can\'t rename SI col ' + col_0)
+                continue
+            if 'Time' in col_0:
+                col = mass + '-x'
+            else:
+                col = mass + '-y'
+            col_type = 'MS'
+        elif 'potentiostat' in col_0:
+            for c0, c in [('Time', 'time/s'), ('Voltage','Ewe/V'), ('Current', 'I/mA'), 
+                          ('Cycle', 'cycle number')]:
+                if c0 in col_0:
+                    col = c
+                    #print('col = ' + col + ', col_0 = ' + col_0) # debugging
+                    break
+            else:
+                print('Can\'t rename SI col ' + col_0)
+                continue
+            col_type = 'EC'
+        else:
+            #print('Not renaming SI col ' + col_0)
+            continue
+        
+        data[col] = data[col_0]
+        data['col_types'][col] = col_type
+        data['data_cols'] += [col]
+        print(col_0 + ' copied to ' + col)
+    if removenans:
+        remove_nans(data)
+    data['data_type'] = 'combined' # since now it has data columns of various types
+
+
+def is_time(col, data=None, verbose=False):
     '''
     determines if a column header is a time variable, 1 for yes 0 for no
     '''
     if verbose:
         print('\nfunction \'is_time\' checking \'' + col + '\'!')
-    col_type = get_type(col)
+    col_type = get_type(col, data)
     if col_type == 'EC':
         if col[0:4]=='time':
             return True
@@ -617,11 +682,15 @@ def is_time(col, verbose=False):
         if col == 't':
             return True
         return False
+    elif col_type == 'SI': # spectro inlets
+        if col[-8] == 'Time [s]':
+            return True
+        return False
     #in case it the time marker is just burried in a number suffix:
     ending_object = re.search(r'_[0-9][0-9]*\Z',col)
     if ending_object:
         col = col[:ending_object.start()]
-        return is_time(col)
+        return is_time(col, data)
     print('can\'t tell if ' + col + ' is time. Returning False.')
     return False
 
@@ -648,7 +717,12 @@ def is_Xray_data(col):
         return False
     return True
 
-def get_type(col):
+def get_type(col, data=None):
+    if data is not None:
+        if 'col_types' in data and col in data['col_types']:
+            return data['col_types'][col]
+        elif 'data_type' in data and data['data_type'] in ['EC','MS','SI','SPEC']:
+            return data['data_type']
     if is_EC_data(col):
         return 'EC'
     if is_MS_data(col):
@@ -661,9 +735,9 @@ def get_type(col):
                       ' Consider adding to EC_cols_0 in EC.py if so.')
     return 'EC' #'Xray' # to be refined later...
 
-def get_timecol(col=None, data_type=None, verbose=False):
+def get_timecol(col=None, dataset=None, data_type=None, verbose=False):
     if data_type is None:
-        data_type = get_type(col)
+        data_type = get_type(col, dataset)
     if data_type == 'EC':
         timecol = 'time/s'
     elif data_type == 'MS':
@@ -671,10 +745,12 @@ def get_timecol(col=None, data_type=None, verbose=False):
             timecol = 'M4-x' # probably the least likely timecol to be missing from MS data
         else:
             timecol = col[:-2] + '-x'
-    elif data_type == 'Xray':
-        timecol = 't' # to be refined later...
+    elif data_type == 'SI':
+        timecol = col.split(' - ')[0] + ' - Time [s]'
     elif col[-2:] in ['-y', '-x']: # a timecol is its own timecol
         timecol = col[:-2] + '-x' #for any data downloaded from cinfdata
+    elif data_type == 'Xray':
+        timecol = 't' # to be refined later...
     else:
         print('couldn\'t get a timecol for ' + col +
               '. data_type=' + str(data_type))
@@ -738,8 +814,8 @@ def sort_time(dataset, data_type='EC', verbose=False, vverbose=False):
         if vverbose:
             print('working on ' + col)
         data = dataset[col] #do I need the copy?
-        if get_type(col) in data_type: #retuns 'EC' or 'MS', else I don't know what it is.
-            timecol = get_timecol(col, verbose=vverbose)
+        if get_type(col, dataset) in data_type: #retuns 'EC' or 'MS', else I don't know what it is.
+            timecol = get_timecol(col, dataset, verbose=vverbose)
             if timecol in sort_indeces.keys():
                 indeces = sort_indeces[timecol]
             else:

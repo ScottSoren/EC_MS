@@ -80,7 +80,7 @@ def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True,
 
     for col in EC_data['data_cols']:
         try:
-            if get_type(col) == 'EC':
+            if get_type(col, EC_data) == 'EC':
                 #then we're dealing with EC data
                 try:
                     EC_data[col] = EC_data[col].copy()[mask]
@@ -96,8 +96,8 @@ def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True,
     if cutMS:
         time_masks = {}
         for col in EC_data['data_cols']:
-            if not get_type(col) == 'EC': #then we've got a QMS or synchrotron variable
-                timecol = get_timecol(col)
+            if not get_type(col, EC_data) == 'EC': #then we've got a QMS or synchrotron variable
+                timecol = get_timecol(col, EC_data)
                 print(col + '  ' + timecol) #debugging
                 if timecol in time_masks:
                     mask = time_masks[timecol]
@@ -131,7 +131,7 @@ def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True,
                 print('aka, shifting by t_zero=' + str(t_zero))
 
         for col in EC_data['data_cols']:
-            if is_time(col):
+            if is_time(col, EC_data):
                 EC_data[col] = EC_data[col] - t_zero
 
         tspan = tspan - t_zero
@@ -366,7 +366,7 @@ def close_cycle(cycle_0):
     cycle = cycle_0.copy()
     for col in cycle['data_cols']:
         x = cycle[col]
-        if is_time(col):
+        if is_time(col, cycle_0):
             x = np.append(x,2 * x[-1] - x[-2]) #continue same t spacing
         else:
             x = np.append(x, x[0])
@@ -534,7 +534,7 @@ def sync_metadata(data, RE_vs_RHE=None, A_el=None,
         J_str = data['J_str']
     elif J_str in data:                     # then set it
         data['J_str'] = J_str
-    elif J_str is not None:                 # A brand new J_str demands calibration of variable 1
+    elif J_str is not None:                 # A brand new J_str demands calibration of variable 2
         cal2 = True
 
     # If we're calibrating variable 1 or still looking for a V_str, we need an E_str
@@ -602,6 +602,13 @@ def sync_metadata(data, RE_vs_RHE=None, A_el=None,
     for s in [E_str, I_str, V_str, J_str]:
         if s is not None and s not in data['data_cols']:
             data['data_cols'] += [s]
+    
+    # and make sure that the dataset knows what type they are:
+    if 'col_types' in data:
+        if E_str in data['col_types'] and not V_str in data['col_types']:
+            data['col_types'][V_str] = data['col_types'][E_str]
+        if I_str in data['col_types'] and not J_str in data['col_types']:
+            data['col_types'][J_str] = data['col_types'][I_str]
 
 
     # return the keys for the most useful data

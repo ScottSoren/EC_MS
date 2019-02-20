@@ -410,7 +410,7 @@ def import_text(full_path_name='current', verbose=True):
     return file_lines
 
 
-def text_to_data(file_lines, title='get_from_file',
+def text_to_data(file_lines, title=None,
                  timestamp=None, date='today', tstamp=None, tz=None,
                  data_type='EC', N_blank=10, sep=None,
                  header_string=None, verbose=True):
@@ -447,6 +447,8 @@ def text_to_data(file_lines, title='get_from_file',
     elif data_type == 'XAS':
         datacollines = False # column headers are on multiple lines, this will be True for those lines
         col_headers = []   #this is the most natural place to initiate the vector
+    elif data_type == 'SI':  # Spectro Inlets data
+        sep = '\t' # despite it being a .csv, the separator is a tab.
 
     if sep is None:  #EC, XAS, and MS data all work with '\t'
         sep = '\t'
@@ -457,7 +459,7 @@ def text_to_data(file_lines, title='get_from_file',
         if nl < N_head - 1:            #we're in the header
 
             if data_type == 'EC':
-                if title == 'get_from_file':
+                if title is None:
                     if re.search('File :',line):
                         title_object = re.search(r'[\S]*\Z',line.strip())
                         title = title_object.group()
@@ -523,7 +525,7 @@ def text_to_data(file_lines, title='get_from_file',
                         N_head = nl+2
                 else:
                     n_blank = 0
-                    if title == 'get_from_file':
+                    if title is None:
                         object1 = re.search(r'"Comment"[\s]*"[^"]*',line)
                         if object1:
                             string1 = object1.group()
@@ -543,13 +545,47 @@ def text_to_data(file_lines, title='get_from_file',
                         if verbose:
                             print('timestamp \'' + timestamp + '\' found in line ' + str(nl))
                 header_string = header_string + line
-
+                
+            elif data_type == 'SI': # Spectro Inlets data format
+                items = [item.strip() for item in line.split(sep) if len(item.strip())>0] 
+                if nl < 10:
+                    #print(items) # debugging
+                    pass
+                if len(items) == 0:
+                    continue
+                if title is None and items[0] == 'name':
+                    title = items[-1]
+                    if verbose:
+                        print('title \'' + str(title) + '\' found in line ' + str(nl)) 
+                if items[0] == 'offset':
+                    offset = float(items[-1])
+                    if verbose:
+                        print('SI offset \'' + str(offset) + '\' found in line ' + str(nl)) 
+                        dataset['SI offset'] = offset
+                if items[0] == 'data_start':
+                    N_head = int(items[-1])
+                    if verbose:
+                        print('N_head \'' + str(N_head) + '\' found in line ' + str(nl))
+                
+                if nl == N_head - 2:
+                    col_preheaders = [item.strip() for item in line.split(sep)]
+                    for i, preheader in enumerate(col_preheaders):
+                        if len(preheader) == 0:
+                            col_preheaders[i] = col_preheaders[i-1]
+            
         elif nl == N_head - 1:      #then it is the column-header line
                #(EC-lab includes the column-header line in header lines)
             #col_header_line = line
             col_headers = [col.strip() for col in l.split(sep=sep)]
+            if data_type == 'SI':
+                for i, col in enumerate(col_headers):
+                    col_headers[i] = col_preheaders[i] +' - ' + col
+
             dataset['N_col']=len(col_headers)
             dataset['data_cols'] = col_headers.copy()  #will store names of columns containing data
+            
+            dataset['col_types'] = dict([(col, data_type) for col in col_headers])
+            
             #DataDict['data_cols'] = col_headers.copy()
             for col in col_headers:
                 dataset[col] = []              #data will go here
@@ -565,9 +601,10 @@ def text_to_data(file_lines, title='get_from_file',
                 pass
             for col, data in zip(col_headers, line_data):
                 if col in dataset['data_cols']:  #why would it not?
-                    if get_timecol(col) not in col_headers:
-                        print('Missing time column ' + get_timecol(col) +
-                              ' on line ' + str(nl) + '. Dropping ' + col)
+                    if get_timecol(col, dataset) not in col_headers:
+                        #print('Missing time column ' + get_timecol(col) +
+                        #      ' on line ' + str(nl) + '. Dropping ' + col) # debugging
+                        pass
                     try:
                         data = float(data)
                     except ValueError:
@@ -784,7 +821,6 @@ def download_cinfdata_set(setup='sniffer', group_id=None, grouping_column=None, 
     combined = synchronize(timescans, t_zero='first')
 
     return combined
-
 
 def get_xy(data, xcol=None, ycol=None, label=None, ):
     '''
