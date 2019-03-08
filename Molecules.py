@@ -488,13 +488,13 @@ class Molecule:
         if verbose:
             print('calculating flux of ' + self.name)
 
-        if hasattr(self, 'F_mat'):
-            F_mat = self.F_mat
+        if hasattr(self, 'cal_mat'):
+            cal_mat = self.cal_mat
         else:
-            print('no F_mat! using self.primary and self.F_cal instead.')
+            print('no cal_mat! using self.primary and self.F_cal instead.')
             F_cal = self.F_cal
             mass = self.primary
-            F_mat = {mass:F_cal}
+            cal_mat = {mass:1/F_cal}
 
         if tspan is None:
             tspan = 'tspan'
@@ -511,17 +511,17 @@ class Molecule:
             # ^ approx 5 datapoints a second
 
         y = 0
-        for mass, F in F_mat.items():
+        for mass, C in cal_mat.items():
             x0 = MS_data[mass + '-x']
             s0 = MS_data[mass + '-y']
             s = np.interp(x, x0, s0)
-            y += s/F # units: [A]/[C/mol]=[mol/s]
+            y += s * C # units: [A] * [mol/C] = [mol/s]
 
         if 'nmol' in unit:
             y = y * 1e9
         elif 'pmol' in unit:
             y = y * 1e12
-        if 'cm^2' in unit:
+        if 'cm$^{-2}$' in unit or '/cm^2' in unit:
             y = y / MS_data['A_el']
 
 
