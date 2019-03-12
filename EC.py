@@ -104,6 +104,10 @@ def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True,
                 else:
                     try:
                         mask = np.logical_and(tspan[0] < EC_data[timecol], EC_data[timecol] < tspan[-1])
+                        # add an extra point on the left and right of interval for complete interpolation
+                        extra_left = np.append(mask[1:], False)
+                        extra_right = np.append(False, mask[:-1])
+                        mask = np.logical_or(extra_left, extra_right)
                         time_masks[timecol] = mask
                     except KeyError:
                         print('can\'t cut ' + col + ', don\'t have timecol ' + timecol + '. skipping.')
@@ -269,78 +273,103 @@ def clip_cycles(dataset, cycles=1, V_clip=0, redox=1, V_str=None, t_str='time/s'
     default returns the first full cycle in the dataset.
     if redox=1, cuts on the anodic sweep, if redox=0 on the cathodic sweep.
     '''
-    print(redox)
     if verbose:
         print('\n\nfunction \'clip_cycles\' at your service!\n')
 
+    #print(redox) # debugging
     if V_str is None:
         V_str, J_str = sync_metadata(dataset, verbose=False)
 
     if type(cycles) is int:  #my need to always do this kind of thing is
         cycles = [cycles]    #an annoying aspect of python.
 
-    t, V, ro = dataset[t_str].copy(), dataset[V_str].copy(), dataset[redox_str].copy()
-    #wouldn't want these to get fucked up
-    N = len(V)
+    t, V = dataset[t_str].copy(), dataset[V_str].copy()
+    #copying because I wouldn't want these to get fucked up in the original dataset
+
+    if redox_str is None or redox_str in ['manual', 'Manual']:
+        n_man = 5 # half number of points in interval to check whether V is increasing or decreasing
+        V_left = np.append(V[0] + np.linspace(V[0]-V[n_man], (V[0]-V[n_man])/n_man, n_man),
+                           V[:-n_man])
+        # ^ shift the vector n_man index points to the right, extrapolating leftwards
+        V_right = np.append(V[n_man:],
+                            V[-1] + np.linspace((V[-1]-V[-n_man])/n_man, V[-1]-V[-n_man], n_man))
+        # ^ shift the vector n_man index points to the left, extrapolating rightwards
+        ro = V_right > V_left
+        if False: # debugging
+            fig, ax = plt.subplots()
+            ax.plot(t, V_right, color='b')
+            ax.plot(t, V_left, color='r')
+            ax.twinx().plot(t, ro, color='k')
+    else:
+        ro = dataset[redox_str].copy()
 
     if redox: #I think this is more efficient than putting the if inside the
     #function, because it doesn't have to keep reevaluating truth value of redox
-        print('I_finish will be when redox==1.')
-        def condition(I):
-            return V[I] > V_clip and ro[I] == 1
+        if verbose:
+            print('t_finish will be when redox==1.')
+        submask = np.logical_and(V > V_clip, ro)
         #V[I+1] > V[I] doesn't always work.
     else:
-        print('I_finish will be when redox==0.')
-        def condition(I):
-            return V[I] < V_clip and ro[I] == 0
-    n = 0
+        if verbose:
+            print('t_finish will be when redox==0.')
+        submask = np.logical_and(V < V_clip, np.logical_not(ro))
+
+    submask_left = np.append(submask[1:], False)
+    submask_right = np.append(False, submask[:-1])
+    # mask is when a point and both its adjacent points have the condition satisfied
+    mask = np.logical_and(np.logical_and(submask_left, submask), submask_right)
+    # antimask is when a point and both its adjacent points have the condition not satisfied
+    antimask = np.logical_not(np.logical_or(np.logical_or(submask_left, submask), submask_right))
+
+    n = 0 # will be the cycle number
 
     I_start = np.argmax(t>t_i) #so that I get point 0 in the first cycle.
-    I_finish = I_start + 1
-    I_next = I_start + 1
     cyclesets = []
     endit = False
     while n < max(cycles) + 1:
-        print('I_start = ' + str(I_start))
-        print('t[I_start] = ' + str(t[I_start]))
-        print('V[I_start] = ' + str(V[I_start]))
+        t_start = t[I_start]
 
-        I_next = next(I for I in range(I_start+1, N) if not condition(I))
-        print('I_next = ' + str(I_next))
-        print('t[I_next] = ' + str(t[I_next]))
-        print('V[I_next] = ' + str(V[I_next]))
-        #Choose I_next to be on the subsequent scan, so that I don't just
-        #cut it into a lot of single points.
+        #Choose I_next to be on the subsequent scan (i.e. when redox changes or it passes V_clip)
+        #otherwise this function would just cut it into a lot of single points.
+        mask_next = np.logical_and(antimask, t>t_start)
+        I_next = np.argmax(mask_next)
+        t_next = t[I_next]
 
-        try:
-            I_finish = next(I for I in range(I_next, N) if condition(I))
-            print('I_finish = ' + str(I_finish))
-            print('t[I_finish] = ' + str(t[I_finish]))
-            print('V[I_finish] = ' + str(V[I_finish]))
-        except StopIteration:
-            print('StopIteration')
-            I_finish = N-1
+        #print('I_start = ' + str(I_start)) # debugging
+        #print('I_next = ' + str(I_next)) # debugging
+        if verbose:
+            print('t_start = ' + str(t_start) + ', V_start = ' + str(V[I_start]))
+            print('t_next = ' + str(t_next) + ', V_next = ' + str(V[I_next]))
+
+        mask_finish = np.logical_and(mask, t>t_next)
+        I_finish = np.argmax(mask_finish)
+        if I_finish == 0:
+            print('np.argmask(mask_finish)==0. Probably ends on an incomplete cycle.')
+            I_finish = len(V) - 1 #group the rest in one incomplete cycle
             endit = True
-        except IndexError:
-            print('IndexError')
-            endit = True
-            I_finish = N-1
-        tspan = [t[I_start], t[I_finish]]
+        #print('I_finish = ' + str(I_finish)) # debugging
+        t_finish = t[I_finish]
+        if verbose:
+            print('t_finish = ' + str(t_finish) + ', V_finish = ' + str(V[I_finish]))
+        tspan = [t_start, t_finish]
         if not tspan[1] > tspan[0]:
             print('warning! tspan = ' + str(tspan))
-        print('cutting dataset')
+        if verbose:
+            print('cutting dataset')
         c = cut_dataset(dataset, tspan)
         if closecycle:
             c = closecycle[c]
         cyclesets += [c]
-        print('got a cycle! len(cyclesets) = ' + str(len(cyclesets)) + '\n')
+        if verbose:
+            print('got a cycle! len(cyclesets) = ' + str(len(cyclesets)))
         if endit:
-            print('but also hit a problem. We\'re done here.')
+            if verbose:
+                print('but also hit a problem. We\'re done here.')
             break
         I_start = I_finish
         n += 1
-        print('\n\n')
-
+        if verbose:
+            print('\n\n')
 
     if len(cycles) == 1:
         try:
@@ -352,11 +381,12 @@ def clip_cycles(dataset, cycles=1, V_clip=0, redox=1, V_str=None, t_str='time/s'
     if verbose:
         print('\nfunction \'clip_cycles\' finished!\n\n')
 
-
     try:
         return [cyclesets[i] for i in cycles] #Whoa.
     except:
+        print('WARNING: didn\'t have the cycle you asked for, so \'clip_cycles\' returned all cycles.')
         return cyclesets
+
 
 def close_cycle(cycle_0):
     '''
@@ -602,7 +632,7 @@ def sync_metadata(data, RE_vs_RHE=None, A_el=None,
     for s in [E_str, I_str, V_str, J_str]:
         if s is not None and s not in data['data_cols']:
             data['data_cols'] += [s]
-    
+
     # and make sure that the dataset knows what type they are:
     if 'col_types' in data:
         if E_str in data['col_types'] and not V_str in data['col_types']:

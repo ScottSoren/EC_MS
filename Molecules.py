@@ -26,6 +26,11 @@ else:
     from .Object_Files import structure_to_lines, lines_to_dictionary
     from .Object_Files import lines_to_structure, date_scott, update_lines
 
+
+preferencedir = os.path.dirname(os.path.realpath(__file__)) + os.sep + 'preferences'
+with open(preferencedir + os.sep + 'standard_colors.txt','r') as f:
+    lines = f.readlines()
+    standard_colors = lines_to_dictionary(lines, removecomments=False)['standard colors']
 data_directory = os.path.dirname(os.path.realpath(__file__)) + os.sep + 'data' + os.sep + 'molecules'
 cwd = os.getcwd()
 #for python2:
@@ -475,6 +480,9 @@ class Molecule:
         self.background = background
         return background
 
+    def get_color(self):
+        return standard_colors[self.primary]
+
     def get_flux(self, MS_data, tspan='tspan', density=None,
                  unit='pmol/s', verbose=True, override=False, x=None,
                  removebackground=None, background=None, t_bg=None,
@@ -505,6 +513,10 @@ class Molecule:
             if density is None:
                 x = MS_data[self.primary + '-x']
                 mask = np.logical_and(tspan[0]<x, x<tspan[-1])
+                # Don't cut off outer endpoints before evt interpolation (if used by plot_vs_potential)
+                extra_left = np.append(mask[1:], False)
+                extra_right = np.append(False, mask[:-1])
+                mask = np.logical_or(extra_left, extra_right)
                 x = x[mask]
             else:
                 x = np.linspace(tspan[0], tspan[-1], density*np.floor(tspan[-1] - tspan[0]))
@@ -552,6 +564,8 @@ class Molecule:
                         background = np.interp(t_bg, x, y)
                 else:
                     background = min(y)
+                if not hasattr(self, 'background') or self.background is None:
+                    self.background = background
             elif background=='linear':
                 x_end = [np.average(x[:endpoints]), np.average(x[-endpoints:])]
                 y_end = [np.average(y[:endpoints]), np.average(y[-endpoints:])]
@@ -562,7 +576,6 @@ class Molecule:
                 if verbose:
                     print('using preset constant background for ' + self.name)
                 pass
-
             y = y - 0.99*background #so that we don't break the log scale.
             #I should get rid of this and assume the caller knows what they're doing.
         return x, y

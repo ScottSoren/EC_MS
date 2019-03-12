@@ -452,8 +452,8 @@ def synchronize(data_objects, t_zero='start', append=None, file_number_type='EC'
                 combined_data[col] = {nd: value}
 
     # ----- And now we're out of the loop! --------
-    
-    # There's still a column length problem if the last dataset is missing    
+
+    # There's still a column length problem if the last dataset is missing
     #columns! Fixing that here.
     for col in combined_data['data_cols']:
         l1 = len(combined_data[col])
@@ -579,6 +579,10 @@ def cut_dataset(dataset_0, tspan=None, tspan_0=None, t_zero=None, purge=True, ve
                 purge_column(dataset, col, purge=purge, verbose=verbose)
                 continue
             mask = np.logical_and(tspan[0]<t, t<tspan[-1])
+            # Don't cut off outer endpoints before evt interpolation (if used by plot_vs_potential)
+            extra_left = np.append(mask[1:], False)
+            extra_right = np.append(False, mask[:-1])
+            mask = np.logical_or(extra_left, extra_right)
             time_masks[timecol] = mask
 #        print('about to cut!') # debugging
         try:
@@ -622,14 +626,14 @@ def remove_nans(data):
 def rename_SI_cols(data, removenans=True):
     '''
     names columns of Spectro Inlets data like EC-Lab and PyExpLabSys+cinfdata name them.
-    
+
     '''
     for col_0 in data['data_cols']:
         col = 'test'
         if not get_type(col_0, data) == 'SI':
             continue
         if col_0[0:2] == 'C0':
-            try:    
+            try:
                 mass = re.search(r'M[0-9]+', col_0).group()
             except AttributeError:
                 print('Can\'t rename SI col ' + col_0)
@@ -640,7 +644,7 @@ def rename_SI_cols(data, removenans=True):
                 col = mass + '-y'
             col_type = 'MS'
         elif 'potentiostat' in col_0:
-            for c0, c in [('Time', 'time/s'), ('Voltage','Ewe/V'), ('Current', 'I/mA'), 
+            for c0, c in [('Time', 'time/s'), ('Voltage','Ewe/V'), ('Current', 'I/mA'),
                           ('Cycle', 'cycle number')]:
                 if c0 in col_0:
                     col = c
@@ -653,7 +657,7 @@ def rename_SI_cols(data, removenans=True):
         else:
             #print('Not renaming SI col ' + col_0)
             continue
-        
+
         data[col] = data[col_0]
         data['col_types'][col] = col_type
         data['data_cols'] += [col]
