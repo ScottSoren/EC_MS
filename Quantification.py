@@ -349,7 +349,7 @@ def line_through_zero(x,y):
     return a
 
 
-def get_signal(MS_data, mass, tspan='tspan',
+def get_signal(MS_data, mass, tspan=None,
              removebackground=None, background=None, t_bg=None,
              endpoints=5, fillcolor=None,
              unit='A', verbose=True, override=False,
@@ -377,7 +377,11 @@ def get_signal(MS_data, mass, tspan='tspan',
     if tspan is None:
         tspan = 'tspan'
     if type(tspan) is str and not tspan=='all':
-        tspan = MS_data[tspan]
+        try:
+            tspan = MS_data[tspan]
+        except KeyError:
+            print('WARNING: no tspan available to get_signal()! using tspan=\'all\'')
+            tspan = 'all'
     if not tspan == 'all':
         x, y = cut(x,y,tspan, override=override)
 

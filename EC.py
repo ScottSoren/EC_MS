@@ -19,7 +19,7 @@ import numpy as np
 #import os
 
 from .Data_Importing import epoch_time_to_timestamp
-from .Combining import cut_dataset, is_EC_data, get_timecol, is_time, get_type
+from .Combining import cut_dataset, get_timecol, is_time, get_type
 
 
 E_string_list = ['Ewe/V', '<Ewe>/V', '|Ewe|/V']
@@ -126,7 +126,7 @@ def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True,
                 #regardless of the selected cycles
                 if type(n) is not int:
                     raise NameError
-                t_zero = next(EC_data['time/s'][i] for i,c in enumerate(EC_data[cycle_str]) if c==n)
+                t_zero = next(EC_data['time/s'][i] for i,c in enumerate(EC_pdata[cycle_str]) if c==n)
 
             except NameError:
                 #this should be the case if t_zero=='start'
@@ -265,6 +265,29 @@ def CV_difference(cycles_data, redox=1, Vspan=[0.5, 1.0],
     return dQ, [t, V, J_diff]
 
 
+def get_ro(data, n_man=5, V_str=None, ro_str=None):
+    if V_str is None:
+        V_str, J_str = sync_metadata(data, verbose=False)
+    V = data[V_str]
+    V_left = np.append(V[0] + np.linspace(V[0]-V[n_man], (V[0]-V[n_man])/n_man, n_man),
+                       V[:-n_man])
+    # ^ shift the vector n_man index points to the right, extrapolating leftwards
+    V_right = np.append(V[n_man:],
+                        V[-1] + np.linspace((V[-1]-V[-n_man])/n_man, V[-1]-V[-n_man], n_man))
+    # ^ shift the vector n_man index points to the left, extrapolating rightwards
+    ro = V_right > V_left
+    if ro_str is None and not 'ro' in data:
+        ro_str = 'ro'
+    if not ro_str is None:
+        data[ro_str] = ro
+    if False: # debugging
+        t = data['time/s']
+        fig, ax = plt.subplots()
+        ax.plot(t, V_right, color='b')
+        ax.plot(t, V_left, color='r')
+        ax.twinx().plot(t, ro, color='k')
+    return ro
+
 def clip_cycles(dataset, cycles=1, V_clip=0, redox=1, V_str=None, t_str='time/s',
                 t_i=0, redox_str='ox/red', verbose=True, closecycle=False):
     '''
@@ -287,19 +310,7 @@ def clip_cycles(dataset, cycles=1, V_clip=0, redox=1, V_str=None, t_str='time/s'
     #copying because I wouldn't want these to get fucked up in the original dataset
 
     if redox_str is None or redox_str in ['manual', 'Manual']:
-        n_man = 5 # half number of points in interval to check whether V is increasing or decreasing
-        V_left = np.append(V[0] + np.linspace(V[0]-V[n_man], (V[0]-V[n_man])/n_man, n_man),
-                           V[:-n_man])
-        # ^ shift the vector n_man index points to the right, extrapolating leftwards
-        V_right = np.append(V[n_man:],
-                            V[-1] + np.linspace((V[-1]-V[-n_man])/n_man, V[-1]-V[-n_man], n_man))
-        # ^ shift the vector n_man index points to the left, extrapolating rightwards
-        ro = V_right > V_left
-        if False: # debugging
-            fig, ax = plt.subplots()
-            ax.plot(t, V_right, color='b')
-            ax.plot(t, V_left, color='r')
-            ax.twinx().plot(t, ro, color='k')
+        ro = get_ro(dataset, V_str=V_str)
     else:
         ro = dataset[redox_str].copy()
 
@@ -572,7 +583,7 @@ def sync_metadata(data, RE_vs_RHE=None, A_el=None,
         try:   # see if a possible E_str (listed at the top of the module) is represented in the data
             E_str = next(s for s in E_string_list if s in data['data_cols'])
         except StopIteration:
-            print('sync metadata can\'t find any value for E_str!')
+            print('WARNING: sync metadata can\'t find any value for E_str!')
             print('if you needed to calibrate variable 1, that won\'t happen now.')
             cal1 = False
 
@@ -581,7 +592,7 @@ def sync_metadata(data, RE_vs_RHE=None, A_el=None,
         try:   # see if a possible I_str (listed at the top of the module) is represented in the data
             I_str = next(s for s in I_string_list if s in data['data_cols'])
         except StopIteration:
-            print('sync metadata can\'t find any value for I_str!')
+            print('WANRING: sync metadata can\'t find any value for I_str!')
             print('if you needed to calibrate variable 2, that won\'t happen now.')
             cal2 = False
 
@@ -910,6 +921,34 @@ def get_scan_rate(data, Vspan=[0.3, 0.6], V_str=None, J_str=None, t_i=0):
     scan_rate = (V[I_finish_an] - V[I_start_an])/(t[I_finish_an] - t[I_start_an])*1e3 # mV/s
 
     return scan_rate
+
+
+def time_from_scanrate(data, v_scan, t_str='time/s', t_i=0, V_str=None):
+    '''
+    V_scan is in mV/s, data[V_str] is in V, creates time in s
+    '''
+    if V_str is None:
+        V_str, J_str = sync_metadata(data, verbose=False)
+    V = data[V_str]
+    ro = get_ro(data, V_str=V_str)
+    ro_changes = np.append(np.logical_xor(ro[1:], ro[:-1]), True)
+    # ^ so ro_changes is same length as ro, and ends on True
+    V_turn = V[ro_changes]
+    V_traveled = 0
+    v_i = V[0]
+    for v in V_turn:
+        V_traveled += np.abs(v - v_i)
+        v_i = v
+        print('v = ' + str(v) + ', V_traveled = ' + str(V_traveled)) # debugging
+    dt = V_traveled/(v_scan*1e-3)
+    print('dt = ' + str(dt)) # debugging
+    t = np.linspace(t_i, t_i + dt, len(V))
+    data[t_str] = t
+    if t_str not in data['data_cols']:
+        data['data_cols'] += [t_str]
+    return t
+
+
 
 def get_capacitance(data, V_DL=[0.3, 0.6], V_str=None, J_str=None, t_i=0):
     '''

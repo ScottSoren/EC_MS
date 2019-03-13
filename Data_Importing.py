@@ -14,10 +14,10 @@ float_match = '[-]?\d+[\.]?\d*(e[-]?\d+)?'     #matches floats like '-3.54e4' or
 timestamp_match = '([0-9]{2}:){2}[0-9]{2}'     #matches timestamps like '14:23:01'
 date_match = '([0-9]{2}[/-]){2}[0-9]{4}'          #matches dates like '01/15/2018' or '09-07-2016'
 #^  mm/dd/yyyy, as EC lab does
-date_match_2 = '[0-9]{4}([/-][0-9]{2}){2}'          #matches dates like '01/15/2018' or '09-07-2016'
-#^  yyyy/mm/dd, as cinfdata does
 # older EC-Lab seems to have dashes in date, and newer has slashes.
 # Both seem to save month before day, regardless of where the data was taken or .mpt exported.
+date_match_2 = '[0-9]{4}([/-][0-9]{2}){2}'          #matches dates like '01/15/2018' or '09-07-2016'
+#^  yyyy/mm/dd, as cinfdata does
 
 
 def numerize(data):
@@ -412,18 +412,22 @@ def import_text(full_path_name='current', verbose=True):
 
 def text_to_data(file_lines, title=None,
                  timestamp=None, date='today', tstamp=None, tz=None,
-                 data_type='EC', N_blank=10, sep=None,
+                 data_type='EC', sep=None,
                  header_string=None, verbose=True):
     '''
     This method will organize data in the lines of text from a file useful for
     electropy into a dictionary as follows (plus a few more keys)
     {'title':title, 'header':header, 'timestamp':timestamp,
      'data_cols':[colheader1, colheader2, ...],
-     colheader1:[data1], colheader2:[data2]...}
-     So far made to work with SPEC files (.csv), XAS files (.dat),
-     EC_Lab files (.mpt).
-     If you need to import cinfdata files (.txt), you are in the wrong place.
-     This is EC_Xray's import_data, not EC_MS!!!
+     colheader1:data1, colheader2:data2, ...}
+
+    Supported data types:
+        'EC': text output (.mpt) from Biologic for any voltammetric technique
+        'MS': text output from cinfdata for mass_time_scan, run by PyExpLabSys
+        'SPEC': .csv file saved by SPEC diffraction program at SSRL BL2.1
+        'XAS': text saved by XAS program at SSRL BL11.2
+        'SI': text ouptut (.csv) from Zilien, Kenneth's software for Spectro Inlets
+        'RGA': text output from Residual Gas Analysis program for mass spec
     '''
     if verbose:
         print('\n\nfunction \'text_to_data\' at your service!\n')
@@ -449,6 +453,15 @@ def text_to_data(file_lines, title=None,
         col_headers = []   #this is the most natural place to initiate the vector
     elif data_type == 'SI':  # Spectro Inlets data
         sep = '\t' # despite it being a .csv, the separator is a tab.
+    elif data_type == 'RGA':
+        sep = ','
+        N_blank = 2
+        dataset['channels'] = {}
+    elif data_type == 'CHI': # CH Instruments potentiostat
+        N_blank = 2
+        sep = ','
+    elif data_type == 'MS':
+        N_blank = 10
 
     if sep is None:  #EC, XAS, and MS data all work with '\t'
         sep = '\t'
@@ -487,8 +500,6 @@ def text_to_data(file_lines, title=None,
                     N = finish - start + 1
                     dataset['loop number'] += N * [n]
 
-                header_string = header_string + line
-
 
             elif data_type == 'XAS':
                 if datacollines:
@@ -516,38 +527,37 @@ def text_to_data(file_lines, title=None,
                     tstamp = timestamp_to_epoch_time(l, tz=tz, verbose=verbose) #the XAS data is saved with time.ctime()
                     if verbose:
                         print('timestamp \'' + timestamp + '\' found in line ' + str(nl))
-                header_string = header_string + line
 
             elif data_type == 'MS':
                 if len(line.strip())==0:
                     n_blank += 1
-                    if n_blank>N_blank and len(file_lines[nl+1].strip())>0:
+                    if n_blank >= N_blank and len(file_lines[nl+1].strip())>0:
                         N_head = nl+2
+                    continue
                 else:
                     n_blank = 0
-                    if title is None:
-                        object1 = re.search(r'"Comment"[\s]*"[^"]*',line)
-                        if object1:
-                            string1 = object1.group()
-                            title_object = re.search(r'[\S]*\Z',string1.strip())
-                            title = title_object.group()[1:]
-                            if verbose:
-                                print('name \'' + title + '\' found in line ' + str(nl))
-                    object2 = re.search(r'"Recorded at"[\s]*"[^"]*',line)
-                    if object2:
-                        string2 = object2.group()
-                        timestamp_object = re.search(timestamp_match, string2.strip())
-                        timestamp = timestamp_object.group()
-                        date_object = re.search(date_match_2, string2.strip())
-                        date = date_object.group()
-                        date = date[5:7] + '/' + date[-2:] + '/' + date[:4]
-                        # ^convert yyyy-mm-dd to dd-mm-yyyy
+                if title is None:
+                    object1 = re.search(r'"Comment"[\s]*"[^"]*',line)
+                    if object1:
+                        string1 = object1.group()
+                        title_object = re.search(r'[\S]*\Z',string1.strip())
+                        title = title_object.group()[1:]
                         if verbose:
-                            print('timestamp \'' + timestamp + '\' found in line ' + str(nl))
-                header_string = header_string + line
-                
+                            print('name \'' + title + '\' found in line ' + str(nl))
+                object2 = re.search(r'"Recorded at"[\s]*"[^"]*',line)
+                if object2:
+                    string2 = object2.group()
+                    timestamp_object = re.search(timestamp_match, string2.strip())
+                    timestamp = timestamp_object.group()
+                    date_object = re.search(date_match_2, string2.strip())
+                    date = date_object.group()
+                    date = date[5:7] + '/' + date[-2:] + '/' + date[:4]
+                    # ^convert yyyy-mm-dd to dd-mm-yyyy
+                    if verbose:
+                        print('timestamp \'' + timestamp + '\' found in line ' + str(nl))
+
             elif data_type == 'SI': # Spectro Inlets data format
-                items = [item.strip() for item in line.split(sep) if len(item.strip())>0] 
+                items = [item.strip() for item in line.split(sep) if len(item.strip())>0]
                 if nl < 10:
                     #print(items) # debugging
                     pass
@@ -556,36 +566,79 @@ def text_to_data(file_lines, title=None,
                 if title is None and items[0] == 'name':
                     title = items[-1]
                     if verbose:
-                        print('title \'' + str(title) + '\' found in line ' + str(nl)) 
+                        print('title \'' + str(title) + '\' found in line ' + str(nl))
                 if items[0] == 'offset':
                     offset = float(items[-1])
                     if verbose:
-                        print('SI offset \'' + str(offset) + '\' found in line ' + str(nl)) 
+                        print('SI offset \'' + str(offset) + '\' found in line ' + str(nl))
                         dataset['SI offset'] = offset
                 if items[0] == 'data_start':
                     N_head = int(items[-1])
                     if verbose:
                         print('N_head \'' + str(N_head) + '\' found in line ' + str(nl))
-                
                 if nl == N_head - 2:
                     col_preheaders = [item.strip() for item in line.split(sep)]
                     for i, preheader in enumerate(col_preheaders):
                         if len(preheader) == 0:
                             col_preheaders[i] = col_preheaders[i-1]
-            
+
+            elif data_type == 'RGA':
+                if len(line.strip())==0:
+                    n_blank += 1
+                    if n_blank >= N_blank and len(file_lines[nl+1].strip())>0:
+                        N_head = nl+2
+                    continue
+                else:
+                    n_blank = 0
+                if re.search('Start time', line):
+                    timestamp_object = re.search(timestamp_match,l)
+                    timestamp = timestamp_object.group()
+                    if 'PM' in line: # convert it to 24-hour timestamp
+                        timestamp = str(int(timestamp[0:2]) + 12) + timestamp[2:]
+                if re.search(r'\A[0-9]+\s', l): # lines starting with a number
+                    items = [item.strip() for item in line.split(' ') if len(item.strip())>0]
+                    channel = 'Channel#' + items[0]
+                    mass = 'M' + items[1].split('.')[0]
+                    dataset['channels'][channel] = mass
+
+            elif data_type == 'CHI':
+                if len(line.strip())==0:
+                    n_blank += 1
+                    if n_blank >= N_blank and len(file_lines[nl+1].strip())>0:
+                        N_head = nl+2
+                    continue
+                else:
+                    n_blank = 0
+                if nl == 0:
+                    timestamp_object = re.search(timestamp_match,l)
+                    timestamp = timestamp_object.group()
+                    if 'PM' in line: # convert it to 24-hour timestamp
+                        timestamp = str(int(timestamp[0:2]) + 12) + timestamp[2:]
+                if 'Segment = ' in line:
+                    dataset['segments'] = line.split(' = ')[-1].strip()
+                    last_segment_line = 'Segment ' + dataset['segments'] + ':'
+                if 'segments' in dataset and last_segment_line in line:
+                    N_blank = 1
+            header_string = header_string + line
+
+
+
         elif nl == N_head - 1:      #then it is the column-header line
                #(EC-lab includes the column-header line in header lines)
             #col_header_line = line
             col_headers = [col.strip() for col in l.split(sep=sep)]
+            if data_type == 'RGA': # there's no damn commas on the column header lines!
+                col_headers = [col.strip() for col in l.split(' ') if len(col.strip())>0]
+
             if data_type == 'SI':
                 for i, col in enumerate(col_headers):
                     col_headers[i] = col_preheaders[i] +' - ' + col
 
             dataset['N_col']=len(col_headers)
             dataset['data_cols'] = col_headers.copy()  #will store names of columns containing data
-            
+
             dataset['col_types'] = dict([(col, data_type) for col in col_headers])
-            
+
             #DataDict['data_cols'] = col_headers.copy()
             for col in col_headers:
                 dataset[col] = []              #data will go here
@@ -593,6 +646,9 @@ def text_to_data(file_lines, title=None,
             if verbose:
                 print('Data starting on line ' + str(N_head) + '\n')
 
+        elif nl == N_head and data_type in ['RGA', 'CHI']:
+            # rga and chi text files skip a line after the column header
+            continue
 
         else:                   # data, baby!
             line_data = [dat.strip() for dat in l.split(sep=sep)]
@@ -601,10 +657,9 @@ def text_to_data(file_lines, title=None,
                 pass
             for col, data in zip(col_headers, line_data):
                 if col in dataset['data_cols']:  #why would it not?
-                    if get_timecol(col, dataset) not in col_headers:
+                    #if get_timecol(col, dataset) not in col_headers:
                         #print('Missing time column ' + get_timecol(col) +
                         #      ' on line ' + str(nl) + '. Dropping ' + col) # debugging
-                        pass
                     try:
                         data = float(data)
                     except ValueError:
@@ -664,7 +719,7 @@ def import_data(*args, **kwargs):
     return load_from_file(*args, **kwargs)
 
 def load_from_file(full_path_name='current', title='file', tstamp=None, timestamp=None,
-                 data_type='EC', N_blank=10, tz=None, verbose=True):
+                 data_type='EC', tz=None, verbose=True):
     '''
     This method will organize the data in a file useful for
     electropy into a dictionary as follows (plus a few more keys)
@@ -682,7 +737,7 @@ def load_from_file(full_path_name='current', title='file', tstamp=None, timestam
         folder, title = os.path.split(full_path_name)
     file_lines = import_text(full_path_name, verbose)
     dataset = text_to_data(file_lines=file_lines, title=title, data_type=data_type,
-                           timestamp=timestamp, N_blank=N_blank, tz=tz, tstamp=tstamp,
+                           timestamp=timestamp, tz=tz, tstamp=tstamp,
                            verbose=verbose)
     if tstamp is not None: #then it overrides whatever test_to_data came up with.
         dataset['tstamp'] = tstamp
@@ -904,6 +959,7 @@ def import_set(directory, MS_file='QMS.txt', MS_data=None, t_zero='start',
     if verbose:
          print('\nfunction import_set finished!\n\n')
     return data
+
 
 def save_as_text(filename, dataset, cols=[], mols=[], tspan='all', header=None,
                  N_chars=None, timecols={}, **kwargs):

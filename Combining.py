@@ -531,8 +531,11 @@ def timeshift(dataset, t_zero='start'):
         if is_time(col, dataset):
             #print(f'{col},\n{dataset[col]},\nt0 = {t0}') # debugging
             dataset[col] -= t0
-    tspan = dataset['tspan']
-    dataset['tspan'] = [tspan[0]-t0, tspan[-1]-t0]
+    try:
+        tspan = dataset['tspan']
+        dataset['tspan'] = [tspan[0]-t0, tspan[-1]-t0]
+    except KeyError:
+        print('no tspan for timeshift to shift')
     return dataset
 
 
@@ -666,6 +669,42 @@ def rename_SI_cols(data, removenans=True):
         remove_nans(data)
     data['data_type'] = 'combined' # since now it has data columns of various types
 
+def rename_RGA_cols(data):
+    '''
+    names columns of RGA data like they would be from PyExpLabSys+cinfdata
+    '''
+    channels = data['channels']
+    for channel, mass in channels.items():
+        data[mass + '-x'] = data['Time(s)']
+        data[mass + '-y'] = data[channel]
+        data['col_types'][mass + '-x'] = 'MS'
+        data['col_types'][mass + '-y'] = 'MS'
+        data['data_cols'] += [mass + '-x', mass + '-y']
+        print(channel + ' copied to ' + mass)
+
+def rename_CHI_cols(data):
+    '''
+    names columns of RGA data like they would be from PyExpLabSys+cinfdata
+    '''
+    for col_0 in data['data_cols']:
+        print(col_0) # debugging
+        for c0, c in [('Time/s', 'time/s'), ('Potential/V','Ewe/V'), ('Current/A', 'I/A'),
+                      ('Charge/C', '(Q-Qo)/C')]:
+            if c0 in col_0:
+                col = c
+                print('col = ' + col + ', col_0 = ' + col_0) # debugging
+                break
+        else:
+            continue
+        data[col] = data[col_0]
+        data['col_types'][col] = 'EC'
+        data['data_cols'] += [col]
+        print(col_0 + ' copied to ' + col)
+    if 'I/A' in data and 'I/mA' not in data:
+        data['I/mA'] = data['I/A'] * 1e3
+        data['col_types']['I/mA'] = 'EC'
+        data['data_cols'] += ['I/mA']
+
 
 def is_time(col, data=None, verbose=False):
     '''
@@ -746,15 +785,19 @@ def get_timecol(col=None, dataset=None, data_type=None, verbose=False):
         timecol = 'time/s'
     elif data_type == 'MS':
         if col is None:
-            timecol = 'M4-x' # probably the least likely timecol to be missing from MS data
+            timecol = 'M32-x' # probably the least likely timecol to be missing from MS data
         else:
             timecol = col[:-2] + '-x'
     elif data_type == 'SI':
         timecol = col.split(' - ')[0] + ' - Time [s]'
     elif col[-2:] in ['-y', '-x']: # a timecol is its own timecol
         timecol = col[:-2] + '-x' #for any data downloaded from cinfdata
+    elif data_type == 'RGA':
+        timecol = 'Time(s)'
     elif data_type == 'Xray':
         timecol = 't' # to be refined later...
+    elif data_type == 'CHI':
+        timecol = 'Time/s'
     else:
         print('couldn\'t get a timecol for ' + col +
               '. data_type=' + str(data_type))
