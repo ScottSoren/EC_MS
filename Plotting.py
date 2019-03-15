@@ -14,7 +14,6 @@ import os
 
 from .EC import sync_metadata, select_cycles
 
-from .Combining import synchronize
 from .Quantification import get_flux, get_signal
 from .Object_Files import lines_to_dictionary
 from .Molecules import Molecule
@@ -403,7 +402,7 @@ def plot_signal(MS_data,
     Could probably be simplified a lot, to be the same length as plot_fluxes
     '''
     if verbose:
-        print('\n\nfunction \'plot_masses\' at your service! \n Plotting from: ' +
+        print('\n\nfunction \'plot_signal\' at your service! \n Plotting from: ' +
               MS_data['title'])
 
     if ax == 'new':
@@ -446,7 +445,7 @@ def plot_signal(MS_data,
         ax.set_yscale('log')
     ax.tick_params(axis='both', direction='in') #17K28
     if verbose:
-        print('function \'plot_masses\' finsihed! \n\n')
+        print('function \'plot_signal\' finsihed! \n\n')
     return ax
 
 def plot_masses(*args, **kwargs):
@@ -542,6 +541,8 @@ def plot_experiment(EC_and_MS,
 
     if verbose:
         print('\n\nfunction \'plot_experiment\' at your service!\n Plotting from: ' + EC_and_MS['title'])
+
+    # ----------- prepare the axes on which to plot ------------ #
     if ax == 'new':
         if fig is None:
             figure1 = plt.figure()
@@ -579,6 +580,7 @@ def plot_experiment(EC_and_MS,
                 ax[1].set_zorder(ax[2].get_zorder()+1) #doesn't work
                 ax[1].patch.set_visible(False) # hide the 'canvas'
 
+    # --------- get tspan, V_str, and J_str from input and/or dataset -------- #
     if tspan is None:                  #then use the range of overlap
         tspan = EC_and_MS['tspan'] #changed from 'tspan_2' 17H09
     if type(tspan) is str and not tspan=='all':
@@ -656,7 +658,7 @@ def plot_experiment(EC_and_MS,
         removebackground_right = removebackground
 
 
-    # ----------- and plot the MS signals! -------------
+    # ----------- Plot the MS signals! ------------- #
     if quantified:
         if unit is None:
             unit = 'pmol/s'
@@ -670,7 +672,6 @@ def plot_experiment(EC_and_MS,
                       ax=ax[-1], leg=leg, logplot=logplot[0], unit=unit,
                       removebackground=removebackground_right, background=background,
                       override=override, smooth_points=smooth_points, verbose=verbose)
-
     else:
         if unit is None:
             unit = 'pA'
@@ -692,7 +693,7 @@ def plot_experiment(EC_and_MS,
         ax[0].set_xlim(tspan)
 
 
-    # ---------- get ready to plot electrochemistry data ---------
+    # ---------- make sure I can plot the electrochemistyr data --------- #
 
     try:
         t = EC_and_MS[t_str]
@@ -715,7 +716,10 @@ def plot_experiment(EC_and_MS,
 #    print('len(t) = ' + str(len(t)) +
 #          '\nlen(V) = ' + str(len(V)) +
 #          '\nlen(J) = ' + str(len(J)))
-    print(tspan) # debugging
+    #print(tspan) # debugging
+
+
+    # -------- cut the electrochemistry data according to tspan ------ #
     if not tspan == 'all' and (plotcurrent or plotpotential):
         mask = np.logical_and(tspan[0]<t, t<tspan[-1])
         t = t[mask]
@@ -725,6 +729,8 @@ def plot_experiment(EC_and_MS,
         if plotcurrent:
             J = J[mask]
 
+
+    # ---------- and plot the electrochemistry data! --------------- #
     if plotcurrent:
         if plotpotential:
             i_ax = 2
@@ -761,6 +767,7 @@ def plot_experiment(EC_and_MS,
         if tspan is not None and not tspan == 'all':
             ax[1].set_xlim(tspan)
 
+    # -------- finishing up -------- #
     if saveit:
         if title == 'default':
             title == EC_and_MS['title'] + '.png'
@@ -781,6 +788,7 @@ def plot_experiment(EC_and_MS,
     else:
         return ax
 
+
 def plot_masses_and_I(*args, **kwargs):
     print('\n\n\'plot_masses_and_I\' has been renamed \'plot_experiment\'. Remember that next time!')
     return plot_experiment(*args, **kwargs)
@@ -795,8 +803,9 @@ def plot_folder(folder_name,
     Could add text showing starts of the data files
     '''
     from .Data_Importing import import_folder
+    from .Combining import synchronize
     Datasets = import_folder(folder_name)
-    Combined_data = synchronize(Datasets, t_zero='first')
+    Combined_data = synchronize(Datasets, t_zero='first', append=True)
     sync_metadata(Combined_data, RE_vs_RHE, A_el)
     return plot_experiment(Combined_data, colors=colors)
 

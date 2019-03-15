@@ -14,7 +14,8 @@ import time
 import re
 #import os #, sys
 import numpy as np
-import warnings
+#import warnings # actually not that useful, as you loose information about
+# when in the running of the code the problem appeared.
 
 
 def synchronize(data_objects, t_zero='start', append=None, file_number_type='EC',
@@ -116,18 +117,23 @@ def synchronize(data_objects, t_zero='start', append=None, file_number_type='EC'
     now = time.time()  #now in unix epoch time,
     # ^ which is necessarily larger than the acquisition epochtime of any of the data.
                #prepare to collect some data in the first loop:
+    tomorrow = now + 60*60*24
+    # ^ necessarily larger than the APPARANT acquisition epoch time of any data
+            # (sometimes, dataset importing assumes date='today', in which case
+            # we can have now<t_0, messing up determination of t_start)
+
     recstarts = []            #first recorded time in unix epoch time
 
     # first and last timestamps in unix time
-    t_first = now             #earliest timestamp in unix epoch time
+    t_first = tomorrow        #earliest timestamp in unix epoch time
     t_last = 0                #latest timestamp in unix epoch time
 
     # intersection timespan in unix time
     t_start = 0               #latest start time (start of overlap) in unix epoch time
-    t_finish = now            #earliest finish time (finish of overlap) in unix epoch time
+    t_finish = tomorrow       #earliest finish time (finish of overlap) in unix epoch time
 
     # union timespan in unix time
-    t_begin = now             #first time recorded in data
+    t_begin = tomorrow        #first time recorded in data
     t_end = 0                 #last time recorded in data
 
     hasdata = {}              #'combining number' of dataset with False if its empty or True if it has data
@@ -171,7 +177,7 @@ def synchronize(data_objects, t_zero='start', append=None, file_number_type='EC'
         if verbose:
                 print('\ttstamp is ' + str(t_0) + ' seconds since Epoch')
 
-        t_s = now           # will decrease to the earliest start of time data in the dataset
+        t_s = tomorrow           # will decrease to the earliest start of time data in the dataset
         t_f = 0             # will increase to the latest finish of time data in the dataset
 
         hasdata[nd] = False
@@ -183,11 +189,13 @@ def synchronize(data_objects, t_zero='start', append=None, file_number_type='EC'
                     # ^ earliest start of time data in dataset in epoch time
                     t_f = max(t_f, t_0 + dataset[col][-1])
                     # ^ latest finish of time data in dataset in epoch time
+                    #print('col = ' + col + ', t_s = ' + str(t_s) + ', t_f = ' + str(t_f)) # debugging
+                    #print('t from ' + str(dataset[col][0]) + ' to ' + str(dataset[col][-1])) # debugging
                     hasdata[nd] = True
                 except IndexError:  #if dataset['data_cols'] points to nonexisting data, something went wrong.
                     print('Time column ' + col + ' seems to have no data')
         if not hasdata[nd]:
-            print(dataset['title'] + ' seems to be an empty file, as no time columns have data!')
+            print('WARNING: ' + dataset['title'] + ' seems to be empty, as no time columns have data!')
 
         if not hasdata[nd]:  # move on from empty files
             recstarts += [-1] # otherwise we end up skipping something we didn't mean to skip
@@ -216,6 +224,7 @@ def synchronize(data_objects, t_zero='start', append=None, file_number_type='EC'
     # dataset3              |     *----------------------*
     # t =      first        last  start      finish
     if verbose:
+        print('--- done with first loop.')
         print('\n\nfirst: ' + str(t_first) + ', last: ' + str(t_last) +
         '\n, intersection start: ' + str(t_start) + ', intersection finish: ' + str(t_finish) +
         '\n, union start: ' + str(t_begin) + ', union finish: ' + str(t_end))
@@ -452,12 +461,13 @@ def synchronize(data_objects, t_zero='start', append=None, file_number_type='EC'
                 combined_data[col] = {nd: value}
 
     # ----- And now we're out of the loop! --------
-
+    if verbose:
+        print('--- done with second loop.\n')
     # There's still a column length problem if the last dataset is missing
     #columns! Fixing that here.
     for col in combined_data['data_cols']:
         l1 = len(combined_data[col])
-        timecol = get_timecol(col, data)
+        timecol = get_timecol(col, combined_data)
         #print('about to cut ' + col + ' according to timecol ' + timecol) # debugging
         try:
             l0 = len(combined_data[timecol])
@@ -470,7 +480,7 @@ def synchronize(data_objects, t_zero='start', append=None, file_number_type='EC'
 
     # add 'file number' to data_cols
     if 'file number' in combined_data.keys() and 'file number' not in combined_data['data_cols']:
-        combined_data['data_cols'].append('file number') #for new code
+        combined_data['data_cols'].append('file number')
 
     # add 't_str' to the data set (don't know where else to do it)
     if 'time/s' in combined_data.keys():
@@ -478,7 +488,7 @@ def synchronize(data_objects, t_zero='start', append=None, file_number_type='EC'
 
     # check that there's actually data in the result of all this
     if len(combined_data['data_cols']) == 0:
-        print('The input did not have recognizeable data! Synchronize is returning an empty dataset!')
+        print('WARNING: Synchronize is returning an empty dataset!')
 
     # update the objects (e.g. ScanImages object in EC_Xray). This is nice!
     if update:
@@ -661,7 +671,7 @@ def rename_SI_cols(data, removenans=True):
             #print('Not renaming SI col ' + col_0)
             continue
 
-        data[col] = data[col_0]
+        data[col] = data[col_0].copy()
         data['col_types'][col] = col_type
         data['data_cols'] += [col]
         print(col_0 + ' copied to ' + col)
@@ -675,8 +685,8 @@ def rename_RGA_cols(data):
     '''
     channels = data['channels']
     for channel, mass in channels.items():
-        data[mass + '-x'] = data['Time(s)']
-        data[mass + '-y'] = data[channel]
+        data[mass + '-x'] = data['Time(s)'].copy()
+        data[mass + '-y'] = data[channel].copy()
         data['col_types'][mass + '-x'] = 'MS'
         data['col_types'][mass + '-y'] = 'MS'
         data['data_cols'] += [mass + '-x', mass + '-y']
@@ -687,16 +697,16 @@ def rename_CHI_cols(data):
     names columns of RGA data like they would be from PyExpLabSys+cinfdata
     '''
     for col_0 in data['data_cols']:
-        print(col_0) # debugging
+        #print(col_0) # debugging
         for c0, c in [('Time/s', 'time/s'), ('Potential/V','Ewe/V'), ('Current/A', 'I/A'),
                       ('Charge/C', '(Q-Qo)/C')]:
             if c0 in col_0:
                 col = c
-                print('col = ' + col + ', col_0 = ' + col_0) # debugging
+                #print('col = ' + col + ', col_0 = ' + col_0) # debugging
                 break
         else:
             continue
-        data[col] = data[col_0]
+        data[col] = data[col_0].copy()
         data['col_types'][col] = 'EC'
         data['data_cols'] += [col]
         print(col_0 + ' copied to ' + col)
@@ -705,6 +715,47 @@ def rename_CHI_cols(data):
         data['col_types']['I/mA'] = 'EC'
         data['data_cols'] += ['I/mA']
 
+def parse_CHI_header(data):
+    header = data['header']
+    lines = header.split('\n')
+    for tcol in ['Time/sec', 'Time/s', 'time/s']:
+        if tcol in data:
+            t = data[tcol]
+            break
+    else:
+        print('EC_MS.Combining.parse_CHI_header() can\'t find timecol in CHI data!')
+    N = len(t)
+    ti = 2 * t[0] - t[1]  # one tstep back from the first reorded t
+    cols = {'i':'Current/A', 'E':'Potential/V'}
+    data['Ns'] = np.zeros(N)
+    data['data_cols'] += ['Ns']
+    data['col_types']['Ns'] = 'CHI'
+    i = 1
+    for nl, line in enumerate(lines):
+        #print(line) # debugging
+        if not re.search('T[0-9]+ \(s\) = ', line):
+            continue
+        l = line.strip()
+        dt = eval(l.split(' = ')[-1])
+        tspan = [ti, ti + dt]
+        mask = np.logical_and(tspan[0] <= t, t < tspan[-1])
+
+        l2 = lines[nl - 1].strip()
+        print(l + '\n' + l2) # debugging
+        col = cols[l2[0]]
+        val = eval(l2.split(' = ')[-1])
+        print('tspan = ' + str(tspan) + ' ,  val = ' + str(val))
+        if not col in data:
+            print('adding ' + col + ' to data based on CHI header.')
+            data[col] = np.zeros(N)
+            data['data_cols'] += [col]
+            data['col_types'][col] = 'CHI'
+        data[col][mask] = val
+        data['Ns'][mask] = i
+        ti = ti + dt
+        i = i + 1
+
+
 
 def is_time(col, data=None, verbose=False):
     '''
@@ -712,30 +763,8 @@ def is_time(col, data=None, verbose=False):
     '''
     if verbose:
         print('\nfunction \'is_time\' checking \'' + col + '\'!')
-    col_type = get_type(col, data)
-    if col_type == 'EC':
-        if col[0:4]=='time':
-            return True
-        return False
-    elif col_type in ['MS', 'cinfdata']:
-        if col[-2:] == '-x':
-            return True
-        return False
-    elif col_type == 'Xray':
-        if col == 't':
-            return True
-        return False
-    elif col_type == 'SI': # spectro inlets
-        if col[-8] == 'Time [s]':
-            return True
-        return False
-    #in case it the time marker is just burried in a number suffix:
-    ending_object = re.search(r'_[0-9][0-9]*\Z',col)
-    if ending_object:
-        col = col[:ending_object.start()]
-        return is_time(col, data)
-    print('can\'t tell if ' + col + ' is time. Returning False.')
-    return False
+    timecol = get_timecol(col, data, verbose=verbose)
+    return timecol == col
 
 def is_MS_data(col):
     if re.search(r'^M[0-9]+-[xy]', col):
@@ -774,7 +803,7 @@ def get_type(col, data=None):
         return 'cinfdata' #it's cinfdata but not from a mass channel
     if col is None:
         return None
-    warnings.warn(col + ' is not recognized. Assuming type \'EC\'.\n ' +
+    print('WARNING: ' + col + ' is not recognized. Assuming type \'EC\'.\n ' +
                       ' Consider adding to EC_cols_0 in EC.py if so.')
     return 'EC' #'Xray' # to be refined later...
 
@@ -797,9 +826,12 @@ def get_timecol(col=None, dataset=None, data_type=None, verbose=False):
     elif data_type == 'Xray':
         timecol = 't' # to be refined later...
     elif data_type == 'CHI':
-        timecol = 'Time/s'
+        if dataset is not None and 'Time/sec' in dataset:
+            timecol = 'Time/sec'
+        else:
+            timecol = 'Time/s'
     else:
-        print('couldn\'t get a timecol for ' + col +
+        print('couldn\'t get a timecol for ' + str(col) +
               '. data_type=' + str(data_type))
         timecol = None
     if verbose:

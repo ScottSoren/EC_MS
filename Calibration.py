@@ -290,8 +290,8 @@ def carrier_gas_cal(dataset=None, #if signal not given, reads average from datas
 
 air_composition = {'N2':0.7808, 'O2':0.2095, 'Ar':0.0093, 'CO2':0.000412}
 
-def chip_calibration(data, mol='O2', F_cal=None, primary=None, tspan=None, gas='air',
-                     composition=None, chip='SI-3iv1'):
+def chip_calibration(data, mol='O2', F_cal=None, primary=None, tspan=None,
+                     tspan_bg=None, gas='air', composition=None, chip='SI-3iv1'):
     '''
     Returns obect of class EC_MS.Chip, given data for a given gas (typically air) for which
     one component (typically O2 at M32) has a trusted calibration. The chip object
@@ -313,7 +313,12 @@ def chip_calibration(data, mol='O2', F_cal=None, primary=None, tspan=None, gas='
         composition = air_composition[mol]
 
     x, y = m.get_flux(data, tspan=tspan, unit='mol/s')
-    n_dot = np.mean(y)
+    if tspan_bg is not None:
+        x_bg, y_bg = m.get_flux(data, tspan=tspan_bg, unit='mol/s')
+        y0 = np.mean(y_bg)
+    else:
+        y0 = 0
+    n_dot = np.mean(y) - y0
 
     if type(chip) is str:
         chip = Chip(chip)
@@ -325,9 +330,9 @@ def chip_calibration(data, mol='O2', F_cal=None, primary=None, tspan=None, gas='
 
 
 def point_calibration(data, mol, mass='primary', cal_type='internal',
-                      tspan=0, n_el=None, tail=0, remove_background=True,
-                      chip=None, composition=1, carrier=None,
-):
+                      tspan=None, n_el=None, tail=0, tspan_bg=None,
+                      chip=None, composition=None, carrier=None,
+                      ):
     '''
     Returns a molecule object calibrated based in one of the following ways.
         internally: cal_type='internal', need n_el
@@ -340,14 +345,26 @@ def point_calibration(data, mol, mass='primary', cal_type='internal',
     m = Molecule(mol)
     if mass == 'primary':
         mass = m.primary
+    if composition is None:
+        if carrier==mol or carrier is None:
+            composition = 1
+        elif carrier == 'air':
+            composition = air_composition[mol]
 
     #get average signal
+    if tspan is None:
+        tspan = data['tspan']
+    if tspan_bg is not None:
+        x_bg, y_bg = get_signal(data, mass, tspan=tspan_bg)
+        y0 = np.mean(y_bg)
+    else:
+        y0 = 0
     if type(tspan) in [int, float]:
         x, y = get_signal(data, mass, [tspan-10, tspan+10])
-        S = np.interp(tspan, x, y)
+        S = np.interp(tspan, x, y-y0)
     else:
         x, y = get_signal(data, mass, tspan=[tspan[0], tspan[1]+tail])
-        S = np.trapz(y, x) #/ (x[-1] - x[1])
+        S = np.trapz(y-y0, x) #/ (x[-1] - x[1])
        # S = np.mean(y) #more accurate for few, evenly spaced datapoints
 
     if cal_type == 'internal':

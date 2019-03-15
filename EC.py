@@ -476,9 +476,10 @@ def plot_vs_time(EC_data, axes='new', y_strings='default', colors=None,
 
 
 
-def make_selector(data, sel_str='selector'):
+def make_selector(data, sel_str='selector', cols=[]):
     changes = np.tile(False, data['time/s'].shape)
-    for col in ['cycle number', 'loop number', 'file number']:
+    col_list = ['cycle number', 'loop number', 'file number'] + cols
+    for col in col_list:
         if col in data:
             n = data[col]
             n_up = np.append(n[1:], n[-1])

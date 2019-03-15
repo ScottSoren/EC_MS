@@ -93,6 +93,8 @@ class Molecule:
             return M
         self.transmission_function = T
 
+        self.color = self.get_color()
+
 
     def write(self, a=None, attr=None, *args, **kwargs):
         '''
@@ -481,7 +483,12 @@ class Molecule:
         return background
 
     def get_color(self):
-        return standard_colors[self.primary]
+        try:
+            return standard_colors[self.primary]
+        except AttributeError:
+            print('WARNING: ' + str(self) + ' has no attribute \'primary\'')
+        except KeyError:
+            print('WARNING: standard_colors has no entry for ' + str(self.primary))
 
     def get_flux(self, MS_data, tspan='tspan', density=None,
                  unit='pmol/s', verbose=True, override=False, x=None,

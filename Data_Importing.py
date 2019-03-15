@@ -432,8 +432,6 @@ def text_to_data(file_lines, title=None,
     if verbose:
         print('\n\nfunction \'text_to_data\' at your service!\n')
 
-    from .Combining import get_timecol
-
     #disect header
     N_lines = len(file_lines)        #number of header lines
     N_head = N_lines                 #this will change when I find the line that tells me how ling the header is
@@ -458,6 +456,7 @@ def text_to_data(file_lines, title=None,
         N_blank = 2
         dataset['channels'] = {}
     elif data_type == 'CHI': # CH Instruments potentiostat
+        got_col_headers = False
         N_blank = 2
         sep = ','
     elif data_type == 'MS':
@@ -619,22 +618,28 @@ def text_to_data(file_lines, title=None,
                     last_segment_line = 'Segment ' + dataset['segments'] + ':'
                 if 'segments' in dataset and last_segment_line in line:
                     N_blank = 1
+                if 'Time/s' in line: # then it's actually the column header line.
+                    N_head = nl + 2 # the next line is a blank line, during which we handle the column headers
+                    col_headers = l.split(sep)
+                    got_col_headers = True # to be used on next line (nl=N_head-1)
+
             header_string = header_string + line
-
-
 
         elif nl == N_head - 1:      #then it is the column-header line
                #(EC-lab includes the column-header line in header lines)
             #col_header_line = line
-            col_headers = [col.strip() for col in l.split(sep=sep)]
-            if data_type == 'RGA': # there's no damn commas on the column header lines!
+            if data_type == 'RGA':  # there's no damn commas on the column header lines!
                 col_headers = [col.strip() for col in l.split(' ') if len(col.strip())>0]
+            elif data_type == 'CHI' and got_col_headers:
+                pass
+            else:
+                col_headers = [col.strip() for col in l.split(sep=sep)]
 
             if data_type == 'SI':
                 for i, col in enumerate(col_headers):
                     col_headers[i] = col_preheaders[i] +' - ' + col
 
-            dataset['N_col']=len(col_headers)
+            dataset['N_col'] = len(col_headers)
             dataset['data_cols'] = col_headers.copy()  #will store names of columns containing data
 
             dataset['col_types'] = dict([(col, data_type) for col in col_headers])
@@ -646,7 +651,7 @@ def text_to_data(file_lines, title=None,
             if verbose:
                 print('Data starting on line ' + str(N_head) + '\n')
 
-        elif nl == N_head and data_type in ['RGA', 'CHI']:
+        elif len(l)==0:
             # rga and chi text files skip a line after the column header
             continue
 
