@@ -395,15 +395,19 @@ def smooth_data(data_0, points=3, cols=None, verbose=True):
 def plot_signal(MS_data,
                 masses = {'M2':'b','M4':'r','M18':'0.5','M28':'g','M32':'k'},
                 tspan=None, ax='new', unit='nA', removebackground=False,
-                logplot=True, saveit=False, leg=False,
+                logplot=True, saveit=False, leg=False, name=None,
                 override=False, verbose=True):
     '''
     plots selected masses for a selected time range from MS data or EC_MS data
     Could probably be simplified a lot, to be the same length as plot_fluxes
     '''
+    if name is None:
+        try:
+            name = MS_data['name']
+        except KeyError:
+            name = MS_data['title']
     if verbose:
-        print('\n\nfunction \'plot_signal\' at your service! \n Plotting from: ' +
-              MS_data['title'])
+        print('\n\nfunction \'plot_signal\' at your service! \n Plotting from: ' + name)
 
     if ax == 'new':
         fig1 = plt.figure()
@@ -526,7 +530,7 @@ def plot_experiment(EC_and_MS,
                     plotpotential=True, plotcurrent=True, ax='new', emphasis='MS',
                     RE_vs_RHE=None, A_el=None,
                     removebackground=None, background='constant',
-                    saveit=False, title=None, leg=False, unit=None,
+                    saveit=False, name=None, leg=False, unit=None,
                     masses=None, masses_left=None, masses_right=None,
                     mols=None, mols_left=None, mols_right=None,
                     #mols will overide masses will overide colors
@@ -538,9 +542,14 @@ def plot_experiment(EC_and_MS,
     '''
     this plots signals or fluxes on one axis and current and potential on other axesaxis
     '''
+    if name is None:
+        try:
+            name = EC_and_MS['name']
+        except KeyError:
+            name = EC_and_MS['title']
 
     if verbose:
-        print('\n\nfunction \'plot_experiment\' at your service!\n Plotting from: ' + EC_and_MS['title'])
+        print('\n\nfunction \'plot_experiment\' at your service!\n Plotting from: ' + name)
 
     # ----------- prepare the axes on which to plot ------------ #
     if ax == 'new':
@@ -769,15 +778,10 @@ def plot_experiment(EC_and_MS,
 
     # -------- finishing up -------- #
     if saveit:
-        if title == 'default':
-            title == EC_and_MS['title'] + '.png'
-        figure1.savefig(title)
+        figure1.savefig(name + '.png')
 
     #if colors_right is not None:
     #    ax[0].set_xlim(ax[1].get_xlim())   # probably not necessary
-
-    if title is not None:
-            plt.title(title)
 
     if return_fig and (fig is None):
         fig = ax[0].get_figure()

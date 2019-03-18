@@ -52,7 +52,8 @@ def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True,
     #override to ignore when cut returns empty dataset.
     '''
     if verbose:
-        print('\nSelecting cycles ' + str(cycles) + ' from \'' + EC_data_0['title'] + '\'\n')
+        print('\n\nfunction \'select_cycle\ at your service! \n' +
+              'Selecting cycles ' + str(cycles))
 
     good = True
     EC_data = EC_data_0.copy()
@@ -77,44 +78,33 @@ def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True,
         cycles = [cycles]
     mask = np.any(np.array([cycle_numbers == c for c in cycles]), axis=0)
     #list comprehension is awesome.
+    t_cut = EC_data['time/s'][mask]
+    tspan = [t_cut[0], t_cut[-1]]
 
-    for col in EC_data['data_cols']:
-        try:
+
+    # ------- cutit! ------------- #
+    if cutMS:
+        EC_data = cut_dataset(EC_data_0, tspan=tspan, verbose=verbose,
+                              time_masks={'time/s':mask})
+    else:
+        for col in EC_data['data_cols']:
             if get_type(col, EC_data) == 'EC':
                 #then we're dealing with EC data
                 try:
                     EC_data[col] = EC_data[col].copy()[mask]
+                    good = True
                 except KeyError:
-                    print('hm... \'' + col + '\' in EC_data[data_cols] but not in EC_data')
-        except IndexError:
-            print('trouble selecting cycle ' + str(cycles) + ' of ' + col + '\n' +
-                    'type(mask) = ' + str(type(mask)))
-            good = False
+                    print('WARNING: \'' + col + '\' in EC_data[data_cols] but not in EC_data')
+                    good = False
+                except TypeError:
+                    print('WARNING: mask == ' + str(mask))
+                    good = False
+                except IndexError:
+                    print('WARNING: len(EC_data[\'' + str(col) + '\']) = ' + str(len(EC_data[col])) +
+                          ', len(mask) = ' + str(len(mask)))
+                    good = False
+
     t0 = EC_data['tstamp']
-    tspan = np.array([min(EC_data['time/s']), max(EC_data['time/s'])])
-
-    if cutMS:
-        time_masks = {}
-        for col in EC_data['data_cols']:
-            if not get_type(col, EC_data) == 'EC': #then we've got a QMS or synchrotron variable
-                timecol = get_timecol(col, EC_data)
-                print(col + '  ' + timecol) #debugging
-                if timecol in time_masks:
-                    mask = time_masks[timecol]
-                else:
-                    try:
-                        mask = np.logical_and(tspan[0] < EC_data[timecol], EC_data[timecol] < tspan[-1])
-                        # add an extra point on the left and right of interval for complete interpolation
-                        extra_left = np.append(mask[1:], False)
-                        extra_right = np.append(False, mask[:-1])
-                        mask = np.logical_or(extra_left, extra_right)
-                        time_masks[timecol] = mask
-                    except KeyError:
-                        print('can\'t cut ' + col + ', don\'t have timecol ' + timecol + '. skipping.')
-                        continue
-                #if not is_time(col):
-                EC_data[col] = EC_data[col][mask]
-
     if t_zero is not None:
         if verbose:
             print('\'select_cycles\' is resetting t_zero')
@@ -147,6 +137,9 @@ def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True,
     EC_data['tspan_0'] = tspan + t0
     EC_data['data_type'] += ' selected'
     EC_data['good'] = good
+
+    if verbose:
+        print('function \'select_cycles\' finished!\n\n')
     return EC_data
 
 
@@ -482,8 +475,11 @@ def make_selector(data, sel_str='selector', cols=[]):
     for col in col_list:
         if col in data:
             n = data[col]
-            n_up = np.append(n[1:], n[-1])
-            changes = np.logical_or(changes, n_up>n)
+            if len(n) == 0:
+                print('WARNING: ' + col + ' is empty')
+                continue
+            n_down = np.append(n[0], n[:-1])  # comparing with n_up instead puts selector a point ahead
+            changes = np.logical_or(changes, n_down<n)
     selector = np.cumsum(changes)
     data[sel_str] = selector
     return sel_str
@@ -538,7 +534,7 @@ def sync_metadata(data, RE_vs_RHE=None, A_el=None,
     '''
 
     if verbose:
-        print('\nsyncing metadata for ' + data['title'] + '\n')
+        print('\nsyncing metadata.')
 
     # use these to keep track of whether variables 1 and 2 will be calibrated:
     cal1 = False
@@ -924,12 +920,16 @@ def get_scan_rate(data, Vspan=[0.3, 0.6], V_str=None, J_str=None, t_i=0):
     return scan_rate
 
 
-def time_from_scanrate(data, v_scan, t_str='time/s', t_i=0, V_str=None):
+def time_from_scanrate(data, v_scan=None, t_str='time/s', t_i=0, V_str=None):
     '''
     V_scan is in mV/s, data[V_str] is in V, creates time in s
     '''
     if V_str is None:
         V_str, J_str = sync_metadata(data, verbose=False)
+        if V_str is None: # I can't imagine calling this without V_str defined unless it's CHI data
+            V_str = 'Potential/V'
+    if v_scan is None:
+        v_scan = data['scan rate']
     V = data[V_str]
     ro = get_ro(data, V_str=V_str)
     ro_changes = np.append(np.logical_xor(ro[1:], ro[:-1]), True)

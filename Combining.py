@@ -18,9 +18,9 @@ import numpy as np
 # when in the running of the code the problem appeared.
 
 
-def synchronize(data_objects, t_zero='start', append=None, file_number_type='EC',
-                cutit=False, cut_buffer=60, override=None, update=True, tz=None,
-                verbose=True, vverbose=False):
+def synchronize(data_objects, t_zero=None, append=None, file_number_type=None,
+                cutit=None, cut_buffer=None, override=None, update=True, tz=None,
+                name=None, verbose=True, vverbose=False):
     '''
     'synchronize' is the most important function of electropy/ECpy/EC_MS/EC_Xray
 
@@ -43,7 +43,7 @@ def synchronize(data_objects, t_zero='start', append=None, file_number_type='EC'
         t_zero: a string or number representing the moment that is considered t=0
     in the synchronized dataset. If t_zero is a number, it is interpreted as a
     unix epoch time. t_zero='start' means it starts at the start of the overlap.
-    'first' means t=0 at the earliest datapoint in any data set.
+    'first' means t=0 at the earliest timestamp.
         append: True if identically named data columns should be appended. False
     if the data from the individual sets should be kept in separate columns. By
     default (append=None), append will be set inside the function to True if all of
@@ -64,6 +64,8 @@ def synchronize(data_objects, t_zero='start', append=None, file_number_type='EC'
     dataset for any non-dictionary objects in data_objects
         tz: timezone for genrating timestamp, as pytz.timezone() instance or string
     to be read by pytz.timezone(). Local timezone assumed by default.
+        name: put in the combined dataset with key 'name', referenced by some
+    other functions. By default it combines the names of the original datasets.
         verbose: True if you want the function to talk to you. Recommended, as it
     helps catch your mistakes and my bugs. False if you want a clean terminal or stdout
 
@@ -106,13 +108,32 @@ def synchronize(data_objects, t_zero='start', append=None, file_number_type='EC'
 
     if append is None: #by default, append if all datasets are same type
         append = len({d['data_type'] for d in datasets}) == 1
+    if t_zero is None:
+        if append:
+            t_zero = 'begin' # t=0 at start of earliest dataset (beginning of union)
+        else:
+            t_zero = 'start' # t=0 at start of intersect
     if override is None:
         override = append  # Without override, it checks for overlap.
                            # So, I should override when I expect no overlap.
                            # I expect no overlap when appending datasets
                            # Thus, override should be True when append is True.
+    if cutit is None:
+        cutit = (cut_buffer is not None)
+    elif cutit is True and cut_buffer is None:
+        cut_buffer = 60
+    if append and (file_number_type is None):  # this is a tricky one.
+        if (len({d['data_type'] for d in datasets}) == 1 and
+            not datasets[0]['data_type']=='combined'):
+            file_number_type = datasets[0]['data_type']
+        else:
+            file_number_type = 'EC'
+
+    # check a few of the inputs proving tricky
     if verbose:
         print('append is ' + str(append))
+        if append:
+            print('file_number_type = ' + file_number_type)
 
     now = time.time()  #now in unix epoch time,
     # ^ which is necessarily larger than the acquisition epochtime of any of the data.
@@ -298,10 +319,8 @@ def synchronize(data_objects, t_zero='start', append=None, file_number_type='EC'
 
     # It's very nice when appending data from multiple files (EC data especially,
     # from experience), to be able to select data later based on file number
-    if (append and
-        file_number_type in {d['data_type'] for d in datasets}):
+    if append:
         combined_data['file number'] = []
-        fn_timecol = get_timecol(data_type=file_number_type)
 
     combined_data_keys_0 = list(combined_data.keys())
 # used to avoid overwriting metadata at end of second loop
@@ -352,23 +371,18 @@ def synchronize(data_objects, t_zero='start', append=None, file_number_type='EC'
             #all the collumns line up. oldcollength and collength will help with that:
             oldcollength = {} # will store the existing length of each data col
             for col in combined_data['data_cols']:
-                if is_time(col, combined_data):
+                if is_time(col, dataset):
                     oldcollength[col] = len(combined_data[col])
             collength = {}  # will store the length to be appended to each data col
             for col in dataset['data_cols']:
-                if is_time(col, combined_data):
+                if is_time(col, dataset):
                     collength[col] = len(dataset[col])
                     if col not in oldcollength.keys():
                         oldcollength[col] = 0
                     else: #the case that the timecol is in both combined_data and dataset
                         if vverbose:
                             print('prepared to append data according to timecol ' + col)
-            # now, fill in file number according to datasets of type file_number_type
-            if dataset['data_type'] == file_number_type:
-                fn = np.array([i] * collength[fn_timecol])
-                combined_data['file number'] = np.append(combined_data['file number'], fn)
-                if verbose:
-                    print('len(combined_data[\'file number\']) = ' + str(len(combined_data['file number'])))
+            got_file_number = False # we only want to get the file number once
 
         # now we're ready to go through the columns and actually process the data
         #for smooth entry into combined_data
@@ -378,9 +392,9 @@ def synchronize(data_objects, t_zero='start', append=None, file_number_type='EC'
             if cutit:           #cut data to only return where it overlaps
                 #print('cutting ' + col) # for debugging
                 try:
-                    data = data[masks[get_timecol(col, data)]]
+                    data = data[masks[get_timecol(col, dataset)]]
                 except KeyError:
-                    print('')
+                    print('WARNING: coulsn\'t cut ' + col + ' because no mask for its timecol')
             # processing: offsetting
             if is_time(col, dataset):
                 data = data + offset
@@ -394,22 +408,30 @@ def synchronize(data_objects, t_zero='start', append=None, file_number_type='EC'
                 #but first...
                 # proccessing: ensure elignment with timecol for appended data
                 l1 = len(data) + len(olddata)
-                #print('col = ' + col) #debugging
-                timecol = get_timecol(col, data)
-                #print('timecol = ' + str(timecol)) #debugging
+                timecol = get_timecol(col, dataset)
+                coltype, istime = get_type(col, dataset), col==timecol
+                #print('col = ' + col + ', timecol = ' + str(timecol)) #debugging
+                #print('coltype = ' + coltype + ', istime = ' + str(istime)) # debugging
                 try:
                     l0 = oldcollength[timecol] + collength[timecol]
+                # ^ I had to get these lengths before because I'm not sure whether
+                #timecol will have been processed first or not...
                 except KeyError:
-                    print(col + ' should have timecol ' + timecol + ' but this is ' +
+                    print('WARNING: ' + col + ' should have timecol ' + timecol + ' but this is ' +
                           ' not in dataset. Removing ' + col + ' from data_cols.')
                     dataset['data_cols'].remove(col)
                     continue
-                # ^ I had to get these lengths before because I'm not sure whether
-                #timecol will have been processed first or not...
                 if l0 > l1: #this is the case if the previous dataset was missing col but not timecol
                     filler = np.array([0] * (l0 - l1))
                     olddata = np.append(olddata, filler)
                     # ^ and now len(olddata) = len(combined_data[timecol])
+                    # now, fill in file number according to datasets of type file_number_type
+                if (not got_file_number and istime and
+                        coltype == file_number_type):
+                    fn = np.array([i] * collength[col])
+                    combined_data['file number'] = np.append(combined_data['file number'], fn)
+                    #print('len(combined_data[\'file number\']) = ' + str(len(combined_data['file number']))) # debugging
+                    got_file_number = True
                 # APPEND!
                 data = np.append(olddata, data)
             # processing: ensuring unique column names for non-appended data
@@ -477,6 +499,10 @@ def synchronize(data_objects, t_zero='start', append=None, file_number_type='EC'
             filler = np.array([0] * (l0 - l1))
             combined_data[col] = np.append(combined_data[col], filler)
 
+    # store the name
+    if name is None:
+        name = combined_data['title']
+        combined_data['name'] = name
 
     # add 'file number' to data_cols
     if 'file number' in combined_data.keys() and 'file number' not in combined_data['data_cols']:
@@ -501,6 +527,8 @@ def synchronize(data_objects, t_zero='start', append=None, file_number_type='EC'
 
     return combined_data
 
+
+# -------------------------------------------------------------------- #
 
 
 def cut(x, y, tspan=None, returnindeces=False, override=False):
@@ -557,11 +585,14 @@ def purge_column(dataset, col, purge=True, verbose=True):
     if col in dataset['data_cols']:
         dataset['data_cols'].remove(col)
 
-def cut_dataset(dataset_0, tspan=None, tspan_0=None, t_zero=None, purge=True, verbose=True):
+def cut_dataset(dataset_0, tspan=None, tspan_0=None, time_masks={},
+                t_zero=None, purge=True, verbose=True):
     '''
     Makes a time-cut of a dataset. Written 17H09.
     Unlike time_cut, does not ensure all MS data columns are the same length.
-    if tspan_0 is used, it is interpreted as unix time
+    if tspan_0 is used, it is interpreted as unix time.
+    If some time_masks are already known, as is the case for EC data when
+    using EC_MS.EC.select_cycles(), these can be given as input.
     '''
     if verbose:
         print('\n\nfunction \'cut dataset\' at your service!\n')
@@ -575,7 +606,7 @@ def cut_dataset(dataset_0, tspan=None, tspan_0=None, t_zero=None, purge=True, ve
         t0 = dataset['tstamp']
         tspan = [tspan_0[0] - t0, tspan_0[-1] - t0]
 
-    time_masks = {} #I imagine storing indeces improves performance
+
     for col in dataset['data_cols']:
         timecol = get_timecol(col, dataset)
         #print(col + ', length = ' + str(len(dataset[col]))) # debugging
@@ -601,8 +632,10 @@ def cut_dataset(dataset_0, tspan=None, tspan_0=None, t_zero=None, purge=True, ve
         try:
             #print('len(mask)=' + str(len(mask))) # debugging
             dataset[col] = dataset[col].copy()[mask]
-        except IndexError:
-            print('couldn\'t cut ' + col + ' because IndexError.')
+        except (IndexError, TypeError) as e:
+            print('WARNING: couldn\'t cut ' + col + ' because ' + str(e))
+            print(col + ', length = ' + str(len(dataset[col]))) # debugging
+            print(timecol + ', length = ' + str(len(dataset[timecol]))) #debugging
             purge_column(dataset, col, purge=purge, verbose=verbose)
 
     dataset['tspan'] = tspan
@@ -724,6 +757,9 @@ def parse_CHI_header(data):
             break
     else:
         print('EC_MS.Combining.parse_CHI_header() can\'t find timecol in CHI data!')
+        print('trying to get it from scan rate.')
+        from .EC import time_from_scanrate
+        t = time_from_scanrate(data)
     N = len(t)
     ti = 2 * t[0] - t[1]  # one tstep back from the first reorded t
     cols = {'i':'Current/A', 'E':'Potential/V'}
@@ -738,13 +774,13 @@ def parse_CHI_header(data):
         l = line.strip()
         dt = eval(l.split(' = ')[-1])
         tspan = [ti, ti + dt]
-        mask = np.logical_and(tspan[0] <= t, t < tspan[-1])
+        mask = np.logical_and(tspan[0] <= t, t <= tspan[-1])
 
         l2 = lines[nl - 1].strip()
-        print(l + '\n' + l2) # debugging
+        #print(l + '\n' + l2) # debugging
         col = cols[l2[0]]
         val = eval(l2.split(' = ')[-1])
-        print('tspan = ' + str(tspan) + ' ,  val = ' + str(val))
+        #print('tspan = ' + str(tspan) + ' ,  val = ' + str(val)) # debugging
         if not col in data:
             print('adding ' + col + ' to data based on CHI header.')
             data[col] = np.zeros(N)
@@ -819,8 +855,6 @@ def get_timecol(col=None, dataset=None, data_type=None, verbose=False):
             timecol = col[:-2] + '-x'
     elif data_type == 'SI':
         timecol = col.split(' - ')[0] + ' - Time [s]'
-    elif col[-2:] in ['-y', '-x']: # a timecol is its own timecol
-        timecol = col[:-2] + '-x' #for any data downloaded from cinfdata
     elif data_type == 'RGA':
         timecol = 'Time(s)'
     elif data_type == 'Xray':
@@ -830,6 +864,8 @@ def get_timecol(col=None, dataset=None, data_type=None, verbose=False):
             timecol = 'Time/sec'
         else:
             timecol = 'Time/s'
+    elif col[-2:] in ['-y', '-x']: # a timecol is its own timecol
+        timecol = col[:-2] + '-x' #for any data downloaded from cinfdata
     else:
         print('couldn\'t get a timecol for ' + str(col) +
               '. data_type=' + str(data_type))

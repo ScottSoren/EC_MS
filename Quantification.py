@@ -243,12 +243,14 @@ def recalibrate(quantify = [('H2','M2'), ('He','M4'), ('CH4','M15'), ('H2O','M18
 
     def fit_fun(x, a):
         return a*x
-
-    r, pcov = curve_fit(fit_fun, RSF_vec, F_cal_vec, p0=1)
-    try:
-        r = r[0]  # I think it comes back as an array, but I just want a number
-    except TypeError:
-        pass
+    if len(trusted) <= 1:
+        r = F_cal_vec[0]/RSF_vec[0]
+    else:
+        r, pcov = curve_fit(fit_fun, RSF_vec, F_cal_vec, p0=1)
+        try:
+            r = r[0]  # I think it comes back as an array, but I just want a number
+        except TypeError:
+            pass
     RSF_unit = 'a.u.' #{'Hiden':'a.u.', 'NIST':'a.u.'}[RSF_source]
     print('Calibration Factor / rsf = ' + str(r) + ' (C/mol)/' + RSF_unit)
 

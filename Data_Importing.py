@@ -456,7 +456,6 @@ def text_to_data(file_lines, title=None,
         N_blank = 2
         dataset['channels'] = {}
     elif data_type == 'CHI': # CH Instruments potentiostat
-        got_col_headers = False
         N_blank = 2
         sep = ','
     elif data_type == 'MS':
@@ -466,6 +465,7 @@ def text_to_data(file_lines, title=None,
         sep = '\t'
 
     n_blank = 0
+    got_col_headers = False
     for nl, line in enumerate(file_lines):
         l = line.strip()
         if nl < N_head - 1:            #we're in the header
@@ -590,15 +590,25 @@ def text_to_data(file_lines, title=None,
                 else:
                     n_blank = 0
                 if re.search('Start time', line):
-                    timestamp_object = re.search(timestamp_match,l)
+                    timestamp_object = re.search(timestamp_match, l)
                     timestamp = timestamp_object.group()
-                    if 'PM' in line: # convert it to 24-hour timestamp
-                        timestamp = str(int(timestamp[0:2]) + 12) + timestamp[2:]
+                    # RGA uses 12-hour (AM/PM), must be converted to 24-hour timestamp.
+                    hh = int(timestamp[0:2])
+                    if 'PM' in line and not hh==12:
+                    # Holy fuck the whole AM/PM thing is stupid
+                        timestamp = str(hh + 12) + timestamp[2:]
+                    elif 'AM' in line and hh==12:
+                        timestamp = '00' + timestamp[2:]
+
                 if re.search(r'\A[0-9]+\s', l): # lines starting with a number
                     items = [item.strip() for item in line.split(' ') if len(item.strip())>0]
                     channel = 'Channel#' + items[0]
                     mass = 'M' + items[1].split('.')[0]
                     dataset['channels'][channel] = mass
+                if 'Analog Scan' in l:
+                    col_headers = ['m/z', 'signal/A']
+                    got_col_headers = True
+                    print('got column headers! on line ' + str(nl))
 
             elif data_type == 'CHI':
                 if len(line.strip())==0:
@@ -611,17 +621,18 @@ def text_to_data(file_lines, title=None,
                 if nl == 0:
                     timestamp_object = re.search(timestamp_match,l)
                     timestamp = timestamp_object.group()
-                    if 'PM' in line: # convert it to 24-hour timestamp
-                        timestamp = str(int(timestamp[0:2]) + 12) + timestamp[2:]
                 if 'Segment = ' in line:
                     dataset['segments'] = line.split(' = ')[-1].strip()
                     last_segment_line = 'Segment ' + dataset['segments'] + ':'
                 if 'segments' in dataset and last_segment_line in line:
                     N_blank = 1
+                if 'Scan Rate (V/s)' in line:
+                    dataset['scan rate'] = eval(line.split(' = ')[-1].strip())*1e3 # in mV/s
                 if 'Time/s' in line: # then it's actually the column header line.
                     N_head = nl + 2 # the next line is a blank line, during which we handle the column headers
                     col_headers = l.split(sep)
                     got_col_headers = True # to be used on next line (nl=N_head-1)
+
 
             header_string = header_string + line
 
@@ -629,7 +640,8 @@ def text_to_data(file_lines, title=None,
                #(EC-lab includes the column-header line in header lines)
             #col_header_line = line
             if data_type == 'RGA':  # there's no damn commas on the column header lines!
-                col_headers = [col.strip() for col in l.split(' ') if len(col.strip())>0]
+                if not got_col_headers:
+                    col_headers = [col.strip() for col in l.split(' ') if len(col.strip())>0]
             elif data_type == 'CHI' and got_col_headers:
                 pass
             else:
@@ -639,12 +651,13 @@ def text_to_data(file_lines, title=None,
                 for i, col in enumerate(col_headers):
                     col_headers[i] = col_preheaders[i] +' - ' + col
 
+            #print(col_headers) # debugging
+
             dataset['N_col'] = len(col_headers)
             dataset['data_cols'] = col_headers.copy()  #will store names of columns containing data
 
             dataset['col_types'] = dict([(col, data_type) for col in col_headers])
 
-            #DataDict['data_cols'] = col_headers.copy()
             for col in col_headers:
                 dataset[col] = []              #data will go here
             header_string = header_string + line #include this line in the header
@@ -724,7 +737,7 @@ def import_data(*args, **kwargs):
     return load_from_file(*args, **kwargs)
 
 def load_from_file(full_path_name='current', title='file', tstamp=None, timestamp=None,
-                 data_type='EC', tz=None, verbose=True):
+                 data_type='EC', tz=None, name=None, verbose=True):
     '''
     This method will organize the data in a file useful for
     electropy into a dictionary as follows (plus a few more keys)
@@ -748,7 +761,15 @@ def load_from_file(full_path_name='current', title='file', tstamp=None, timestam
         dataset['tstamp'] = tstamp
     elif dataset['tstamp'] is None:
         dataset['tstamp'] = get_creation_time(full_path_name, verbose=verbose)
-    numerize(dataset)
+    if 'data_cols' not in dataset or len(dataset['data_cols']) == 0:
+        print('WARNING! empty dataset')
+        dataset['empty'] = True
+    else:
+        numerize(dataset)
+        dataset['empty'] = False
+    if name is None:
+        name = dataset['title']
+    dataset['name'] = name
 
     if verbose:
         print('\nfunction \'load_from_file\' finished!\n\n')
