@@ -9,16 +9,9 @@ import os, platform, re, codecs
 import time, datetime, pytz  #all three seem necessary for dealing with timezones.
 import numpy as np
 
-float_match = '[-]?\d+[\.]?\d*(e[-]?\d+)?'     #matches floats like '-3.54e4' or '7' or '245.13' or '1e-15'
+float_match = '[-]?\d+[\.]?\d*(e[-]?\d+)?'     #matches floats like '-3.5e4' or '7' or '245.13' or '1e-15'
 #note, no white space included on the ends! Seems to work fine.
 timestamp_match = '([0-9]{2}:){2}[0-9]{2}'     #matches timestamps like '14:23:01'
-date_match = '([0-9]{2}[/-]){2}[0-9]{4}'          #matches dates like '01/15/2018' or '09-07-2016'
-#^  mm/dd/yyyy, as EC lab does
-# older EC-Lab seems to have dashes in date, and newer has slashes.
-# Both seem to save month before day, regardless of where the data was taken or .mpt exported.
-date_match_2 = '[0-9]{4}([/-][0-9]{2}){2}'          #matches dates like '01/15/2018' or '09-07-2016'
-#^  yyyy/mm/dd, as cinfdata does
-
 
 def numerize(data):
     for col in data['data_cols']: #numerize!
@@ -46,10 +39,51 @@ def parse_timezone(tz=None):
     else:
         return tz
 
-def timestamp_to_epoch_time(timestamp, date='today', tz=None, verbose=True):
+def parse_date(line):
+    date_match = '([0-9]{2}[/-]){2}[0-9]{4}'          #matches dates like '01/15/2018' or '09-07-2016'
+    #^  mm/dd/yyyy, as EC lab does
+    # older EC-Lab seems to have dashes in date, and newer has slashes.
+    # Both seem to save month before day, regardless of where the data was taken or .mpt exported.
+    d1 = re.search(date_match, line)
+    if d1:
+        date1 = d1.group()
+        yyyy, mm, dd  = date1[-4:], date1[:2], date1[3:5]
+        date = yyyy + '/' + mm + '/' + dd
+        return date
+
+    date_match_2 = '[0-9]{4}([/-][0-9]{2}){2}'          #matches dates like '2018/01/15' or '2018-09-07'
+    #^  yyyy/mm/dd, as cinfdata does
+    d2 = re.search(date_match_2, line)
+    if d2:
+        date2 = d2.group()
+        yyyy, mm, dd = date2[:4], date2[5:7], date2[-2:]
+        date = yyyy + '/' + mm + '/' + dd
+        return date
+
+    month_names = {'01':'January', '02':'February', '03':'March', '04':'April',
+                   '05':'May', '06':'June', '07':'July', '08':'August',
+                   '09':'September', '10':'October', '11':'November', '12':'December'}
+    month_match = '(' + ''.join(list([v[:3] + '|' for v in month_names.values()]))[:-1] + ')' + '[a-z]*(\.)?'
+    date_match_3 = month_match + ' [0-9]+, [0-9]{4}'    #matches dates like 'Apr. 12, 2019' or 'August 1, 2019'
+    d3 = re.search(date_match_3, line)
+    if d3:
+        date3 = d3.group()
+        month = re.search(month_match, date3).group()
+        mm = next(key for key, value in month_names.items() if value[:3]==month[:3])
+        yyyy = date3[-4:]
+        dd = re.search('[0-9]+,', date3).group()[:-1]
+        date = yyyy + '/' + mm + '/' + dd
+        return date
+
+    print('can\'t find date in line \'' + line + '\'. parse_date() is returning None.')
+    return None
+
+
+def timestring_to_epoch_time(timestring, date=None, tz=None, verbose=True,
+                             out='tstamp'):
     '''
-    Possibly overly idiot-proof way to convert a number of timestamps read
-    from my data into epoch (unix) time.
+    A way to convert a number of timestrings read from my data into a standard-formatted
+    date and time, and then to an epoch (unix) time.
 
     tz is the Timezone, which is only strictly necessary when synchronizing
     data taken at different places or accross dst at a place with different dst
@@ -64,69 +98,64 @@ def timestamp_to_epoch_time(timestamp, date='today', tz=None, verbose=True):
         if verbose:
             print('getting epoch time given a timestamp local to ' + str(tz))
         epoch = pytz.utc.localize(datetime.datetime.utcfromtimestamp(0))
-    if timestamp == 'now':
+
+    if timestring == 'now':
         return time.time()
-    elif type(timestamp) is time.struct_time:
+    elif type(timestring) is time.struct_time:
         if verbose:
-            print('\'timestamp_to_unix_time\' revieved a time.struct_time object. ' +
+            print('\'timestring_to_epoch_time\' revieved a time.struct_time object. ' +
                   'Returning the corresponding epoch time.')
-    elif type(timestamp) is not str:
+        return time.mktime(timestring)
+
+    elif type(timestring) is not str:
         if verbose:
             print('timestamp_to_unix_time\' didn\'t receive a string. ' +
-                  'Received:\n' + str(timestamp) + ' \nReturning the argument.')
-        return timestamp
-    if len(timestamp) > 8 and date=='today':
-        if verbose:
-            print('\'timestamp_to_unix_time\' is assuming' +
-                  ' the date and timestamp are input in the same string.')
+                  'Received:\n' + str(timestring) + ' \nReturning the argument.')
+        return timestring
+
+    if len(timestring) > 8:
         try:
-            if tz is None:
-                struct = time.strptime(timestamp)
-                tstamp = time.mktime(struct)
-            else:
-                dt_naive = datetime.datetime.strptime(timestamp, '%a %b %d %H:%M:%S %Y')
-                dt = tz.localize(dt_naive)
-                tstamp = (dt - epoch).total_seconds()
+            timestamp = re.search(timestamp_match, timestring).group()
+            hh = int(timestamp[0:2])
+            if 'PM' in timestring and not hh==12:
+            # Holy fuck the whole AM/PM thing is stupid
+                timestamp = str(hh + 12) + timestamp[2:]
+            elif 'AM' in timestring and hh==12:
+                timestamp = '00' + timestamp[2:]
+        except AttributeError:
             if verbose:
-                print('timestamp went straight into time.strptime()! Returning based on that.')
-            return tstamp
-        except ValueError:
-            if verbose:
-                print('bit \'' + timestamp + '\' is not formatted like ' +
-                      'time.strptime() likes it. Checking another format')
-            try:
-                date = re.search(date_match, timestamp).group()
-                if verbose:
-                    print('Matched the date with \'' + date_match + '\'.')
-            except AttributeError:
-                if verbose:
-                    print('Couldn\'t match with \'' + date_match +
-                          '\'. Assuming you want today.')
-            try:
-                timestamp = re.search(timestamp_match, timestamp).group()
-                if verbose:
-                    print('Matched the time with \'' + timestamp_match + '\'.' )
-            except AttributeError:
-                if verbose:
-                    print('I got no clue what you\'re talking about, dude, ' +
-                          'when you say ' + timestamp + '. It didn\'t match \.' +
-                          timestamp_match + '\'. Assuming you want 00:00:00')
-                timestamp = '00:00:00'
-    #h, m, s = (int(n) for n in timestamp.split(':'))
-    #D, M, Y = (int(n) for n in re.split('[-/]', date))
+                print('WARNING: I got no clue what you\'re talking \'bout ' +
+                      'when you say ' + timestamp + '. It didn\'t match \.' +
+                      timestamp_match + '\'. Assuming you want 00:00:00')
+            timestamp = '00:00:00'
+
+    if date is None:
+        if verbose:
+            print('\'timestring_to_epoch_time\' is assuming' +
+                  ' the date is in the timestring.')
+        date = parse_date(timestring)
+
+    if date is None:
+        if verbose:
+            print('couldn\'t figure out the date for ' + timestring + '. Assuming today.')
+        date = 'today'
     if date == 'today':
-        date = time.strftime('%m/%d/%Y')
+        date = time.strftime('%Y/%m/%d')
+
     if tz is None:
         if '-' in date:
             date = date.replace('-','/') #18D08
-        struct = time.strptime(date + ' ' + timestamp, '%m/%d/%Y %H:%M:%S')
+        struct = time.strptime(date + ' ' + timestamp, '%Y/%m/%d %H:%M:%S')
         tstamp = time.mktime(struct)
     else:
-        dt_naive = datetime.datetime.strptime(date + ' ' + timestamp, '%m/%d/%Y %H:%M:%S')
+        dt_naive = datetime.datetime.strptime(date + ' ' + timestamp, '%Y/%m/%d %H:%M:%S')
         dt = tz.localize(dt_naive)
         tstamp = (dt - epoch).total_seconds()
 
+    if out == 'all':
+        return tstamp, date, timestamp
     return tstamp
+
 
 def epoch_time_to_timestamp(tstamp, tz=None, verbose=True):
     '''
@@ -446,9 +475,6 @@ def text_to_data(file_lines, title=None,
         N_head = 1 #the column headers are the first line
         if sep is None:
             sep = ','
-    elif data_type == 'XAS':
-        datacollines = False # column headers are on multiple lines, this will be True for those lines
-        col_headers = []   #this is the most natural place to initiate the vector
     elif data_type == 'SI':  # Spectro Inlets data
         sep = '\t' # despite it being a .csv, the separator is a tab.
     elif data_type == 'RGA':
@@ -461,7 +487,7 @@ def text_to_data(file_lines, title=None,
     elif data_type == 'MS':
         N_blank = 10
 
-    if sep is None:  #EC, XAS, and MS data all work with '\t'
+    if sep is None:  #EC and MS data all work with '\t'
         sep = '\t'
 
     n_blank = 0
@@ -485,11 +511,11 @@ def text_to_data(file_lines, title=None,
                 elif timestamp is None and re.search('Acquisition started',line):
                     timestamp_object = re.search(timestamp_match,l)
                     timestamp = timestamp_object.group()
-                    date_object = re.search(date_match, l)
-                    date = date_object.group()
+                    date = parse_date(l)
                     if verbose:
                         print('timestamp \'' + timestamp + '\' found in line ' + str(nl))
-                elif re.search('Number of loops', line): #Then I want to add a loop number variable to data_cols
+                elif re.search('Number of loops', line):
+                    #Then I want to add a loop number variable to data_cols
                     loop = True
                     dataset['loop number'] = []
                 elif re.search('Loop', line):
@@ -498,34 +524,6 @@ def text_to_data(file_lines, title=None,
                     finish = int(re.search(r'to \d+', line).group()[3:])
                     N = finish - start + 1
                     dataset['loop number'] += N * [n]
-
-
-            elif data_type == 'XAS':
-                if datacollines:
-                    if l == '': #then we're done geting the column headers
-                        datacollines = False
-                        #header = False  #and ready for data.
-                        N_head = nl + 1 # so that the next line is data!
-                        dataset['data_cols'] = col_headers.copy()
-                        if verbose:
-                            print('data col lines finish on line' + str(nl) +
-                                  '. the next line should be data')
-                    else:
-                        col_headers += [l]
-                        dataset[l] = []
-                elif l == 'Data:':  #then we're ready to get the column headers
-                    datacollines = True
-                    if verbose:
-                        print('data col lines start on line ' + str(nl+1))
-                a = re.search(timestamp_match, l)
-                if timestamp is None and a is not None:
-                    timestamp = a.group()
-                    d = re.search(date_match, l)
-                    if d is not None:
-                        date = d.group()
-                    tstamp = timestamp_to_epoch_time(l, tz=tz, verbose=verbose) #the XAS data is saved with time.ctime()
-                    if verbose:
-                        print('timestamp \'' + timestamp + '\' found in line ' + str(nl))
 
             elif data_type == 'MS':
                 if len(line.strip())==0:
@@ -548,9 +546,7 @@ def text_to_data(file_lines, title=None,
                     string2 = object2.group()
                     timestamp_object = re.search(timestamp_match, string2.strip())
                     timestamp = timestamp_object.group()
-                    date_object = re.search(date_match_2, string2.strip())
-                    date = date_object.group()
-                    date = date[5:7] + '/' + date[-2:] + '/' + date[:4]
+                    date = parse_date(l)
                     # ^convert yyyy-mm-dd to dd-mm-yyyy
                     if verbose:
                         print('timestamp \'' + timestamp + '\' found in line ' + str(nl))
@@ -568,9 +564,9 @@ def text_to_data(file_lines, title=None,
                         print('title \'' + str(title) + '\' found in line ' + str(nl))
                 if items[0] == 'offset':
                     offset = float(items[-1])
+                    dataset['SI offset'] = offset
                     if verbose:
                         print('SI offset \'' + str(offset) + '\' found in line ' + str(nl))
-                        dataset['SI offset'] = offset
                 if items[0] == 'data_start':
                     N_head = int(items[-1])
                     if verbose:
@@ -590,16 +586,8 @@ def text_to_data(file_lines, title=None,
                 else:
                     n_blank = 0
                 if re.search('Start time', line):
-                    timestamp_object = re.search(timestamp_match, l)
-                    timestamp = timestamp_object.group()
-                    # RGA uses 12-hour (AM/PM), must be converted to 24-hour timestamp.
-                    hh = int(timestamp[0:2])
-                    if 'PM' in line and not hh==12:
-                    # Holy fuck the whole AM/PM thing is stupid
-                        timestamp = str(hh + 12) + timestamp[2:]
-                    elif 'AM' in line and hh==12:
-                        timestamp = '00' + timestamp[2:]
-
+                    tstamp, date, timestamp = timestring_to_epoch_time(l, tz=tz,
+                                                    out='all', verbose=verbose)
                 if re.search(r'\A[0-9]+\s', l): # lines starting with a number
                     items = [item.strip() for item in line.split(' ') if len(item.strip())>0]
                     channel = 'Channel#' + items[0]
@@ -618,9 +606,11 @@ def text_to_data(file_lines, title=None,
                     continue
                 else:
                     n_blank = 0
-                if nl == 0:
-                    timestamp_object = re.search(timestamp_match,l)
-                    timestamp = timestamp_object.group()
+                if nl == 0: # record time (measurement finish time) on top line
+                    if verbose:
+                        print('finding tstamp from line: ' + l)
+                    tstamp, date, timestamp = timestring_to_epoch_time(l, tz=tz,
+                                                    out='all', verbose=verbose)
                 if 'Segment = ' in line:
                     dataset['segments'] = line.split(' = ')[-1].strip()
                     last_segment_line = 'Segment ' + dataset['segments'] + ':'
@@ -712,7 +702,7 @@ def text_to_data(file_lines, title=None,
     dataset['timestamp'] = timestamp
     dataset['date'] = date
     if tstamp is None:
-        tstamp = timestamp_to_epoch_time(timestamp, date, tz=tz, verbose=verbose)
+        tstamp = timestring_to_epoch_time(timestamp, date, tz=tz, verbose=verbose, out='tstamp')
     dataset['timezone'] = tz
     dataset['tstamp'] = tstamp
     #UNIX epoch time, for proper synchronization!
@@ -744,10 +734,6 @@ def load_from_file(full_path_name='current', title='file', tstamp=None, timestam
     {'title':title, 'header':header, 'timestamp':timestamp,
     'data_cols':[colheader1, colheader2, ...],
     colheader1:[data1], colheader2:[data2]...}
-    So far made to work with SPEC files (.csv), XAS files (.dat),
-    EC_Lab files (.mpt).
-    If you need to import cinfdata files (.txt), you are in the wrong place.
-    Use EC_MS's import_data instead!!!
     '''
     if verbose:
         print('\n\nfunction \'load_from_file\' at your service!\n')
@@ -757,9 +743,10 @@ def load_from_file(full_path_name='current', title='file', tstamp=None, timestam
     dataset = text_to_data(file_lines=file_lines, title=title, data_type=data_type,
                            timestamp=timestamp, tz=tz, tstamp=tstamp,
                            verbose=verbose)
-    if tstamp is not None: #then it overrides whatever test_to_data came up with.
+    if tstamp is not None: #then it overrides whatever text_to_data came up with.
         dataset['tstamp'] = tstamp
     elif dataset['tstamp'] is None:
+        print('WARNING: no tstamp found in ' + full_path_name + '. Using file timestamp.')
         dataset['tstamp'] = get_creation_time(full_path_name, verbose=verbose)
     if 'data_cols' not in dataset or len(dataset['data_cols']) == 0:
         print('WARNING! empty dataset')
@@ -770,6 +757,19 @@ def load_from_file(full_path_name='current', title='file', tstamp=None, timestam
     if name is None:
         name = dataset['title']
     dataset['name'] = name
+
+    if data_type == 'SI':
+        from .Combining import rename_SI_cols
+        rename_SI_cols(dataset)
+    elif data_type == 'RGA':
+        from .Combining import rename_RGA_cols
+        rename_RGA_cols(dataset)
+    elif data_type == 'CHI':
+        from .Combining import parse_CHI_header, rename_CHI_cols, timeshift
+        parse_CHI_header(dataset)
+        rename_CHI_cols(dataset)
+        dt = dataset['time/s'][-1] - dataset['time/s'][0]
+        timeshift(dataset, dt)
 
     if verbose:
         print('\nfunction \'load_from_file\' finished!\n\n')

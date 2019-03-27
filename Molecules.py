@@ -69,10 +69,11 @@ class Molecule:
                 self.file_lines = f.readlines()
                 if len(self.file_lines) == 0:
                     print('The file for ' + name + ' is empty!')
-                    raise FileNotFoundError
             self.reset(verbose=verbose)
             self.file_lines = ['name: ' + self.name] + self.file_lines
         except FileNotFoundError: # I don't know the name of the error, so I'll have to actually try it first.
+            os.chdir(cwd)
+            raise
             print('no file found for ' + name)
             if writenew:
                 string = input('Start new data file for \'' + self.name + '\'? (y/n)\n')
@@ -92,8 +93,7 @@ class Molecule:
         def T(M):
             return M
         self.transmission_function = T
-
-        self.color = self.get_color()
+        #self.color = self.get_color()
 
 
     def write(self, a=None, attr=None, *args, **kwargs):
@@ -276,7 +276,7 @@ class Molecule:
             if 'primary' in dir(self):
                 self.rsf = self.RSF[self.primary]
             if verbose:
-                print('returning Hiden rsf, adjusted to mass of measurement according' +
+                print('RSFs from Hiden rsf, adjusted to mass of measurement according' +
                       'to NIST spectrum for ' + self.name)
 
 
@@ -286,7 +286,7 @@ class Molecule:
             if 'primary' in dir(self):
                 self.rsf = self.ifcs * transmission_function(int(self.primary[1:]))
             if verbose:
-                print('returning ionization-fragmentation cross section in Ang^2 \'ifcs\'' +
+                print('RSFs from ionization-fragmentation cross section in Ang^2 \'ifcs\'' +
                       'based on NIST cross section and spectrum for ' + self.name +
                       'and the given transmission function T(M)')
 
@@ -484,11 +484,14 @@ class Molecule:
 
     def get_color(self):
         try:
-            return standard_colors[self.primary]
+            return self.color
         except AttributeError:
-            print('WARNING: ' + str(self) + ' has no attribute \'primary\'')
-        except KeyError:
-            print('WARNING: standard_colors has no entry for ' + str(self.primary))
+            try:
+                return standard_colors[self.primary]
+            except AttributeError:
+                print('WARNING: ' + str(self) + ' has no attribute \'primary\'')
+            except KeyError:
+                print('WARNING: standard_colors has no entry for ' + str(self.primary))
 
     def get_flux(self, MS_data, tspan='tspan', density=None,
                  unit='pmol/s', verbose=True, override=False, x=None,
@@ -512,7 +515,10 @@ class Molecule:
             cal_mat = {mass:1/F_cal}
 
         if tspan is None:
-            tspan = 'tspan'
+            if x is not None:
+                tspan = [x[0], x[-1]]
+            else:
+                tspan = 'tspan'
         if type(tspan) is str and not tspan=='all':
             tspan = MS_data[tspan]
 
@@ -535,14 +541,6 @@ class Molecule:
             s0 = MS_data[mass + '-y']
             s = np.interp(x, x0, s0)
             y += s * C # units: [A] * [mol/C] = [mol/s]
-
-        if 'nmol' in unit:
-            y = y * 1e9
-        elif 'pmol' in unit:
-            y = y * 1e12
-        if 'cm$^{-2}$' in unit or '/cm^2' in unit:
-            y = y / MS_data['A_el']
-
 
         if (background is None or background is 'preset') and hasattr(self, 'background'):
             background = self.background
@@ -585,6 +583,16 @@ class Molecule:
                 pass
             y = y - 0.99*background #so that we don't break the log scale.
             #I should get rid of this and assume the caller knows what they're doing.
+
+        # important that this comes after the background bit, so that we don't
+        # subtract a background in different units than the signal
+        if 'nmol' in unit:
+            y = y * 1e9
+        elif 'pmol' in unit:
+            y = y * 1e12
+        if 'cm$^{-2}$' in unit or '/cm^2' in unit:
+            y = y / MS_data['A_el']
+
         return x, y
 
 

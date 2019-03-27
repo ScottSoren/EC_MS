@@ -13,25 +13,26 @@ Most recently edited: 16J27
 
 from __future__ import division, print_function
 
-import os, sys
+import os, sys, pickle
 import numpy as np
 from matplotlib import pyplot as plt
 
 if os.path.split(os.getcwd())[1] == 'EC_MS':
                                 #then we're running from inside the package
     import Chem
-    from EC import plot_CV_cycles, CV_difference, sync_metadata
+    from EC import plot_CV_cycles, CV_difference, sync_metadata, select_cycles
     from Molecules import Molecule
     from Chips import Chip
-    from Quantification import get_signal
+    from Quantification import get_signal, get_current, get_potential
     print(os.getcwd())
     sys.exit()
 else:                           #then we use relative import
     from . import Chem
-    from .EC import plot_CV_cycles, CV_difference, sync_metadata
+    from .EC import plot_CV_cycles, CV_difference, sync_metadata, select_cycles
     from .Molecules import Molecule
     from .Chips import Chip
-    from .Quantification import get_signal, get_current
+    from .Quantification import get_signal, get_current, get_potential
+    from .Plotting import colorax, align_zero, plot_experiment
 
 def ML_strip_cal(CV_and_MS, cycles=[1,2], t_int=200, cycle_str='cycle number',
              mol='CO2', mass='primary', n_el=None,
@@ -397,27 +398,208 @@ def point_calibration(data, mol, mass='primary', cal_type='internal',
     return m
 
 
-def LCA_cal():
-    calibration = {'type': 'LCA'}
-    return calibration
+
+def calibration_curve(data, mol, mass='primary', n_el=-2,
+                      cycles=None, cycle_str='selector',
+                      mode='average', t_int=15, t_tail=30, t_pre=15,
+                      background=None, t_bg=None, tspan_plot=None,
+                      out='Molecule', ax='new', J_color='0.5', verbose=True
+                      ):
+
+    # ----- parse inputs -------- #
+    m = Molecule(mol)
+    if mass == 'primary':
+        mass = m.primary
+
+    if mode in ['average', 'averaging', 'mean']:
+        mode = 'average'
+    elif mode in ['integral', 'integrate', 'integrating']:
+        mode = 'integral'
+
+    use_bg_fun = False
+    if t_bg is not None:
+        x_bg, y_bg = get_signal(data, mass=mass, tspan=t_bg, unit='A')
+        bg = np.mean(y_bg)
+    elif callable(background):
+        use_bg_fun = True
+    elif background is not None:
+        bg = background
+    else:
+        bg = 0
+
+    # ---------- shit, lots of plotting options... ---------#
+    ax1, ax2a, ax2b, ax2c = None, None, None, None
+    fig1, fig2 = None, None
+    if ax == 'new':
+        ax1 = 'new'
+        ax2 = 'new'
+    else:
+        try:
+            iter(ax)
+        except TypeError:
+            ax2c = ax
+        else:
+            try:
+                ax1, ax2 = ax
+            except (TypeError, IndexError):
+                print('WARNING: calibration_curve couldn\'t use the give axes')
+    if ax1 == 'new':
+        ax1 = plot_experiment(data, masses=[mass], tspan=tspan_plot,
+                              emphasis=None, removebackground=False, unit='A')
+        fig1 = ax1[0].get_figure()
+    if ax2 == 'new':
+        fig2, [ax2a, ax2c] = plt.subplots(ncols=2)
+        ax2b = ax2a.twinx()
+        fig2.set_figwidth(fig1.get_figheight()*3)
+    else:
+        try:
+            iter(ax2)
+        except TypeError:
+            ax2c = ax2
+        else:
+            try:
+                ax2a, ax2b, ax2c = ax
+            except (TypeError, IndexError):
+                print('WARNING: calibration_curve couldn\'t use the give ax2')
 
 
-if __name__ == '__main__':
-    '''
+    # ----- cycle through and calculate integrals/averages -------- #
+    Ys, ns, Vs = [], [], []
+    for cycle in cycles:
+        c = select_cycles(data, [cycle], cycle_str=cycle_str, verbose=verbose)
+        t_end = c['time/s'][-1]
+        t_start = c['time/s'][0]
+        if mode == 'average':
+            tspan = [t_end - t_int, t_end]
+        elif mode == 'ingegral':
+            c = select_cycles(data, [cycle-1, cycle, cycle+1], cycle_str=cycle_str,
+                              t_zero=str(cycle), verbose=verbose)
+            tspan = [t_start-t_pre, t_end+t_tail]
 
-    from Data_Importing import import_data
-    from Combining import synchronize
-    from EC import select_cycles, plot_CV_cycles, plot_vs_time
-    from Plotting import plot_masses_and_I
-    from Time_Response import stagnant_pulse, fit_step
+        t, I = get_current(c, tspan=tspan, verbose=verbose)
+        t_v, v = get_potential(c, tspan=tspan, verbose=verbose)
+        x, y = get_signal(c, mass=mass, tspan=tspan, verbose=verbose, unit='A')
+        if use_bg_fun: # has to work on x.
+            bg = background(x)
+
+        V = np.mean(v)
+
+        if mode == 'average':
+            I_av = np.mean(I)
+            n = I_av/(n_el*Chem.Far)
+            Y = np.mean(y-bg)
+
+        elif mode == 'integral':
+            Q = np.trapz(I, t)
+            n = Q/(n_el*Chem.Far)
+            Y = np.trapz(y-bg, x)
+
+        if ax1 is not None:
+            color = m.get_color()
+            try:
+                iter(bg)
+            except TypeError:
+                y_bg = bg*np.ones(y.shape)
+            else:
+                y_bg = bg
+            ax1[0].fill_between(x, y, y_bg, where=y>y_bg, color=color, alpha=0.5)
+            J = I * 1e3 / data['A_el']
+            J_bg = np.zeros(J.shape)
+            ax1[2].fill_between(t, J, J_bg, color=J_color, alpha=0.5)
+
+        ns += [n]
+        Ys += [Y]
+        Vs += [V]
+
+    # ----- evaluate the calibration factor -------- #
+    ns, Ys, Vs = np.array(ns), np.array(Ys), np.array(Vs)
+
+    pfit = np.polyfit(ns, Ys, deg=1)
+    F_cal = pfit[0]
+    Y_pred = F_cal * ns + pfit[1]
+
+    m.F_cal = F_cal
+
+    # ----- plot the results -------- #
+    color = m.get_color()
+    ax2 = []
+    if ax2a is not None: # plot the internal H2 calibration
+        V_str, J_str = sync_metadata(data, verbose=False)
+        if n_el < 0:
+            ax2a.invert_xaxis()
+        ax2a.plot(Vs, ns*1e9, '.-', color=J_color, markersize=10)
+        ax2b.plot(Vs, Ys*1e9, 's', color=color)
+        ax2a.set_xlabel(V_str)
+        if mode == 'average':
+            ax2a.set_ylabel('<I>/(' + str(n_el) + '$\mathcal{F}$) / [nmol s$^{-1}$]')
+            ax2b.set_ylabel('<M2 signal> / nA')
+        else:
+            ax2a.set_ylabel('$\Delta$Q/(' + str(n_el) + '$\mathcal{F}$) / nmol')
+            ax2b.set_ylabel('M2 signal / nC')
+        colorax(ax2b, color)
+        colorax(ax2a, J_color)
+        align_zero(ax2a, ax2b)
+        ax2 += [ax2a, ax2b]
+    if ax2c is not None:
+        ax2c.plot(ns*1e9, Ys*1e9, '.', color=color, markersize=10)
+        ax2c.plot(ns*1e9, Y_pred*1e9, '--', color=color)
+        if mode == 'average':
+            ax2c.set_xlabel('<I>/(' + str(n_el) + '$\mathcal{F}$) / [nmol s$^{-1}$]')
+            ax2c.set_ylabel('<M2 signal> / nA')
+        else:
+            ax2c.set_xlabel('$\Delta$Q/(' + str(n_el) + '$\mathcal{F}$) / nmol')
+            ax2c.set_ylabel('M2 signal / nC')
+        ax2 += [ax2c]
+
+    # ------- parse 'out' and return -------- #
+    possible_outs = {'ax':[ax1, ax2], 'fig':[fig1, fig2], 'Molecule':m,
+                     'F_cal':F_cal, 'Vs':Vs, 'ns':ns, 'Ys':Ys}
+    if type(out) is str:
+        outs = possible_outs[out]
+    else:
+        outs = [possible_outs[o] for o in out]
+    if verbose:
+        print('\nfunction \'calibration_curve\' finished!\n\n')
+    return outs
 
 
+def save_calibration_results(mdict, f):
+    calibration_results = {}
+    for mol, m in mdict.items():
+        result = {}
+        for attr in ['primary', 'F_cal', 'cal_mat']:
+            if hasattr(m, attr):
+                result[attr] = getattr(m, attr)
+        calibration_results[mol] = result
+    if type(f) is str:
+        with open(f, 'wb') as f:
+            pickle.dump(calibration_results, f) # save it
+    else: # then it must be a file
+        pickle.dump(calibration_results, f) # save it
 
-        ##
+def load_calibration_results(f, verbose=True):
+    if verbose:
+        print('\n\nfunction \'load_calibration_results\' at your service!\n')
+    if type(f) is str:
+        with open(f, 'rb') as f: # load the calibrations!
+            calibration_results = pickle.load(f)
+    else:
+        calibration_results = pickle.load(f)
 
+    mdict = {} # turn the calibration results back into Molecule objects
+    for mol, result in calibration_results.items():
+        try:
+            m = Molecule(mol, verbose=verbose)
+        except FileNotFoundError:  # this happens if any molecule names were changed
+            m = result
+        else:
+            for attr, value in result.items():
+                setattr(m, attr, value)
+        mdict[mol] = m
+    if verbose:
+        print('\nfunction \'load_calibration_results\' finished!\n\n')
+    return mdict
 
-
-    '''
 
 
 

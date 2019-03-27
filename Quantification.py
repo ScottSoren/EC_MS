@@ -183,6 +183,7 @@ def recalibrate(quantify = [('H2','M2'), ('He','M4'), ('CH4','M15'), ('H2O','M18
     mdict = {}  # to be returned by the function
     if type(quantify) is list:
         quantify = dict(quantify)
+    quantmols = list(quantify.keys())
     for mol, mass in quantify.items():
         mdict[mol] = Molecule(mol)
         mdict[mol].primary = mass
@@ -222,7 +223,7 @@ def recalibrate(quantify = [('H2','M2'), ('He','M4'), ('CH4','M15'), ('H2O','M18
 
     if transmission_function == 'default':
         def T(M):
-            return np.power(M, -1/2)
+            return M**(-1/2)
     elif transmission_function == 1:
         def T(M):
             return 1
@@ -252,7 +253,7 @@ def recalibrate(quantify = [('H2','M2'), ('He','M4'), ('CH4','M15'), ('H2O','M18
         except TypeError:
             pass
     RSF_unit = 'a.u.' #{'Hiden':'a.u.', 'NIST':'a.u.'}[RSF_source]
-    print('Calibration Factor / rsf = ' + str(r) + ' (C/mol)/' + RSF_unit)
+    print('\n--- Calibration Factor / rsf = ' + str(r) + ' (C/mol)/' + RSF_unit + '---\n')
 
     # ----------- prepare the figure, plot the given F_cals
     if ax == 'new':
@@ -262,16 +263,24 @@ def recalibrate(quantify = [('H2','M2'), ('He','M4'), ('CH4','M15'), ('H2O','M18
         ax.set_ylabel('F_cal / [C/mol]')
         for m in internal:
             mol, mass, F_cal = m.name, m.primary, m.F_cal
-            rsf = m.get_RSF(RSF_source=RSF_source, transmission_function=T, mass=mass)
-            color = standard_colors[mass]
-            print('plotting ' + m.name + ' as a color=' + color + ' square.')
+            rsf = m.get_RSF(RSF_source=RSF_source, transmission_function=T,
+                            mass=mass, verbose=False)
+            try:
+                color = m.get_color()
+            except AttributeError:
+                color = standard_colors[mass]
+            print('plotting ' + m.name + ' as a color=' + color + ' square.\n')
             ax.plot(rsf, F_cal, 's', color=color, markersize=10)
         for m in external:
             mol, mass, F_cal = m.name, m.primary, m.F_cal
-            rsf = m.get_RSF(RSF_source=RSF_source, transmission_function=T, mass=mass)
-            color = standard_colors[mass]
-            print('plotting ' + mol + ' as a color=' + color + ' triangle.')
-            ax.plot(rsf, F_cal, '^', color=standard_colors[mass], markersize=10)
+            rsf = m.get_RSF(RSF_source=RSF_source, transmission_function=T,
+                            mass=mass, verbose=False)
+            try:
+                color = m.get_color()
+            except AttributeError:
+                color = standard_colors[mass]
+            print('plotting ' + mol + ' as a color=' + color + ' triangle.\n')
+            ax.plot(rsf, F_cal, '^', color=color, markersize=10)
 
 
     # -------- use rsf to predict F_cal for all the other molecules
@@ -281,7 +290,10 @@ def recalibrate(quantify = [('H2','M2'), ('He','M4'), ('CH4','M15'), ('H2O','M18
             mass = quantify[mol]
         else:
             mass = m.primary
-        color=standard_colors[mass]
+        try:
+            color = m.get_color()
+        except AttributeError:
+            color=standard_colors[mass]
 
         # calculate RSF
         rsf = m.get_RSF(RSF_source=RSF_source, transmission_function=T, mass=mass)
@@ -299,16 +311,17 @@ def recalibrate(quantify = [('H2','M2'), ('He','M4'), ('CH4','M15'), ('H2O','M18
             F_cal = r * rsf  #the extrapolation!
             if ax is not None:
                 print('plotting ' + mol + ' as a color=' + color + ' dot.')
-                ax.plot(rsf, F_cal, '.', color=standard_colors[mass], markersize=10)
+                ax.plot(rsf, F_cal, '.', color=color, markersize=10)
         print(mol + ': F_cal = ' + str(F_cal))
 
         # write it to the Molecule object
-        if 'cal' in m.__dict__:
-            m.cal[mass] = F_cal
-        if 'primary' not in m.__dict__:
-            m.primary = mass
-        if m.primary == mass:
-            m.F_cal = F_cal
+        if mol in quantmols:  # only do it for the molecules that were asked for
+            if 'cal' in m.__dict__:
+                m.cal[mass] = F_cal
+            if 'primary' not in m.__dict__:
+                m.primary = mass
+            if m.primary == mass:
+                m.F_cal = F_cal
 
         # write it to the Molecule's data file
         if writeit:
@@ -384,8 +397,12 @@ def get_signal(MS_data, mass, tspan=None,
         except KeyError:
             print('WARNING: no tspan available to get_signal()! using tspan=\'all\'')
             tspan = 'all'
-    if not tspan == 'all':
-        x, y = cut(x,y,tspan, override=override)
+    if not tspan == 'all̈́':
+        try:
+            x, y = cut(x,y,tspan, override=override)
+        except TypeError:
+            x = tspan
+            y = np.interp(tspan, x, y)
 
     if removebackground is None:
         removebackground = not (background is None)
@@ -453,12 +470,14 @@ def get_flux(MS_data, mol, **kwargs):
     return m.get_flux(MS_data, **kwargs)
 
 
-def get_current(EC_data, tspan='tspan', unit='A'):
+def get_current(EC_data, tspan='tspan', unit='A', verbose=False):
     '''
     I'm not happy with this function. I need to completely upgrade the way
     mass-, area-, and otherwise normalized currents and units are handled.
     This should work for now.
     '''
+    if verbose:
+        print('getting current in ' + unit)
     t_str = 'time/s'
     V_str, J_str = sync_metadata(EC_data, verbose=False)
     if '/' in unit: #then it's normalized in some way
@@ -479,12 +498,14 @@ def get_current(EC_data, tspan='tspan', unit='A'):
     return [t, j]
 
 
-def get_potential(EC_data, tspan='tspan', scale='RHE'):
+def get_potential(EC_data, tspan='tspan', scale='RHE', verbose=False):
     '''
     I'm not happy with this function. I need to completely upgrade the way
     mass-, area-, and otherwise normalized currents and units are handled.
     This should work for now.
     '''
+    if verbose:
+        print('getting potential on ' + scale + ' scale if possible')
     t_str = 'time/s'
     V_str, J_str = sync_metadata(EC_data, verbose=False)
     if scale=='RHE': #then it's normalized in some way

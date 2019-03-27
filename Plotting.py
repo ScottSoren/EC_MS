@@ -698,7 +698,7 @@ def plot_experiment(EC_and_MS,
         ax[0].set_xlabel('')
         ax[0].xaxis.tick_top()
 
-    if tspan is not None and not tspan == 'all':
+    if tspan is not None and not type(tspan) is str:
         ax[0].set_xlim(tspan)
 
 
@@ -729,7 +729,7 @@ def plot_experiment(EC_and_MS,
 
 
     # -------- cut the electrochemistry data according to tspan ------ #
-    if not tspan == 'all' and (plotcurrent or plotpotential):
+    if type(tspan) is not str and (plotcurrent or plotpotential):
         mask = np.logical_and(tspan[0]<t, t<tspan[-1])
         t = t[mask]
         #print(np.where(mask)) #debugging
@@ -773,7 +773,7 @@ def plot_experiment(EC_and_MS,
 
     if plotcurrent or plotpotential:
         ax[1].set_xlabel(t_str)
-        if tspan is not None and not tspan == 'all':
+        if tspan is not None and not type(tspan) is str:
             ax[1].set_xlim(tspan)
 
     # -------- finishing up -------- #

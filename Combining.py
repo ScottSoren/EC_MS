@@ -81,7 +81,7 @@ def synchronize(data_objects, t_zero=None, append=None, file_number_type=None,
     if verbose:
         print('\n\nfunction \'synchronize\' at your service!')
 
-    from .Data_Importing import timestamp_to_epoch_time, epoch_time_to_timestamp
+    from .Data_Importing import timestring_to_epoch_time, epoch_time_to_timestamp
 
     if type(data_objects) is not list:
         print('''The first argument to synchronize should be a list of datasets!
@@ -193,7 +193,7 @@ def synchronize(data_objects, t_zero=None, append=None, file_number_type=None,
                 date = dataset['date']
             if 'timestamp' in dataset:
                 timestamp = dataset['timestamp']
-            t_0 = timestamp_to_epoch_time(timestamp, date, tz=tz, verbose=verbose)
+            t_0 = timestring_to_epoch_time(timestamp, date, tz=tz, verbose=verbose)
 
         if verbose:
                 print('\ttstamp is ' + str(t_0) + ' seconds since Epoch')
@@ -320,10 +320,10 @@ def synchronize(data_objects, t_zero=None, append=None, file_number_type=None,
     # It's very nice when appending data from multiple files (EC data especially,
     # from experience), to be able to select data later based on file number
     if append:
-        combined_data['file number'] = []
+        file_number = np.array([])
 
     combined_data_keys_0 = list(combined_data.keys())
-# used to avoid overwriting metadata at end of second loop
+    # used to avoid overwriting metadata at end of second loop
 
     # ... And loop again to synchronize the data and put it into the combined dictionary.
     if verbose:
@@ -382,6 +382,9 @@ def synchronize(data_objects, t_zero=None, append=None, file_number_type=None,
                     else: #the case that the timecol is in both combined_data and dataset
                         if vverbose:
                             print('prepared to append data according to timecol ' + col)
+            if 'file number' in dataset['data_cols']:
+                dataset['data_cols'].remove('file number') # so that file numbers from
+                # previous synchronizations get stored as metadata, i.e., as '_file number'
             got_file_number = False # we only want to get the file number once
 
         # now we're ready to go through the columns and actually process the data
@@ -429,8 +432,9 @@ def synchronize(data_objects, t_zero=None, append=None, file_number_type=None,
                 if (not got_file_number and istime and
                         coltype == file_number_type):
                     fn = np.array([i] * collength[col])
-                    combined_data['file number'] = np.append(combined_data['file number'], fn)
-                    #print('len(combined_data[\'file number\']) = ' + str(len(combined_data['file number']))) # debugging
+                    #print('len(fn) = ' + str(len(fn)) + '\n collength = ' + str(collength)) # debugging
+                    file_number = np.append(file_number, fn)
+                    #print('len(file_number) = ' + str(len(file_number))) # debugging
                     got_file_number = True
                 # APPEND!
                 data = np.append(olddata, data)
@@ -504,9 +508,11 @@ def synchronize(data_objects, t_zero=None, append=None, file_number_type=None,
         name = combined_data['title']
         combined_data['name'] = name
 
-    # add 'file number' to data_cols
-    if 'file number' in combined_data.keys() and 'file number' not in combined_data['data_cols']:
-        combined_data['data_cols'].append('file number')
+    if append:
+        combined_data['file number'] = file_number
+        combined_data['col_types']['file number'] = file_number_type
+        if 'file number' not in combined_data['data_cols']: # how could it be?
+            combined_data['data_cols'].append('file number')
 
     # add 't_str' to the data set (don't know where else to do it)
     if 'time/s' in combined_data.keys():
@@ -542,7 +548,7 @@ def cut(x, y, tspan=None, returnindeces=False, override=False):
         print('\nfunction \'cut\' received an empty input\n')
         offerquit()
 
-    mask = np.logical_and(tspan[0]<x, x<tspan[-1])
+    mask = np.logical_and(tspan[0]<=x, x<=tspan[-1])
 
     if True not in mask and not override:
         print ('\nWarning! cutting like this leaves an empty dataset!\n' +
@@ -585,7 +591,8 @@ def purge_column(dataset, col, purge=True, verbose=True):
     if col in dataset['data_cols']:
         dataset['data_cols'].remove(col)
 
-def cut_dataset(dataset_0, tspan=None, tspan_0=None, time_masks={},
+def cut_dataset(dataset_0, tspan=None, tspan_0=None, time_masks=None,
+                # if I directly write time_masks = {} here, it saves old values...
                 t_zero=None, purge=True, verbose=True):
     '''
     Makes a time-cut of a dataset. Written 17H09.
@@ -600,13 +607,16 @@ def cut_dataset(dataset_0, tspan=None, tspan_0=None, time_masks={},
     dataset['data_cols'] = dataset['data_cols'].copy()
     if tspan is None and tspan_0 is None:
         return dataset
-    #print(dataset['title'])
+    if time_masks is None:
+        time_masks = {}
+    #print('time_masks = ' + str(time_masks)) # debugging
 
     if tspan is None and tspan_0 is not None:
         t0 = dataset['tstamp']
         tspan = [tspan_0[0] - t0, tspan_0[-1] - t0]
 
-
+    if verbose:
+        print('cutting according to tspan = ' + str(tspan))
     for col in dataset['data_cols']:
         timecol = get_timecol(col, dataset)
         #print(col + ', length = ' + str(len(dataset[col]))) # debugging
@@ -628,14 +638,14 @@ def cut_dataset(dataset_0, tspan=None, tspan_0=None, time_masks={},
             extra_right = np.append(False, mask[:-1])
             mask = np.logical_or(extra_left, extra_right)
             time_masks[timecol] = mask
-#        print('about to cut!') # debugging
+            #print('made a time_mask. True for ' + str(len(np.where(mask)[0])) + ' points') # debugging
         try:
             #print('len(mask)=' + str(len(mask))) # debugging
             dataset[col] = dataset[col].copy()[mask]
         except (IndexError, TypeError) as e:
             print('WARNING: couldn\'t cut ' + col + ' because ' + str(e))
-            print(col + ', length = ' + str(len(dataset[col]))) # debugging
-            print(timecol + ', length = ' + str(len(dataset[timecol]))) #debugging
+            #print(col + ', length = ' + str(len(dataset[col]))) # debugging
+            #print(timecol + ', length = ' + str(len(dataset[timecol]))) #debugging
             purge_column(dataset, col, purge=purge, verbose=verbose)
 
     dataset['tspan'] = tspan
@@ -643,6 +653,21 @@ def cut_dataset(dataset_0, tspan=None, tspan_0=None, time_masks={},
     if verbose:
         print('\nfunction \'cut dataset\' finsihed!\n\n')
     return dataset
+
+def deep_append(d1, d2):
+    combined = {}
+
+    for key in set(d1.keys()).intersection(set(d2.keys())):
+        if type(d1[key]) is dict and type(d2[key]) is dict:
+            v = deep_append(d1[key], d2[key])
+        else:
+            try:
+                v = np.append(d1[key], d2[key])
+            except TypeError:
+                print('couldn\'t append ' + key)
+                continue
+        combined[key] = v
+    return combined
 
 
 def offerquit():
@@ -790,7 +815,6 @@ def parse_CHI_header(data):
         data['Ns'][mask] = i
         ti = ti + dt
         i = i + 1
-
 
 
 def is_time(col, data=None, verbose=False):

@@ -52,7 +52,7 @@ def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True,
     #override to ignore when cut returns empty dataset.
     '''
     if verbose:
-        print('\n\nfunction \'select_cycle\ at your service! \n' +
+        print('\n\nfunction \'select_cycles\' at your service! \n' +
               'Selecting cycles ' + str(cycles))
 
     good = True
@@ -302,7 +302,7 @@ def clip_cycles(dataset, cycles=1, V_clip=0, redox=1, V_str=None, t_str='time/s'
     t, V = dataset[t_str].copy(), dataset[V_str].copy()
     #copying because I wouldn't want these to get fucked up in the original dataset
 
-    if redox_str is None or redox_str in ['manual', 'Manual']:
+    if redox_str is None or redox_str in ['manual', 'Manual'] or redox_str not in dataset:
         ro = get_ro(dataset, V_str=V_str)
     else:
         ro = dataset[redox_str].copy()
@@ -706,12 +706,14 @@ def plot_CV_cycles(CV_data, cycles=[0], RE_vs_RHE=None, A_el=None, ax='new',
 
 
 def get_through_sweep(data=None, t_str=None, V_str=None, t=None, V=None, t_i=0,
-                      Vspan=[0.4, 0.6], edge=0.01, redox=None, verbose=True):
+                      Vspan=[0.4, 0.6], edge=0.01, redox=None,
+                      out='dataset', verbose=True):
     '''
-    Return i_start and i_finish, the indeces corresponding to the first
-    complete anodic(redox=True) or cathodic (redox=False) sweep through V_span
-    starting after t_i. t and V can be given directly, or
+    Finds the first complete anodic(redox=True) or cathodic (redox=False)
+    sweep through V_span starting after t_i. t and V can be given directly, or
     V_str and J_str can point to the corresponding columns in data.
+
+    returns
     '''
     # parse inputs:
     if t is None:
@@ -758,10 +760,19 @@ def get_through_sweep(data=None, t_str=None, V_str=None, t=None, V=None, t_i=0,
     i_finish = np.argmax(np.logical_and(t>t_out, before(Vspan[1], V))) - 1
     # ^ last index of full sweep through range
     if verbose:
-        print('first scan from ' + str(Vspan[0]) + ' --> ' +
+        print('get_through_sweep(): first scan from ' + str(Vspan[0]) + ' --> ' +
               str(Vspan[1]) + ' occurs between indeces ' + str(i_start) +
               ' and ' + str(i_finish))
-    return i_start, i_finish
+    tspan = [t[i_start], t[i_finish]]
+
+    if out == 'indeces':
+        return i_start, i_finish
+    elif out == 'mask':
+        return np.logical_and(tspan[0]<t, t<tspan[-1])
+    elif out == 'tspan':
+        return tspan
+    elif out == 'dataset':
+        return cut_dataset(data, tspan=tspan)
 
 
 def get_shunt_current_line(data, V_DL, t_i=0,
@@ -790,8 +801,8 @@ def get_shunt_current_line(data, V_DL, t_i=0,
     t = data[t_str]
     #print('t_str = ' + t_str + ', V_str = ' + V_str) # debugging
 
-    an_start, an_finish = get_through_sweep(t=t, V=V, Vspan=V_DL, redox=True, t_i=t_i)
-    cat_start, cat_finish = get_through_sweep(t=t, V=V, Vspan=V_DL, redox=False, t_i=t_i)
+    an_start, an_finish = get_through_sweep(t=t, V=V, Vspan=V_DL, redox=True, t_i=t_i, out='indeces')
+    cat_start, cat_finish = get_through_sweep(t=t, V=V, Vspan=V_DL, redox=False, t_i=t_i, out='indeces')
 
     V_an = V[an_start:an_finish]
     I_an = I[an_start:an_finish]
@@ -913,7 +924,7 @@ def get_scan_rate(data, Vspan=[0.3, 0.6], V_str=None, J_str=None, t_i=0):
 
     t, V = data[t_str], data[V_str]
 
-    I_start_an, I_finish_an = get_through_sweep(data, Vspan=Vspan, t_i=t_i, redox=1)
+    I_start_an, I_finish_an = get_through_sweep(data, Vspan=Vspan, t_i=t_i, redox=1, out='indeces')
 
     scan_rate = (V[I_finish_an] - V[I_start_an])/(t[I_finish_an] - t[I_start_an])*1e3 # mV/s
 
@@ -965,10 +976,10 @@ def get_capacitance(data, V_DL=[0.3, 0.6], V_str=None, J_str=None, t_i=0):
 
     t, V, J = data[t_str], data[V_str], data[J_str]
 
-    I_start_an, I_finish_an = get_through_sweep(data, Vspan=V_DL, t_i=t_i, redox=1)
+    I_start_an, I_finish_an = get_through_sweep(data, Vspan=V_DL, t_i=t_i, redox=1, out='indeces')
     J_an = np.mean(J[I_start_an:I_finish_an]) # average current on anodic sweep in mA/cm^2
 
-    I_start_cat, I_finish_cat = get_through_sweep(data, Vspan=V_DL, t_i=t_i, redox=0)
+    I_start_cat, I_finish_cat = get_through_sweep(data, Vspan=V_DL, t_i=t_i, redox=0, out='indeces')
     J_cat = np.mean(J[I_start_cat:I_finish_cat]) # average current on cathodic sweep in mA/cm^2
 
     scan_rate = (V[I_finish_an] - V[I_start_an])/(t[I_finish_an] - t[I_start_an])*1e3 # mV/s
