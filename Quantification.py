@@ -123,6 +123,7 @@ def RSF_to_F_cal(*args, **kwargs):
     return recalibrate(*args, **kwargs)
 
 
+
 def recalibrate(quantify = [('H2','M2'), ('He','M4'), ('CH4','M15'), ('H2O','M18'),
                              ('N2','M28'), ('CO','M28'), ('C2H4','M26'), ('C2H6','M30'),
                              ('O2','M32'), ('Ar','M40'), ('CO2','M44'), ('Cl2','M70'),],
@@ -284,6 +285,7 @@ def recalibrate(quantify = [('H2','M2'), ('He','M4'), ('CH4','M15'), ('H2O','M18
 
 
     # -------- use rsf to predict F_cal for all the other molecules
+    rsf_max = 0
     for (mol, m) in mdict.items():
         print('\n\n --- working on ' + mol + ' ----')
         if mol in quantify:
@@ -297,6 +299,7 @@ def recalibrate(quantify = [('H2','M2'), ('He','M4'), ('CH4','M15'), ('H2O','M18
 
         # calculate RSF
         rsf = m.get_RSF(RSF_source=RSF_source, transmission_function=T, mass=mass)
+        rsf_max = max(rsf_max, rsf)
         if writeit:
             m.write('#the folowing rsf is calculated for ' + mass + ' on ' + date_scott())
             m.write(('rsf', rsf))
@@ -337,7 +340,6 @@ def recalibrate(quantify = [('H2','M2'), ('He','M4'), ('CH4','M15'), ('H2O','M18
 
     # make a trendline (needs to come here for use of rsf_max)
     if ax is not None and trendline:
-        rsf_max = max([m.rsf for mol, m in mdict.items()])
         ax.plot([0, rsf_max], [0, r * rsf_max], 'k--')
 
     # ---- done!
@@ -397,12 +399,16 @@ def get_signal(MS_data, mass, tspan=None,
         except KeyError:
             print('WARNING: no tspan available to get_signal()! using tspan=\'all\'')
             tspan = 'all'
-    if not tspan == 'all̈́':
+    if not tspan == 'all':
         try:
             x, y = cut(x,y,tspan, override=override)
         except TypeError:
+            #print('x = ' + str(x) + ', y = ' + str(y) + ', tspan = ' + str(tspan)) # debugging
             x = tspan
-            y = np.interp(tspan, x, y)
+            try:
+                y = np.interp(tspan, x, y)
+            except ValueError:
+                print('WARNING: couldn\'t cut according to tspan=' + str(tspan))
 
     if removebackground is None:
         removebackground = not (background is None)

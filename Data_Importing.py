@@ -19,6 +19,7 @@ def numerize(data):
 
 def get_empty_set(cols, **kwargs):
         #get the colheaders and make space for data
+        # cols should be a set
     data = {}
     data.update(kwargs)
     for col in cols:
@@ -283,7 +284,7 @@ def load_from_csv(filepath, multiset=False, timestamp=None, verbose=True):
     with open(filepath,'r') as f: # read the file!
         lines = f.readlines()
     colheaders = [col.strip() for col in lines[0].split(',')]
-    data = get_empty_set(colheaders, title=filepath,
+    data = get_empty_set(set(colheaders), title=filepath,
                          timestamp=timestamp, data_type='SPEC')
     datasets = []
 
@@ -306,7 +307,7 @@ def load_from_csv(filepath, multiset=False, timestamp=None, verbose=True):
                 numerize(data)
                 datasets += [data.copy()]
                 colheaders = [val.strip() for val in vals]
-                data = get_empty_set(colheaders,
+                data = get_empty_set(set(colheaders),
                          timestamp=timestamp, data_type='SPEC')
                 continue
             else:
@@ -447,7 +448,7 @@ def text_to_data(file_lines, title=None,
     This method will organize data in the lines of text from a file useful for
     electropy into a dictionary as follows (plus a few more keys)
     {'title':title, 'header':header, 'timestamp':timestamp,
-     'data_cols':[colheader1, colheader2, ...],
+     'data_cols':{colheader1, colheader2, ...},
      colheader1:data1, colheader2:data2, ...}
 
     Supported data types:
@@ -644,7 +645,10 @@ def text_to_data(file_lines, title=None,
             #print(col_headers) # debugging
 
             dataset['N_col'] = len(col_headers)
-            dataset['data_cols'] = col_headers.copy()  #will store names of columns containing data
+            dataset['data_cols'] = set(col_headers.copy())  #will store names of columns containing data
+            if not len(col_headers) == len(dataset['data_cols']):
+                print('WARNING: repeated column headers!!!')
+                print('col_headers = ' + str(col_headers))
 
             dataset['col_types'] = dict([(col, data_type) for col in col_headers])
 
@@ -663,40 +667,36 @@ def text_to_data(file_lines, title=None,
             if not len(line_data) == len(col_headers):
                 #print('Mismatch between col_headers and data on line ' + str(nl) + ' of ' + title) #debugging
                 pass
-            for col, data in zip(col_headers, line_data):
-                if col in dataset['data_cols']:  #why would it not?
-                    #if get_timecol(col, dataset) not in col_headers:
-                        #print('Missing time column ' + get_timecol(col) +
-                        #      ' on line ' + str(nl) + '. Dropping ' + col) # debugging
+            for col, x in zip(col_headers, line_data):
+                try:
+                    x = float(x)
+                except ValueError:
+                    if x == '':
+                        continue        #added 17C22 to deal with data acquisition crashes.
                     try:
-                        data = float(data)
+                        x = x.replace('.','')
+                        # ^ in case there's also '.' as thousands separator, just get rid of it.
+                        x = x.replace(',','.')       #put '.' as decimals
+                        x = float(x)
                     except ValueError:
-                        if data == '':
-                            continue        #added 17C22 to deal with data acquisition crashes.
-                        try:
-                            if verbose and not col in commacols:
-                                print('ValueError on value ' + data + ' in column ' + col + ' line ' + str(nl) +
-                                      '\n Checking if you''re using commas as decimals in that column... ')
-                            data = data.replace('.','')
-                            # ^ in case there's also '.' as thousands separator, just get rid of it.
-                            data = data.replace(',','.')       #put '.' as decimals
-                            data = float(data)
-                            if not col in commacols:
-                                if verbose:
-                                    print('... and you were, dumbass. I''ll fix it.')
-                                commacols += [col]
-                        except ValueError:
-                            if verbose :
-                                print(list(zip(col_headers,line_data)))
-                                print(title + ' in text_to_data: \nRemoved \'' + str(col) +
-                                      '\' from data columns because of value \'' +
-                                    str(data) + '\' at line ' + str(nl) +'\n')
-                            dataset['data_cols'].remove(col)
-
-                dataset[col].append(data)
+                        if verbose :
+                            print(list(zip(col_headers,line_data)))
+                            print(title + ' in text_to_data: \nRemoved \'' + str(col) +
+                                  '\' from data columns because of value \'' +
+                                str(x) + '\' at line ' + str(nl) +'\n')
+                        dataset['data_cols'].remove(col)
+                    else:
+                        if verbose and not col in commacols:
+                            print('ValueError on value ' + x + ' in column ' + col + ' line ' + str(nl) +
+                                  '\n Checking if you''re using commas as decimals in that column... ')
+                        if not col in commacols:
+                            if verbose:
+                                print('... and you were, dumbass. I''ll fix it.')
+                            commacols += [col]
+                dataset[col].append(x)
 
     if loop:
-        dataset['data_cols'] += ['loop number']
+        dataset['data_cols'].add('loop number')
     dataset['title'] = title
     dataset['header'] = header_string
     dataset['timestamp'] = timestamp
@@ -710,10 +710,10 @@ def text_to_data(file_lines, title=None,
 
     if data_type == 'EC':           #so that synchronize can combine current data from different EC-lab techniques
         if '<I>/mA' in dataset['data_cols'] and 'I/mA' not in dataset['data_cols']:
-            dataset['data_cols'].append('I/mA')
+            dataset['data_cols'].add('I/mA').copy() # who knows what trouble I'd eventually get into otherwise
             dataset['I/mA'] = dataset['<I>/mA'] #so that synchronize can combine current data from different EC-lab techniques
         if '<Ewe>/V' in dataset['data_cols'] and 'Ewe/V' not in dataset['data_cols']:
-            dataset['data_cols'].append('Ewe/V')
+            dataset['data_cols'].add('Ewe/V').copy()
             dataset['Ewe/V'] = dataset['<Ewe>/V']
 
     if verbose:
@@ -874,24 +874,25 @@ def download_cinfdata_set(setup='sniffer', group_id=None, grouping_column=None, 
         else:
             dataset['scan_type'] = 'time'
 
-        dataset['data_cols'] = []
-        dataset['timecols'] = []
+        dataset['data_cols'] = set()
+        dataset['timecols'] = {}
         for i in idlist: #avoiding id since it's got a builtin meaning
             data = cinfd.get_data(i)
             label = metadatas[i]['mass_label']
             if len(data.shape) == 1:
                 dataset[label] = data
-                dataset['data_cols'] += [label]
+                dataset['data_cols'].add(label)
             elif data.shape[1] == 2:
                 x = data[:, 0]
                 y = data[:, 1]
                 x_label = label + '-x'
                 y_label = label + '-y'
-                dataset['timecols'] += [(x_label, y_label)]
+                dataset['timecols'][x_label] = y_label
                 dataset[x_label] = x * 1e-3 # cinfdata saves time in ms!!!
                 dataset[y_label] = y
 
-                dataset['data_cols'] += [x_label, y_label]
+                dataset['data_cols'].add(x_label)
+                dataset['data_cols'].add(y_label)
 
         datasets[timestamp] = dataset
 

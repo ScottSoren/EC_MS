@@ -90,9 +90,7 @@ class Molecule:
         if self.M == 0:
             self.M = Chem.get_mass(self.formula)
 
-        def T(M):
-            return M
-        self.transmission_function = T
+        self.transmission_function = None
         #self.color = self.get_color()
 
 
@@ -244,7 +242,15 @@ class Molecule:
                             #portion of the 'relative sensitivity' for each mass,
                             #i.e. the partial ionization cross-section in Ang^2 at 100keV
         if transmission_function is None:
-            transmission_function = self.transmission_function #T(M)=1 unless otherwise stated
+            if self.transmission_function is None:
+                print('WARNING: no transmission function for ' + self.name + '. using constant')
+                def transmission_function(M):
+                    return 1
+            else:
+                transmission_function = self.transmission_function #T(M)=1 unless otherwise stated
+        elif self.transmission_function is None:
+            self.transmission_function = transmission_function
+
 
         spec_total = 0
         for value in self.spectrum.values():
@@ -283,12 +289,16 @@ class Molecule:
         elif RSF_source == 'NIST':
             self.RSF = dict((key, value*transmission_function(int(key[1:]))) for key, value in self.IFCS.items())
 
+            N2_M28_RSF = 2.283 * transmission_function(28)
+            #print('N2_M28_RSF = ' + str(N2_M28_RSF)) # debugging
+            self.RSF = dict([(key, value/N2_M28_RSF) for (key, value) in self.RSF.items()])
+
             if 'primary' in dir(self):
-                self.rsf = self.ifcs * transmission_function(int(self.primary[1:]))
+                self.rsf = self.ifcs * transmission_function(int(self.primary[1:])) #/ N2_M28_RSF
             if verbose:
                 print('RSFs from ionization-fragmentation cross section in Ang^2 \'ifcs\'' +
                       'based on NIST cross section and spectrum for ' + self.name +
-                      'and the given transmission function T(M)')
+                      ' and the given transmission function T(M)')
 
         if mass == 'primary':
             mass = self.primary

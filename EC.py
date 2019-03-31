@@ -639,7 +639,7 @@ def sync_metadata(data, RE_vs_RHE=None, A_el=None,
     # oh, yeah, and they're all data columns!
     for s in [E_str, I_str, V_str, J_str]:
         if s is not None and s not in data['data_cols']:
-            data['data_cols'] += [s]
+            data['data_cols'].add(s)
 
     # and make sure that the dataset knows what type they are:
     if 'col_types' in data:
@@ -905,9 +905,9 @@ def correct_shunt(data, tspan='all', R_shunt=None, V_intercept=None, pfit=None,
     data['I_str'] = I_str
     data['J_str'] = J_str
     if I_str not in data['data_cols']:
-        data['data_cols'] += [I_str]
+        data['data_cols'].add(I_str)
     if J_str not in data['data_cols']:
-        data['data_cols'] += [J_str]
+        data['data_cols'].add(J_str)
 
     return pfit
 
@@ -957,7 +957,7 @@ def time_from_scanrate(data, v_scan=None, t_str='time/s', t_i=0, V_str=None):
     t = np.linspace(t_i, t_i + dt, len(V))
     data[t_str] = t
     if t_str not in data['data_cols']:
-        data['data_cols'] += [t_str]
+        data['data_cols'].add(t_str)
     return t
 
 

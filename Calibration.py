@@ -403,7 +403,9 @@ def calibration_curve(data, mol, mass='primary', n_el=-2,
                       cycles=None, cycle_str='selector',
                       mode='average', t_int=15, t_tail=30, t_pre=15,
                       background=None, t_bg=None, tspan_plot=None,
-                      out='Molecule', ax='new', J_color='0.5', verbose=True
+                      remove_EC_bg=False,
+                      ax='new', J_color='0.5', unit=None,
+                      out='Molecule', verbose=True
                       ):
 
     # ----- parse inputs -------- #
@@ -422,10 +424,21 @@ def calibration_curve(data, mol, mass='primary', n_el=-2,
         bg = np.mean(y_bg)
     elif callable(background):
         use_bg_fun = True
-    elif background is not None:
+    elif background is not None and type(background) is not str:
         bg = background
     else:
         bg = 0
+
+    if unit is None:
+        if mode == 'average':
+            unit = 'p' # pmol/s and pA
+        elif mode == 'integral':
+            unit = 'n' # nmol and nC
+    elif unit[0] in ['p', 'n', 'u']:
+        unit = unit[0] # I'm only going to look at the prefix
+    else:
+        print('WARNING! unit=' + str(unit) + ' not recognized. calibration_curve() using raw SI.')
+        unit = ''
 
     # ---------- shit, lots of plotting options... ---------#
     ax1, ax2a, ax2b, ax2c = None, None, None, None
@@ -481,6 +494,14 @@ def calibration_curve(data, mol, mass='primary', n_el=-2,
         x, y = get_signal(c, mass=mass, tspan=tspan, verbose=verbose, unit='A')
         if use_bg_fun: # has to work on x.
             bg = background(x)
+        elif type(background) is str and background in ['linear', 'endpoints']:
+            tspan_before = [t_start-t_pre-t_bg, t_start-t_pre]
+            tspan_after = [t_end+t_tail, t_end+t_tail+t_bg]
+            x_before, y_before = get_signal(data, mass=mass, tspan=tspan_before)
+            x_after, y_after = get_signal(data, mass=mass, tspan=tspan_after)
+            x0, y0 = np.mean(x_before), np.mean(y_before)
+            x1, y1 = np.mean(x_after), np.mean(y_after)
+            bg = y0 + (x-x0) * (y1-y0)/(x1-x0)
 
         V = np.mean(v)
 
@@ -514,41 +535,53 @@ def calibration_curve(data, mol, mass='primary', n_el=-2,
     # ----- evaluate the calibration factor -------- #
     ns, Ys, Vs = np.array(ns), np.array(Ys), np.array(Vs)
 
+    if remove_EC_bg:
+        ns = ns - min(ns)
+
     pfit = np.polyfit(ns, Ys, deg=1)
     F_cal = pfit[0]
-    Y_pred = F_cal * ns + pfit[1]
 
     m.F_cal = F_cal
 
     # ----- plot the results -------- #
     color = m.get_color()
     ax2 = []
+    if unit == 'p':
+        ns_plot, Ys_plot = ns*1e12, Ys*1e12
+    elif unit == 'n':
+        ns_plot, Ys_plot = ns*1e9, Ys*1e9
+    elif unit == 'u':
+        ns_plot, Ys_plot = ns*1e6, Ys*1e6
+    else:
+        ns_plot, Ys_plot = ns, Ys
+
     if ax2a is not None: # plot the internal H2 calibration
         V_str, J_str = sync_metadata(data, verbose=False)
         if n_el < 0:
             ax2a.invert_xaxis()
-        ax2a.plot(Vs, ns*1e9, '.-', color=J_color, markersize=10)
-        ax2b.plot(Vs, Ys*1e9, 's', color=color)
+        ax2a.plot(Vs, ns_plot, '.-', color=J_color, markersize=10)
+        ax2b.plot(Vs, Ys_plot, 's', color=color)
         ax2a.set_xlabel(V_str)
         if mode == 'average':
-            ax2a.set_ylabel('<I>/(' + str(n_el) + '$\mathcal{F}$) / [nmol s$^{-1}$]')
-            ax2b.set_ylabel('<M2 signal> / nA')
+            ax2a.set_ylabel('<I>/(' + str(n_el) + '$\mathcal{F}$) / [' + unit + 'mol s$^{-1}$]')
+            ax2b.set_ylabel('<M2 signal> / ' + unit + 'A')
         else:
-            ax2a.set_ylabel('$\Delta$Q/(' + str(n_el) + '$\mathcal{F}$) / nmol')
-            ax2b.set_ylabel('M2 signal / nC')
+            ax2a.set_ylabel('$\Delta$Q/(' + str(n_el) + '$\mathcal{F}$) / ' + unit + 'mol')
+            ax2b.set_ylabel('M2 signal / ' + unit + 'C')
         colorax(ax2b, color)
         colorax(ax2a, J_color)
         align_zero(ax2a, ax2b)
         ax2 += [ax2a, ax2b]
     if ax2c is not None:
-        ax2c.plot(ns*1e9, Ys*1e9, '.', color=color, markersize=10)
-        ax2c.plot(ns*1e9, Y_pred*1e9, '--', color=color)
+        Y_pred_plot = F_cal * ns_plot + pfit[1]
+        ax2c.plot(ns_plot, Ys_plot, '.', color=color, markersize=10)
+        ax2c.plot(ns_plot, Y_pred_plot, '--', color=color)
         if mode == 'average':
-            ax2c.set_xlabel('<I>/(' + str(n_el) + '$\mathcal{F}$) / [nmol s$^{-1}$]')
-            ax2c.set_ylabel('<M2 signal> / nA')
+            ax2c.set_xlabel('<I>/(' + str(n_el) + '$\mathcal{F}$) / [' + unit + 'mol s$^{-1}$]')
+            ax2c.set_ylabel('<M2 signal> / ' + unit + 'A')
         else:
-            ax2c.set_xlabel('$\Delta$Q/(' + str(n_el) + '$\mathcal{F}$) / nmol')
-            ax2c.set_ylabel('M2 signal / nC')
+            ax2c.set_xlabel('$\Delta$Q/(' + str(n_el) + '$\mathcal{F}$) / ' + unit + 'mol')
+            ax2c.set_ylabel('M2 signal / ' + unit + 'C')
         ax2 += [ax2c]
 
     # ------- parse 'out' and return -------- #

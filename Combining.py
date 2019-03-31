@@ -159,7 +159,8 @@ def synchronize(data_objects, t_zero=None, append=None, file_number_type=None,
 
     hasdata = {}              #'combining number' of dataset with False if its empty or True if it has data
 
-    combined_data = {'data_type':'combined', 'data_cols':[], 'col_types':{}}
+    combined_data = {'data_type':'combined', 'data_cols':set(), 'col_types':{}}
+    # ^ data_cols is a SET, col_types is a DICTIONAIRY
     title_combined = ''
 
     #go through once to generate the title and get the start and end times of the files and of the overlap
@@ -371,7 +372,7 @@ def synchronize(data_objects, t_zero=None, append=None, file_number_type=None,
             #all the collumns line up. oldcollength and collength will help with that:
             oldcollength = {} # will store the existing length of each data col
             for col in combined_data['data_cols']:
-                if is_time(col, dataset):
+                if is_time(col, combined_data):
                     oldcollength[col] = len(combined_data[col])
             collength = {}  # will store the length to be appended to each data col
             for col in dataset['data_cols']:
@@ -421,8 +422,7 @@ def synchronize(data_objects, t_zero=None, append=None, file_number_type=None,
                 #timecol will have been processed first or not...
                 except KeyError:
                     print('WARNING: ' + col + ' should have timecol ' + timecol + ' but this is ' +
-                          ' not in dataset. Removing ' + col + ' from data_cols.')
-                    dataset['data_cols'].remove(col)
+                          ' not in dataset. Not adding ' + col + ' to the combined dataset.')
                     continue
                 if l0 > l1: #this is the case if the previous dataset was missing col but not timecol
                     filler = np.array([0] * (l0 - l1))
@@ -448,7 +448,7 @@ def synchronize(data_objects, t_zero=None, append=None, file_number_type=None,
             combined_data[col] = data
             # And make sure it's in data_cols
             if col not in combined_data['data_cols']:
-                combined_data['data_cols'].append(col)
+                combined_data['data_cols'].add(col)
             # And make sure the dataset knows what type it is:
             combined_data['col_types'][col] = get_type(col, dataset)
 
@@ -512,7 +512,7 @@ def synchronize(data_objects, t_zero=None, append=None, file_number_type=None,
         combined_data['file number'] = file_number
         combined_data['col_types']['file number'] = file_number_type
         if 'file number' not in combined_data['data_cols']: # how could it be?
-            combined_data['data_cols'].append('file number')
+            combined_data['data_cols'].add('file number')
 
     # add 't_str' to the data set (don't know where else to do it)
     if 'time/s' in combined_data.keys():
@@ -697,9 +697,9 @@ def remove_nans(data):
 def rename_SI_cols(data, removenans=True):
     '''
     names columns of Spectro Inlets data like EC-Lab and PyExpLabSys+cinfdata name them.
-
     '''
-    for col_0 in data['data_cols']:
+    data_cols = data['data_cols'].copy() # to avoid changing the size of a set during iteration
+    for col_0 in data_cols:
         col = 'test'
         if not get_type(col_0, data) == 'SI':
             continue
@@ -731,7 +731,7 @@ def rename_SI_cols(data, removenans=True):
 
         data[col] = data[col_0].copy()
         data['col_types'][col] = col_type
-        data['data_cols'] += [col]
+        data['data_cols'].add(col)
         print(col_0 + ' copied to ' + col)
     if removenans:
         remove_nans(data)
@@ -743,18 +743,25 @@ def rename_RGA_cols(data):
     '''
     channels = data['channels']
     for channel, mass in channels.items():
-        data[mass + '-x'] = data['Time(s)'].copy()
-        data[mass + '-y'] = data[channel].copy()
-        data['col_types'][mass + '-x'] = 'MS'
-        data['col_types'][mass + '-y'] = 'MS'
-        data['data_cols'] += [mass + '-x', mass + '-y']
-        print(channel + ' copied to ' + mass)
+        if mass + '-x' in data:
+            print('WARNING: rename_RGA_cols() not copying ' + channel + ' to ' + mass +
+                  ' because there is existing data. Maybe rename_RGA_cols' +
+                  ' was already called, or maybe the same mass appears in multiple channels.')
+        else:
+            data[mass + '-x'] = data['Time(s)'].copy()
+            data[mass + '-y'] = data[channel].copy()
+            data['col_types'][mass + '-x'] = 'MS'
+            data['col_types'][mass + '-y'] = 'MS'
+            data['data_cols'].add(mass + '-x')
+            data['data_cols'].add(mass + '-y')
+            print(channel + ' copied to ' + mass)
 
 def rename_CHI_cols(data):
     '''
     names columns of RGA data like they would be from PyExpLabSys+cinfdata
     '''
-    for col_0 in data['data_cols']:
+    data_cols = data['data_cols'].copy() # to avoid changing the size of a set during iteration
+    for col_0 in data_cols:
         #print(col_0) # debugging
         for c0, c in [('Time/s', 'time/s'), ('Potential/V','Ewe/V'), ('Current/A', 'I/A'),
                       ('Charge/C', '(Q-Qo)/C')]:
@@ -766,12 +773,12 @@ def rename_CHI_cols(data):
             continue
         data[col] = data[col_0].copy()
         data['col_types'][col] = 'EC'
-        data['data_cols'] += [col]
+        data['data_cols'].add(col)
         print(col_0 + ' copied to ' + col)
     if 'I/A' in data and 'I/mA' not in data:
         data['I/mA'] = data['I/A'] * 1e3
         data['col_types']['I/mA'] = 'EC'
-        data['data_cols'] += ['I/mA']
+        data['data_cols'].add('I/mA')
 
 def parse_CHI_header(data):
     header = data['header']
@@ -789,7 +796,7 @@ def parse_CHI_header(data):
     ti = 2 * t[0] - t[1]  # one tstep back from the first reorded t
     cols = {'i':'Current/A', 'E':'Potential/V'}
     data['Ns'] = np.zeros(N)
-    data['data_cols'] += ['Ns']
+    data['data_cols'].add('Ns')
     data['col_types']['Ns'] = 'CHI'
     i = 1
     for nl, line in enumerate(lines):
@@ -809,7 +816,7 @@ def parse_CHI_header(data):
         if not col in data:
             print('adding ' + col + ' to data based on CHI header.')
             data[col] = np.zeros(N)
-            data['data_cols'] += [col]
+            data['data_cols'].add(col)
             data['col_types'][col] = 'CHI'
         data[col][mask] = val
         data['Ns'][mask] = i
@@ -849,12 +856,12 @@ def is_Xray_data(col):
         return False
     return True
 
-def get_type(col, data=None):
-    if data is not None:
-        if 'col_types' in data and col in data['col_types']:
-            return data['col_types'][col]
-        elif 'data_type' in data and data['data_type'] in ['EC','MS','SI','SPEC']:
-            return data['data_type']
+def get_type(col, dataset=None):
+    if dataset is not None:
+        if 'col_types' in dataset and col in dataset['col_types']:
+            return dataset['col_types'][col]
+        elif 'data_type' in dataset and dataset['data_type'] in ['EC','MS','SI','SPEC']:
+            return dataset['data_type']
     if is_EC_data(col):
         return 'EC'
     if is_MS_data(col):
@@ -922,17 +929,18 @@ def seconds_to_timestamp(seconds):
     return timestamp
 
 def dayshift(dataset, days=1):
-    ''' Can work for up to 4 days. After that, hh becomes hhh...
-    This function should find little use now that
     '''
-    dataset['timestamp'] = seconds_to_timestamp(timestamp_to_seconds(dataset['timestamp']) + days*24*60*60)
+    Adds one day's worth of seconds to the dataset's epoch timestamp (dataset['tstamp'])
+    '''
+    dataset['tstamp'] += days * 24 * 60 * 60
     return dataset
 
 
 
-def sort_time(dataset, data_type='EC', verbose=False, vverbose=False):
-    #17K11: This now operates on the original dictionary, so
-    #that I don't need to read the return.
+def sort_time(dataset, verbose=True, vverbose=False):
+    '''
+    sorts each data column of a dataset according to its time column
+    '''
     if verbose:
         print('\nfunction \'sort_time\' at your service!\n\n')
 
@@ -941,47 +949,33 @@ def sort_time(dataset, data_type='EC', verbose=False, vverbose=False):
     else:
         dataset['NOTES'] = 'Time-Sorted\n'
 
-    if data_type == 'all':
-        data_type = ['EC','MS']
-    elif type(data_type) is str:
-        data_type = [data_type]
-
     sort_indeces = {} #will store sort indeces of the time variables
     data_cols = dataset['data_cols'].copy()
-    dataset['data_cols'] = []
+    dataset['data_cols'] = set()
     for col in data_cols:
         if vverbose:
             print('working on ' + col)
-        data = dataset[col] #do I need the copy?
-        if get_type(col, dataset) in data_type: #retuns 'EC' or 'MS', else I don't know what it is.
-            timecol = get_timecol(col, dataset, verbose=vverbose)
-            if timecol in sort_indeces.keys():
-                indeces = sort_indeces[timecol]
-            else:
-                if verbose:
-                    print('getting indeces to sort based on ' + timecol)
-                indeces = np.argsort(dataset[timecol])
-                sort_indeces[timecol] = indeces
-            if len(data) != len(indeces):
-                if vverbose:
-                    print(col + ' is not the same length as its time variable!\n' +
-                          col + ' will not be included in the time-sorted dataset.')
-            else:
-                dataset[col] = data[indeces]
-                dataset['data_cols'] += [col]
-                if verbose:
-                    print('sorted ' + col + '!')
-        else: #just keep it without sorting.
-            dataset['data_cols'] += [col]
-            dataset[col] = data
-
+        x = dataset[col] #do I need the copy?
+        timecol = get_timecol(col, dataset, verbose=vverbose)
+        if timecol in sort_indeces.keys():
+            indeces = sort_indeces[timecol]
+        else:
+            indeces = np.argsort(dataset[timecol])
+            #print('found the sort_indeces for ' + timecol + '!') # debugging
+            #print('indeces = ' + str(indeces)) # debugging
+            sort_indeces[timecol] = indeces
+        if len(x) != len(indeces):
+            if verbose:
+                print(col + ' is not the same length as its time variable!\n' +
+                      col + ' will not be included in the time-sorted dataset.')
+        else:
+            dataset[col] = x[indeces]
+            dataset['data_cols'].add(col)
+            if verbose:
+                print('sorted ' + col + ' based on time in ' + timecol)
 
     if verbose:
         print('\nfunction \'sort_time\' finished!\n\n')
-
-    #return dataset#, sort_indeces  #sort indeces are useless, 17J11
-    #if I need to read the return for normal use, then I don't want sort_indeces
-    return dataset
 
 
 
