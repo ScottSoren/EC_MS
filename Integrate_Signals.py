@@ -189,13 +189,44 @@ def integrate_transient(x, y, tspan=None, t_transient=None, t_steady='half',
     return steady, transient
 
 
-
-
 def activity_steps(data, mols, cycles, cycle_str='selector',
                    mode='average', t_int=15, t_tail=30, t_pre=15,
+                   find_max=False, t_max_buffer=5, V_max_buffer=5,
+                   find_min=False, t_min_buffer=5, V_min_buffer=5,
                    background=None, t_bg=None, unit='pmol/s',
                    ax='new', tspan_plot=None, verbose=True,
                    ):
+    '''
+    Powerful function for determining activity and faradaic efficiency for
+    a set of potential steps.
+    Requires calibrated molecule objects (mols) and cycle numbers, which by
+    default refer to data['selector']
+
+    if mode='average', it integrates over the last t_int of each cycle. If
+    mode='integral', it integrates from t_pre before the start until t_tail
+    after the end of each cycle.
+
+    If find_max=True, rather than using the full timespan of the cycle, it
+    finds the timespan at which the potential is within V_max_buffer mV of its
+    maximum value, and cuts of t_max_buffer, and then uses this timespan as above.
+    Correspondingly for find_min, V_min_buffer, and t_min_buffer.
+
+    A timespan for which to get the background signals at each of the masses
+    can be given as t_bg. Alternately, background can be set to 'linear' in
+    which case it draws a line connecting the signals just past the endpoints
+    of the timespan for each cycle.
+
+    If ax is not None, it highlights the area under the signals and EC currents
+    that are integrated/averaged.
+
+    The function returns a dictionary including:
+        'Qs': the integrated charges or averaged currents for each cycle
+        'ns': dictionary containing, for each molecule, the integrated amounts
+            or average flux for each cycle
+        'Vs': the average potential for each cycle
+        'ax': the axes on which the function plotted.
+
+    '''
     if verbose:
         print('\n\nfunction \'evaluate_datapoints\' at your service!\n')
     # ----- parse inputs -------- #
@@ -216,20 +247,42 @@ def activity_steps(data, mols, cycles, cycle_str='selector',
         bgs = dict([(mol, 0) for mol in mdict.keys()])
 
     if ax=='new':
-        ax = plot_experiment(data, mols=mols, removebackground=False,
+        ax = plot_experiment(data, mols, removebackground=False,
                              tspan=tspan_plot, emphasis=None)
+    else:
+        try:
+            iter(ax)
+        except TypeError:
+            ax = [ax]
 
     Qs, Vs = np.array([]), np.array([])
     ns = dict([(mol, np.array([])) for mol in mdict.keys()])
     for cycle in cycles:
         c = select_cycles(data, [cycle], cycle_str=cycle_str, verbose=verbose)
-        t_end = c['time/s'][-1]
-        t_start = c['time/s'][0]
+
+        if find_max:
+            t_v, v = get_potential(c)
+            v_max = max(v)
+            mask = v_max - V_max_buffer*1e-3 < v
+            t_max = t_v[mask]
+            t_start = t_max[0] + t_max_buffer
+            t_end = t_max[-1] - t_max_buffer
+        elif find_min:
+            t_v, v = get_potential(c)
+            v_min = min(v)
+            mask = v < v_min + V_min_buffer*1e-3
+            t_min = t_v[mask]
+            t_start = t_min[0] + t_min_buffer
+            t_end = t_min[-1] - t_min_buffer
+        else:
+            t_start = c['time/s'][0]
+            t_end = c['time/s'][-1]
+
         if mode == 'average':
             tspan = [t_end - t_int, t_end]
-        elif mode == 'ingegral':
+        elif mode == 'integral':
             c = select_cycles(data, [cycle-1, cycle, cycle+1], cycle_str=cycle_str,
-                              t_zero=str(cycle), verbose=verbose)
+                              verbose=verbose)
             tspan = [t_start-t_pre, t_end+t_tail]
 
         t_v, v = get_potential(c, tspan=tspan, verbose=verbose)
@@ -249,7 +302,7 @@ def activity_steps(data, mols, cycles, cycle_str='selector',
             y = y0 - bg
             if mode == 'average':
                 yy = np.mean(y)
-            elif mode == 'integra':
+            elif mode == 'integral':
                 yy = np.trapz(y, x)
             ns[mol] = np.append(ns[mol], yy)
             if ax is not None:
@@ -264,7 +317,6 @@ def activity_steps(data, mols, cycles, cycle_str='selector',
             J = I * 1e3 / data['A_el']
             bg_J = np.zeros(J.shape)
             ax[2].fill_between(t, J, bg_J, color='0.5', alpha=0.5)
-
 
     if verbose:
         print('\nfunction \'evaluate_datapoints\' finished!\n\n')

@@ -368,22 +368,24 @@ def indeces_from_input(options, prompt):
     return choices
 
 
-def smooth_data(data_0, points=3, cols=None, verbose=True):
+def smooth_data(data, points=3, cols=None, verbose=True):
     '''
     Does a moving-average smoothing of data. I don't like it, but
     experencing problems 17G26
+    cols should be a list of columns to smooth.
+    Operates on the original data set!
     '''
-    data = data_0.copy()
     if cols is None:
         cols = data['data_cols']
     for col in cols:
         if verbose:
             print('smoothening \'' + col + '\' with a ' + str(points) + '-point moving average')
-        x = data[col]
+        x = data[col].copy() # in case it's linked to another column.
         c = np.array([1] * points) / points
         #print(str(len(c))) # debugging
         X = np.convolve(x, c, mode='same')
-        for n in range(points):
+        # convolve doesn't get the endpoints quite right. I can fix them
+        for n in range(points):  # fixing endpooints
             X[n] = np.mean(x[0:n+1])
             if n>0:
                 X[-n] = np.mean(x[-n:])
@@ -525,13 +527,13 @@ def plot_flux(MS_data, mols={'H2':'b', 'CH4':'r', 'C2H4':'g', 'O2':'k'},
 
 
 def plot_experiment(EC_and_MS,
-                    colors={'M2':'b','M4':'m','M18':'y','M28':'0.5','M32':'k'},
+                    colors=None,
                     tspan=None, overlay=False, logplot=[True,False], verbose=True,
                     plotpotential=True, plotcurrent=True, ax='new', emphasis='MS',
                     RE_vs_RHE=None, A_el=None,
                     removebackground=None, background='constant',
                     saveit=False, name=None, leg=False, unit=None,
-                    masses=None, masses_left=None, masses_right=None,
+                    masses='all', masses_left=None, masses_right=None,
                     mols=None, mols_left=None, mols_right=None,
                     #mols will overide masses will overide colors
                     V_color='k', J_color='0.5', V_label=None, J_label=None,
@@ -619,7 +621,7 @@ def plot_experiment(EC_and_MS,
     # ----------- parse input on which masses / fluxes to plot ------- #
 
 #    print(masses)
-    quantified = False      #added 16L15
+    quantified = False
     #print(type(colors))
     #if type(colors) is list and type(colors[0]) is not str:
     #    print(type(colors[0]))
@@ -627,7 +629,8 @@ def plot_experiment(EC_and_MS,
         quantified = True
     elif ((type(colors) is dict and list(colors.keys())[0][0] == 'M') or
           (type(colors) is list and type(colors[0]) is str and colors[0][0] == 'M' ) or
-          (type(colors) is str and colors[0]=='M')):
+          (type(colors) is str and colors[0]=='M') or
+          colors is None):
         if verbose:
             print('uncalibrated data to be plotted.')
         if masses is None:
@@ -635,6 +638,10 @@ def plot_experiment(EC_and_MS,
     else:
         quantified = True
         mols = colors
+
+    if not quantified and masses=='all':        # this is now the default!
+        masses = [key[:-2] for key in EC_and_MS.keys() if key[0]=='M' and key[-2:]=='-y']
+    print('quantified = ' + str(quantified)) # debugging
 
     try:
         if type(mols[0]) in (list, tuple):

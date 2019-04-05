@@ -617,7 +617,9 @@ def cut_dataset(dataset_0, tspan=None, tspan_0=None, time_masks=None,
 
     if verbose:
         print('cutting according to tspan = ' + str(tspan))
-    for col in dataset['data_cols']:
+    data_cols = dataset['data_cols'].copy()
+    # ^ use this in loop to avoid a "Set changed size during iteration" RuntimeError
+    for col in data_cols:
         timecol = get_timecol(col, dataset)
         #print(col + ', length = ' + str(len(dataset[col]))) # debugging
         #print(timecol + ', length = ' + str(len(dataset[timecol]))) #debugging

@@ -536,6 +536,13 @@ def sync_metadata(data, RE_vs_RHE=None, A_el=None,
     if verbose:
         print('\nsyncing metadata.')
 
+
+    # This is an excelent place to make old pickled data sets back-compatible
+    # with new changes (i.e. data_cols is now a set) !
+    if type(data['data_cols']) is list:
+        data['data_cols'] = set(data['data_cols'])
+
+
     # use these to keep track of whether variables 1 and 2 will be calibrated:
     cal1 = False
     cal2 = False

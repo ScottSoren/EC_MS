@@ -32,7 +32,7 @@ else:                           #then we use relative import
     from .Molecules import Molecule
     from .Chips import Chip
     from .Quantification import get_signal, get_current, get_potential
-    from .Plotting import colorax, align_zero, plot_experiment
+    from .Plotting import colorax, align_zero, plot_experiment, plot_signal
 
 def ML_strip_cal(CV_and_MS, cycles=[1,2], t_int=200, cycle_str='cycle number',
              mol='CO2', mass='primary', n_el=None,
@@ -402,16 +402,55 @@ def point_calibration(data, mol, mass='primary', cal_type='internal',
 def calibration_curve(data, mol, mass='primary', n_el=-2,
                       cycles=None, cycle_str='selector',
                       mode='average', t_int=15, t_tail=30, t_pre=15,
+                      find_max=False, t_max_buffer=5, V_max_buffer=5,
+                      find_min=False, t_min_buffer=5, V_min_buffer=5,
                       background=None, t_bg=None, tspan_plot=None,
                       remove_EC_bg=False,
                       ax='new', J_color='0.5', unit=None,
                       out='Molecule', verbose=True
                       ):
+    '''
+    Powerful function for integrating a molecule when the assumption of
+    100% faradaic efficiency can be made.
+
+    Requires a dataset, and cycle numbers, which by default refer to data['selector']
+
+    if mode='average', it integrates over the last t_int of each cycle. If
+    mode='integral', it integrates from t_pre before the start until t_tail
+    after the end of each cycle.
+
+    If find_max=True, rather than using the full timespan of the cycle, it
+    finds the timespan at which the potential is within V_max_buffer mV of its
+    maximum value, and cuts of t_max_buffer, and then uses this timespan as above.
+    Correspondingly for find_min, V_min_buffer, and t_min_buffer.
+
+    A timespan for which to get the background signals at each of the masses
+    can be given as t_bg. Alternately, background can be set to 'linear' in
+    which case it draws a line connecting the signals just past the endpoints
+    of the timespan for each cycle.
+
+    If ax is not None, it highlights the area under the signals and EC currents
+    that are integrated/averaged, and also makes the calibration curve.
+
+    The can return any or multiple of the following:
+        'Qs': the integrated charges or averaged currents for each cycle
+        'ns': the corresponding amount or flux for each cycle
+        'Ys': the integrated or averaged signal for each cycle
+        'Vs': the average potential for each cycle
+        'F_cal': calibration factor in C/mol
+        'Molecule': Molecule object with the calibration factor
+        'ax': the axes on which the function plotted.
+    out specifies what the function returns.
+    By default, it returns the molecule
+
+    '''
 
     # ----- parse inputs -------- #
     m = Molecule(mol)
     if mass == 'primary':
         mass = m.primary
+    else:
+        m.primary = mass
 
     if mode in ['average', 'averaging', 'mean']:
         mode = 'average'
@@ -460,6 +499,13 @@ def calibration_curve(data, mol, mass='primary', n_el=-2,
         ax1 = plot_experiment(data, masses=[mass], tspan=tspan_plot,
                               emphasis=None, removebackground=False, unit='A')
         fig1 = ax1[0].get_figure()
+    else:
+        try:
+            ax1a = ax1[0]
+        except TypeError:
+            ax1a = ax1
+        plot_signal(data, masses=[mass], tspan=tspan_plot,
+                    removebackground=False, unit='A', ax=ax1a)
     if ax2 == 'new':
         fig2, [ax2a, ax2c] = plt.subplots(ncols=2)
         ax2b = ax2a.twinx()
@@ -471,7 +517,7 @@ def calibration_curve(data, mol, mass='primary', n_el=-2,
             ax2c = ax2
         else:
             try:
-                ax2a, ax2b, ax2c = ax
+                ax2a, ax2b, ax2c = ax2
             except (TypeError, IndexError):
                 print('WARNING: calibration_curve couldn\'t use the give ax2')
 
@@ -480,13 +526,33 @@ def calibration_curve(data, mol, mass='primary', n_el=-2,
     Ys, ns, Vs = [], [], []
     for cycle in cycles:
         c = select_cycles(data, [cycle], cycle_str=cycle_str, verbose=verbose)
-        t_end = c['time/s'][-1]
-        t_start = c['time/s'][0]
+
+        if find_max:
+            t_v, v = get_potential(c)
+            v_max = max(v)
+            mask = v_max - V_max_buffer*1e-3 < v
+            t_max = t_v[mask]
+            t_start = t_max[0] + t_max_buffer
+            t_end = t_max[-1] - t_max_buffer
+            print('v_max = ' + str(v_max)) # debugging
+        elif find_min:
+            t_v, v = get_potential(c)
+            v_min = min(v)
+            mask = v < v_min + V_min_buffer*1e-3
+            t_min = t_v[mask]
+            t_start = t_min[0] + t_min_buffer
+            t_end = t_min[-1] - t_min_buffer
+        else:
+            t_start = c['time/s'][0]
+            t_end = c['time/s'][-1]
+
+        print('[t_start, t_end] = ' + str([t_start, t_end]) + '\n\n') # debugging
+
         if mode == 'average':
             tspan = [t_end - t_int, t_end]
-        elif mode == 'ingegral':
+        elif mode == 'integral':
             c = select_cycles(data, [cycle-1, cycle, cycle+1], cycle_str=cycle_str,
-                              t_zero=str(cycle), verbose=verbose)
+                              verbose=verbose)
             tspan = [t_start-t_pre, t_end+t_tail]
 
         t, I = get_current(c, tspan=tspan, verbose=verbose)
@@ -495,6 +561,8 @@ def calibration_curve(data, mol, mass='primary', n_el=-2,
         if use_bg_fun: # has to work on x.
             bg = background(x)
         elif type(background) is str and background in ['linear', 'endpoints']:
+            if t_bg is None:
+                t_bg = 5
             tspan_before = [t_start-t_pre-t_bg, t_start-t_pre]
             tspan_after = [t_end+t_tail, t_end+t_tail+t_bg]
             x_before, y_before = get_signal(data, mass=mass, tspan=tspan_before)
