@@ -128,7 +128,7 @@ def recalibrate(quantify = [('H2','M2'), ('He','M4'), ('CH4','M15'), ('H2O','M18
                              ('N2','M28'), ('CO','M28'), ('C2H4','M26'), ('C2H6','M30'),
                              ('O2','M32'), ('Ar','M40'), ('CO2','M44'), ('Cl2','M70'),],
                                 #molecules we want to calc F_cal (at the given mass) for by extrapolation
-                trust = 'internal', # says what to trust, e.g., 'internal', 'external', or 'all'
+                trust = None, # says what to trust, e.g., 'internal', 'external', or 'all'
                 trusted = [], # list of Molecule objects with trusted F_cal
                 internal = [], # list of Molecule objects with F_cal from internal calibration
                 external = [], # list of Molecule objects with F_cal from internal calibration
@@ -137,7 +137,7 @@ def recalibrate(quantify = [('H2','M2'), ('He','M4'), ('CH4','M15'), ('H2O','M18
                                      #'Hiden' is RSF's from Hiden Analytical
                 transmission_function='default',  # 'default' is T(M) = M^(-1/2)
                 trendline = True,
-                ax = 'new',
+                ax = 'new', labels=False,
                 writeit = False, writeprimary=False, rewriteit=False):
     '''
     ---- You need -----
@@ -185,14 +185,30 @@ def recalibrate(quantify = [('H2','M2'), ('He','M4'), ('CH4','M15'), ('H2O','M18
     if type(quantify) is list:
         quantify = dict(quantify)
     quantmols = list(quantify.keys())
-    for mol, mass in quantify.items():
-        mdict[mol] = Molecule(mol)
-        mdict[mol].primary = mass
-    for m in trusted + internal + external:
+    for name, mass in quantify.items():
+        mdict[name] = Molecule(name)
+        mdict[name].primary = mass
+    if type(internal) is dict:
+        print('converting internal from dict to list')
+        internal = list(internal.values())
+    if type(external) is dict:
+        print('converting external from dict to list')
+        external = list(external.values())
+    if type(trusted) is dict:
+        print('converting external from dict to list')
+        trusted = list(trusted.values())
+    if len(trusted) == 0 and trust is None:
+        trusted = 'internal'
+    for m in external + internal + trusted:
         try:
-            mdict[m.name] = m
+            name = m.name
         except AttributeError:
+            print('WARNING! ' + str(m) + ' has no name')
             pass
+        else:
+            if name in mdict:
+                print('WARNING! recalibrate recieved multiple input molecules named ' + name)
+            mdict[m.name] = m
 
     # store the mass and calibration factor of the trusted molecule in calmol and F_cals, respectively
     # (this could perhaps be done smarter)
@@ -201,7 +217,7 @@ def recalibrate(quantify = [('H2','M2'), ('He','M4'), ('CH4','M15'), ('H2O','M18
     if trust == 'all' or trust == 'external':
         trusted += external
     if trust == 'files': # trusts F_cal saved in molecule files. never used.
-        trusted = [Molecule(mol) for mol in trusted]
+        trusted = [Molecule(name) for name in trusted]
     if len(internal) == 0 and len(external)==0 and len(trusted)>0:
         internal = trusted # so that trusted points show up as squares
     calmol = {}
@@ -218,7 +234,7 @@ def recalibrate(quantify = [('H2','M2'), ('He','M4'), ('CH4','M15'), ('H2O','M18
     if len(internal) == 0 and len(external) == 0:
         internal = calmol # so that they plot as squares
 
-    # --------- get the F_cal vs RSF relationship for the trusted molecules -------
+    # --------- get the F_cal vs RSF relationship for the trusted molecules ------- #
     RSF_vec = []
     F_cal_vec = []
 
@@ -232,10 +248,10 @@ def recalibrate(quantify = [('H2','M2'), ('He','M4'), ('CH4','M15'), ('H2O','M18
         T = transmission_function
 
     for m in trusted:
-        mol, mass, F_cal = m.name, m.primary, m.F_cal
+        name, mass, F_cal = m.name, m.primary, m.F_cal
         rsf = m.get_RSF(RSF_source=RSF_source, transmission_function=T, mass=mass)
-        print('F_' + mol + '_' + mass + ' = ' + str(F_cal) + ', ' +
-              'rsf_' + mol + '_' + mass + ' = ' + str(rsf))
+        print('F_' + name + '_' + mass + ' = ' + str(F_cal) + ', ' +
+              'rsf_' + name + '_' + mass + ' = ' + str(rsf))
         F_cal_vec += [F_cal]
         RSF_vec += [rsf]
         if writeit:
@@ -263,33 +279,39 @@ def recalibrate(quantify = [('H2','M2'), ('He','M4'), ('CH4','M15'), ('H2O','M18
         ax.set_xlabel('Relative Sensitivity Factor / [' + RSF_unit +']')
         ax.set_ylabel('F_cal / [C/mol]')
         for m in internal:
-            mol, mass, F_cal = m.name, m.primary, m.F_cal
+            name, mass, F_cal = m.name, m.primary, m.F_cal
             rsf = m.get_RSF(RSF_source=RSF_source, transmission_function=T,
                             mass=mass, verbose=False)
             try:
                 color = m.get_color()
             except AttributeError:
                 color = standard_colors[mass]
-            print('plotting ' + m.name + ' as a color=' + color + ' square.\n')
+            print('plotting ' + name + ' as a color=' + color + ' square.\n')
             ax.plot(rsf, F_cal, 's', color=color, markersize=10)
+            if labels:
+                ax.annotate(name + ' at m/z=' + mass[1:],
+                            xy=[rsf+0.05, F_cal], color=color)
         for m in external:
-            mol, mass, F_cal = m.name, m.primary, m.F_cal
+            name, mass, F_cal = m.name, m.primary, m.F_cal
             rsf = m.get_RSF(RSF_source=RSF_source, transmission_function=T,
                             mass=mass, verbose=False)
             try:
                 color = m.get_color()
             except AttributeError:
                 color = standard_colors[mass]
-            print('plotting ' + mol + ' as a color=' + color + ' triangle.\n')
+            print('plotting ' + name + ' as a color=' + color + ' triangle.\n')
             ax.plot(rsf, F_cal, '^', color=color, markersize=10)
+            if labels:
+                ax.annotate(name + ' at m/z=' + mass[1:],
+                            xy=[rsf+0.05, F_cal], color=color)
 
 
     # -------- use rsf to predict F_cal for all the other molecules
     rsf_max = 0
-    for (mol, m) in mdict.items():
-        print('\n\n --- working on ' + mol + ' ----')
-        if mol in quantify:
-            mass = quantify[mol]
+    for (name, m) in mdict.items():
+        print('\n\n --- working on ' + name + ' ----')
+        if name in quantify:
+            mass = quantify[name]
         else:
             mass = m.primary
         try:
@@ -304,27 +326,30 @@ def recalibrate(quantify = [('H2','M2'), ('He','M4'), ('CH4','M15'), ('H2O','M18
             m.write('#the folowing rsf is calculated for ' + mass + ' on ' + date_scott())
             m.write(('rsf', rsf))
         if rsf is None:
-            print('missing rsf for ' + mol + ' at ' + mass)
+            print('missing rsf for ' + name + ' at ' + mass)
             continue # then nothing to do
 
         # get (already plotted) or calculate (and plot) F_cal
-        if mol in F_cals:
-            F_cal = F_cals[mol]
-        else:
+        if name in F_cals:
+            F_cal = F_cals[name]
+        elif name in quantmols:
             F_cal = r * rsf  #the extrapolation!
             if ax is not None:
-                print('plotting ' + mol + ' as a color=' + color + ' dot.')
+                print('plotting ' + name + ' as a color=' + color + ' dot.')
                 ax.plot(rsf, F_cal, '.', color=color, markersize=10)
-        print(mol + ': F_cal = ' + str(F_cal))
+                if labels:
+                    ax.annotate(name + ' at m/z=' + mass[1:],
+                                xy=[rsf+0.05, F_cal], color=color)
+            print(name + ': F_cal = ' + str(F_cal))
 
-        # write it to the Molecule object
-        if mol in quantmols:  # only do it for the molecules that were asked for
-            if 'cal' in m.__dict__:
-                m.cal[mass] = F_cal
-            if 'primary' not in m.__dict__:
-                m.primary = mass
-            if m.primary == mass:
-                m.F_cal = F_cal
+            # write it to the Molecule object
+            if name in quantmols:  # only do it for the molecules that were asked for
+                if 'cal' in m.__dict__:
+                    m.cal[mass] = F_cal
+                if 'primary' not in m.__dict__:
+                    m.primary = mass
+                if m.primary == mass:
+                    m.F_cal = F_cal
 
         # write it to the Molecule's data file
         if writeit:
@@ -401,7 +426,7 @@ def get_signal(MS_data, mass, tspan=None,
             tspan = 'all'
     if not tspan == 'all':
         try:
-            x, y = cut(x,y,tspan, override=override)
+            x, y = cut(x,y, tspan, override=override)
         except TypeError:
             #print('x = ' + str(x) + ', y = ' + str(y) + ', tspan = ' + str(tspan)) # debugging
             x = tspan

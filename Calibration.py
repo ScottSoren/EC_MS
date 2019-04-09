@@ -327,6 +327,7 @@ def chip_calibration(data, mol='O2', F_cal=None, primary=None, tspan=None,
 
     l_eff = chip.l_cap * n_dot_0 / n_dot
     chip.l_cap = l_eff
+    chip.parameters['l_cap'] = l_eff
     return chip
 
 
@@ -365,8 +366,8 @@ def point_calibration(data, mol, mass='primary', cal_type='internal',
         S = np.interp(tspan, x, y-y0)
     else:
         x, y = get_signal(data, mass, tspan=[tspan[0], tspan[1]+tail])
-        S = np.trapz(y-y0, x) #/ (x[-1] - x[1])
-       # S = np.mean(y) #more accurate for few, evenly spaced datapoints
+        #S = np.trapz(y-y0, x) #/ (x[-1] - x[1])
+        S = np.mean(y) #more accurate for few, evenly spaced datapoints
 
     if cal_type == 'internal':
         if type(tspan) in [int, float]:
@@ -374,7 +375,7 @@ def point_calibration(data, mol, mass='primary', cal_type='internal',
             I = np.interp(tspan, t, i)
         else:
             t, i = get_current(data, tspan=tspan, unit='A')
-            I = np.trapz(i, t) #/ (t[-1] - t[1])
+            I = np.mean(i) #np.trapz(i, t) #/ (t[-1] - t[1])
         n = I/(n_el*Chem.Far)
 
     elif cal_type == 'external':
@@ -386,7 +387,8 @@ def point_calibration(data, mol, mass='primary', cal_type='internal',
             carrier = mol
         n = chip.capillary_flow(gas=carrier) / Chem.NA * composition
         if type(tspan) not in [int, float]:
-            n = n * (tspan[-1]- tspan[0])
+            pass
+            #n = n * (tspan[-1]- tspan[0])
 
     else:
         print('not sure what you mean, dude, when you say cal_type = \'' +
@@ -405,7 +407,7 @@ def calibration_curve(data, mol, mass='primary', n_el=-2,
                       find_max=False, t_max_buffer=5, V_max_buffer=5,
                       find_min=False, t_min_buffer=5, V_min_buffer=5,
                       background=None, t_bg=None, tspan_plot=None,
-                      remove_EC_bg=False,
+                      remove_EC_bg=False, color=None,
                       ax='new', J_color='0.5', unit=None,
                       out='Molecule', verbose=True
                       ):
@@ -523,7 +525,8 @@ def calibration_curve(data, mol, mass='primary', n_el=-2,
 
 
     # ----- cycle through and calculate integrals/averages -------- #
-    Ys, ns, Vs = [], [], []
+    Ys, ns, Vs, Is, Qs = [], [], [], [], []
+
     for cycle in cycles:
         c = select_cycles(data, [cycle], cycle_str=cycle_str, verbose=verbose)
 
@@ -577,14 +580,17 @@ def calibration_curve(data, mol, mass='primary', n_el=-2,
             I_av = np.mean(I)
             n = I_av/(n_el*Chem.Far)
             Y = np.mean(y-bg)
+            Is += [I_av]
 
         elif mode == 'integral':
             Q = np.trapz(I, t)
             n = Q/(n_el*Chem.Far)
             Y = np.trapz(y-bg, x)
+            Qs += [Q]
 
         if ax1 is not None:
-            color = m.get_color()
+            if color is None:
+                color = m.get_color()
             try:
                 iter(bg)
             except TypeError:
@@ -602,6 +608,7 @@ def calibration_curve(data, mol, mass='primary', n_el=-2,
 
     # ----- evaluate the calibration factor -------- #
     ns, Ys, Vs = np.array(ns), np.array(Ys), np.array(Vs)
+    Is, Qs = np.array(Is), np.array(Qs)
 
     if remove_EC_bg:
         ns = ns - min(ns)
@@ -612,7 +619,8 @@ def calibration_curve(data, mol, mass='primary', n_el=-2,
     m.F_cal = F_cal
 
     # ----- plot the results -------- #
-    color = m.get_color()
+    if color is None:
+        color = m.get_color()
     ax2 = []
     if unit == 'p':
         ns_plot, Ys_plot = ns*1e12, Ys*1e12
@@ -632,13 +640,13 @@ def calibration_curve(data, mol, mass='primary', n_el=-2,
         ax2a.set_xlabel(V_str)
         if mode == 'average':
             ax2a.set_ylabel('<I>/(' + str(n_el) + '$\mathcal{F}$) / [' + unit + 'mol s$^{-1}$]')
-            ax2b.set_ylabel('<M2 signal> / ' + unit + 'A')
+            ax2b.set_ylabel('<' + mass + ' signal> / ' + unit + 'A')
         else:
             ax2a.set_ylabel('$\Delta$Q/(' + str(n_el) + '$\mathcal{F}$) / ' + unit + 'mol')
-            ax2b.set_ylabel('M2 signal / ' + unit + 'C')
+            ax2b.set_ylabel(mass + 'signal / ' + unit + 'C')
         colorax(ax2b, color)
         colorax(ax2a, J_color)
-        align_zero(ax2a, ax2b)
+        #align_zero(ax2a, ax2b)
         ax2 += [ax2a, ax2b]
     if ax2c is not None:
         Y_pred_plot = F_cal * ns_plot + pfit[1]
@@ -646,15 +654,20 @@ def calibration_curve(data, mol, mass='primary', n_el=-2,
         ax2c.plot(ns_plot, Y_pred_plot, '--', color=color)
         if mode == 'average':
             ax2c.set_xlabel('<I>/(' + str(n_el) + '$\mathcal{F}$) / [' + unit + 'mol s$^{-1}$]')
-            ax2c.set_ylabel('<M2 signal> / ' + unit + 'A')
+            ax2c.set_ylabel('<' + mass + ' signal> / ' + unit + 'A')
         else:
             ax2c.set_xlabel('$\Delta$Q/(' + str(n_el) + '$\mathcal{F}$) / ' + unit + 'mol')
-            ax2c.set_ylabel('M2 signal / ' + unit + 'C')
+            ax2c.set_ylabel(mass + ' signal / ' + unit + 'C')
         ax2 += [ax2c]
 
     # ------- parse 'out' and return -------- #
+    if fig1 is None and ax1 is not None:
+        fig1 = ax1[0].get_figure()
+    if fig2 is None and ax2 is not None:
+        fig2 = ax2[0].get_figure()
     possible_outs = {'ax':[ax1, ax2], 'fig':[fig1, fig2], 'Molecule':m,
-                     'F_cal':F_cal, 'Vs':Vs, 'ns':ns, 'Ys':Ys}
+                     'Is':Is, 'Qs':Qs, 'F_cal':F_cal, 'Vs':Vs,
+                     'ns':ns, 'Ys':Ys}
     if type(out) is str:
         outs = possible_outs[out]
     else:

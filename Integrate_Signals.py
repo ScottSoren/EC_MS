@@ -248,7 +248,7 @@ def activity_steps(data, mols, cycles, cycle_str='selector',
 
     if ax=='new':
         ax = plot_experiment(data, mols, removebackground=False,
-                             tspan=tspan_plot, emphasis=None)
+                             tspan=tspan_plot, emphasis=None, unit=unit)
     else:
         try:
             iter(ax)
@@ -279,7 +279,12 @@ def activity_steps(data, mols, cycles, cycle_str='selector',
             t_end = c['time/s'][-1]
 
         if mode == 'average':
-            tspan = [t_end - t_int, t_end]
+            try:
+                iter(t_int)
+            except TypeError:
+                tspan = [t_end - t_int, t_end]
+            else:
+                tspan = [t_start + t_int[0], t_start + t_int[-1]]
         elif mode == 'integral':
             c = select_cycles(data, [cycle-1, cycle, cycle+1], cycle_str=cycle_str,
                               verbose=verbose)
@@ -289,7 +294,7 @@ def activity_steps(data, mols, cycles, cycle_str='selector',
         V = np.mean(v)
         Vs = np.append(Vs, V)
 
-        t, I = get_current(c, tspan=tspan, verbose=verbose)
+        t, I = get_current(c, tspan=tspan, verbose=verbose, unit='A')
         if mode == 'average':
             Q = np.mean(I)
         elif mode == 'integral':

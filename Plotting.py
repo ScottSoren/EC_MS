@@ -395,13 +395,12 @@ def smooth_data(data, points=3, cols=None, verbose=True):
     return data
 
 def plot_signal(MS_data,
-                masses = {'M2':'b','M4':'r','M18':'0.5','M28':'g','M32':'k'},
+                masses = 'all',
                 tspan=None, ax='new', unit='nA', removebackground=False,
                 logplot=True, saveit=False, leg=False, name=None,
                 override=False, verbose=True):
     '''
     plots selected masses for a selected time range from MS data or EC_MS data
-    Could probably be simplified a lot, to be the same length as plot_fluxes
     '''
     if name is None:
         try:
@@ -415,8 +414,10 @@ def plot_signal(MS_data,
         fig1 = plt.figure()
         ax = fig1.add_subplot(111)
     lines = {}
-    #note, tspan is processed in get_signal, and not here!
-    if type(masses) is str:
+
+    if masses=='all':        # this is now the default!
+        masses = [key[:-2] for key in MS_data.keys() if key[0]=='M' and key[-2:]=='-y']
+    elif type(masses) is str:
         masses = [masses]
     if type(masses) is list:
         c = masses

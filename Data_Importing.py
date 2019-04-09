@@ -758,7 +758,9 @@ def load_from_file(full_path_name='current', title='file', tstamp=None, timestam
         name = dataset['title']
     dataset['name'] = name
 
-    if data_type == 'SI':
+    if dataset['empty']:
+        print('WARNING! load_from_file is returning an empty dataset')
+    elif data_type == 'SI':
         from .Combining import rename_SI_cols
         rename_SI_cols(dataset)
     elif data_type == 'RGA':
@@ -1069,3 +1071,27 @@ def save_as_text(filename, dataset, cols=[], mols=[], tspan='all', header=None,
         f.writelines(lines)
 
 
+def save_results_as_text(name, cols='all', **kwargs):
+    if cols == 'all':
+        cols = list(kwargs.keys())
+    header_line =  ''.join([(col + ', \t') for col in cols])
+    header_line = header_line[:-3] + '\n'
+    lines = [header_line]
+
+    N = len(kwargs[cols[0]])
+
+    for i in range(N):
+        l = ''
+        for col in cols:
+            try:
+                v = kwargs[col][i]
+            except IndexError:
+                s = ', \t'
+            else:
+                s = '{:6.4g}'.format(v) + ', \t'
+            l += s
+        l = l[:-3] + '\n'
+        lines += [l]
+
+    with open(name, 'w') as f:
+        f.writelines(lines)

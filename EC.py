@@ -478,6 +478,9 @@ def make_selector(data, sel_str='selector', cols=[]):
             if len(n) == 0:
                 print('WARNING: ' + col + ' is empty')
                 continue
+            elif not len(data[col]) == len(changes):
+                print('WARNING: ' + col + ' has an unexpected length')
+                continue
             n_down = np.append(n[0], n[:-1])  # comparing with n_up instead puts selector a point ahead
             changes = np.logical_or(changes, n_down<n)
     selector = np.cumsum(changes)

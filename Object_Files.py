@@ -19,9 +19,9 @@ float_match = r'\s[-]?\d+[\.]?\d*(e[-]?\d+)?\s'     #matches floats like -3.57e4
 
 def group_lines(lines, indent='\t', removecomments=True):
     '''
-    Groups indentation blocks into list elements. The line before the 
+    Groups indentation blocks into list elements. The line before the
     indentation block is included.
-    '''        
+    '''
     if removecomments:
         lines = remove_comments(lines)
     nest = 0 #to keep track of how deep we are in the indentation block
@@ -29,7 +29,7 @@ def group_lines(lines, indent='\t', removecomments=True):
     whitespace = re.compile(r'\s+')
     for (i,line) in enumerate(lines):
         #print(line)
-        if len(re.sub(whitespace, '', line)) == 0: 
+        if len(re.sub(whitespace, '', line)) == 0:
             #print('... skipped!')
                 #fix 17C23 to protect against empty lines
             continue
@@ -41,8 +41,8 @@ def group_lines(lines, indent='\t', removecomments=True):
             nest += 1
             group[-1] = [group[-1], line[nest:]]
         elif len(line)>nest: #to drop empty lines
-            group += [line[nest:]]                 
-    return grouped_lines    
+            group += [line[nest:]]
+    return grouped_lines
 
 def remove_comments(lines):
     new_lines = []
@@ -65,7 +65,7 @@ def structure_to_lines(structure, nest=0, indent='\t', toplevel=False,
     intro = ''
     if preamble is not None:
         intro += preamble
-    
+
     if type(structure) is dict:
         if title_key in structure.keys(): #changed 'intro' to 'title_key' 16L14
             intro += indent + '-' + indent + structure[title_key]
@@ -78,7 +78,7 @@ def structure_to_lines(structure, nest=0, indent='\t', toplevel=False,
         for (key, value) in structure.items():
             if key == title_key:
                 continue
-            lines += structure_to_lines(value, nest, indent, preamble=key, 
+            lines += structure_to_lines(value, nest, indent, preamble=key,
                                      title_key='title')
     elif type(structure) is list:
         if not toplevel:
@@ -93,17 +93,17 @@ def structure_to_lines(structure, nest=0, indent='\t', toplevel=False,
                 #added 16L14 to enable writing of lists of (key, value)
             else:
                 lines += structure_to_lines(value, nest, indent)
-                
+
     elif type(structure) is str:
         if len(intro) > 0:
             intro += ': '
         lines += [nest * indent + intro + structure + '\n']
-    
+
     else:
         if len(intro) > 0:
             intro += indent + '=' + indent
         lines += [nest * indent + intro + str(structure) + '\n']
-        
+
     return lines
 
 
@@ -117,29 +117,30 @@ def grouped_lines_to_structure(lines, indent='\t'):
     # as of 16L14, '\n' is removed by group_lines and not here.
     '''
     if type(lines) is str:
-        if ':' in lines: #then we've got a key and string value separated by a ': '
-            key = re.search(r'^.+:', lines).group()[:-1] #don't want the ':'
+        line = lines.strip()
+        if ':' in line: #then we've got a key and string value separated by a ': '
+            key = re.search(r'^.+:', line).group()[:-1] #don't want the ':'
             try:
-                value = re.search(r':.+$', lines).group()[2:] #don't want the ': '
+                value = re.search(r':.+$', line).group()[2:] #don't want the ': '
                             #note: use of '$' means '\n' isn't in group()!
             except AttributeError:
                 value = None
-            structure = (key, value)  
-        elif '=' in lines: #then we've got a key and numerical value separated by a '\t=\t'
-            key = re.search(r'^.+=', lines).group()[:-2] #don't want the '\t='
+            structure = (key, value)
+        elif '=' in line: #then we've got a key and numerical value separated by a '\t=\t'
+            key = re.search(r'^.+=', line).group()[:-2] #don't want the '\t='
             try:
-                value = re.search(r'=.+$', lines).group()[2:] #don't want the '=\t'
+                value = re.search(r'=.+$', line).group()[2:] #don't want the '=\t'
             except AttributeError:
                 value = None
-            try:            
-                value = eval(value)    
+            try:
+                value = eval(value)
             except (SyntaxError, NameError):
                 print('wasn''t able to evaluate \'' + value + '\'')
             structure = (key, value)
         else:   #then we've got just a string
-            structure = lines
-     
-    elif type(lines) is list:  
+            structure = line
+
+    elif type(lines) is list:
         title_line = lines[0]
         if ':' in title_line:  #then we want to make it into a list
             key = re.search(r'^.+:', title_line).group()[:-1]
@@ -149,15 +150,15 @@ def grouped_lines_to_structure(lines, indent='\t'):
         else:       #then we want to make it into a dictionary
             value = {}
             if (indent + '-' + indent) in title_line:
-                key = re.search(r'^.+' + indent + '-', title_line).group()[:-2] 
+                key = re.search(r'^.+' + indent + '-', title_line).group()[:-2]
                                             #don't want the '\t-'
                 title = re.search(r'-' + indent + '.+$', title_line).group()[2:]
-                                            #don't want the '-\t' 
+                                            #don't want the '-\t'
                 value['title'] = title
             else:
                 key = title_line
             for line in lines[1:]:
-                item = grouped_lines_to_structure(line) 
+                item = grouped_lines_to_structure(line)
                 try:
                     value[item[0]] = item[1]
                 except IndexError:
@@ -166,7 +167,7 @@ def grouped_lines_to_structure(lines, indent='\t'):
             structure = value
         else:
             structure = (key, value)
-            
+
     return structure
 
 
@@ -194,9 +195,9 @@ def lines_to_dictionary(lines, indent='\t', removecomments=True):
 def lines_to_attributes(lines, obj, verbose=1, indent='\t'):
     if verbose:
         print('function \'lines_to_attributes\' at your service!')
-    lines = ['<dictionary>\n'] + lines 
+    lines = ['<dictionary>\n'] + lines
     #gets lines_to_structure to treat it as one big dictionary
-    attributes = lines_to_structure(lines, indent)[1]  
+    attributes = lines_to_structure(lines, indent)[1]
     for (key, value) in attributes.items():
         setattr(obj, key, value)
     if verbose:
@@ -216,7 +217,7 @@ def attributes_to_file(f, obj, verbose=1, indent='\t'):
     for unwanted_key in ['file_lines', 'attr_status', '__str__']:
         if unwanted_key in attributes.keys():
             del(attributes[unwanted_key]) #so I don't write the whole file in itself
-    lines = structure_to_lines(attributes, indent=indent) 
+    lines = structure_to_lines(attributes, indent=indent)
     lines = [line[1:] for line in lines[1:]] #dropping '<dictionary>\n' and an indentation
     for line in lines:
         f.write(line)
@@ -225,20 +226,20 @@ def attributes_to_file(f, obj, verbose=1, indent='\t'):
     #return f #shouldn't be necessary
 
 
-def advanced_update(dict1, dict2, newstuff=True, oldstuff=False, 
+def advanced_update(dict1, dict2, newstuff=True, oldstuff=False,
                  newkeys=[], oldkeys=[], mask=None):
     '''
     updates dict1 with dict2, but with options about which keys to add/update.
     Default values give a normal update.
     '''
-    
+
     keys2 = list(dict2.keys()) # so that I don't have a dictionary changed size during iteration error
-    if not newstuff: 
+    if not newstuff:
         #then don't add new keys
         for key in keys2:
             if key not in dict1.keys() and key not in newkeys:
                 dict2.pop(key, None)
-    if oldstuff or len(oldkeys)>0:  
+    if oldstuff or len(oldkeys)>0:
         #then don't replace values of (evt. select) existing keys
         for key in keys2:
             if (oldstuff and key in dict1.keys()) or key in oldkeys:
@@ -249,9 +250,9 @@ def advanced_update(dict1, dict2, newstuff=True, oldstuff=False,
         for key in keys2:
             if mask(key):
                 dict2.pop(key)
-                
+
     #print(type(dict2))
-    
+
     dict1.update(dict2)
     return dict1
 
@@ -262,9 +263,9 @@ def update_lines(lines, dictionary, **kwargs):
     dict1 = lines_to_dictionary(lines)
     newdict = advanced_update(dict1, dictionary, **kwargs)
     newlines = dictionary_to_lines(newdict)
-    
+
     return newlines
-    
+
 
 def date_scott(date='today')  :
     '''
@@ -282,13 +283,13 @@ def date_scott(date='today')  :
             month = date[2:4]
             year = date[4:6]
         else: #if you insist
-            return str(date)  
-    
+            return str(date)
+
     else:
         return str(date)
     date_string = '{0:2d}{1:1s}{2:2d}'.format(year%100, chr(ord('A') + month - 1), day)
     date_string = date_string.replace(' ', '0')
-        
+
     return date_string
 
 
@@ -302,8 +303,8 @@ if __name__ == '__main__':
     #write everything about the happy H2 molecule to a file
     f = open('data/test.txt', 'w')
     attributes_to_file(f, a)
-    f.close() 
-    #make a CO2 molecule from the data file... 
+    f.close()
+    #make a CO2 molecule from the data file...
     b = Molecule('CO2')
     print(b.name)
     #... and confuse the shit out it!
@@ -316,9 +317,8 @@ if __name__ == '__main__':
     b.reset()
     print(b.name) #and now it's back to normal.
 
-    
-    
-    
 
 
-    
+
+
+

@@ -1,5 +1,5 @@
 #cleaned up 19A27
-name: CO2
+name: CO2 	# NIST
 formula: CO2
 M	=	44.009
 D	=	1.92e-09
@@ -22,57 +22,4 @@ dynamic_viscosity	=	1.5000000000000002e-05
 density_RTP	=	1.977
 D_gas_RTP	=	5.8e-05
 primary: M44
-#the folowing rsf is calculated for M44 on 19B01
-rsf	=	0.990577169303
-#the following F_cal value is for M44, trusted on 19B01
-F_cal	=	5.24475345303
-#the following F_cal value is for M44, extrapolated from trusted values based on RSF from NIST on 19B01
-F_cal	=	5.24475345303
-#the folowing rsf is calculated for M44 on 19B01
-rsf	=	0.990577169303
-#the following F_cal value is for M44, trusted on 19B01
-F_cal	=	5.24475345303
-#the following F_cal value is for M44, extrapolated from trusted values based on RSF from NIST on 19B01
-F_cal	=	5.24475345303
-#the folowing rsf is calculated for M44 on 19B01
-rsf	=	0.990577169303
-#the following F_cal value is for M44, trusted on 19B01
-F_cal	=	5.24475345303
-#the following F_cal value is for M44, extrapolated from trusted values based on RSF from NIST on 19B01
-F_cal	=	5.24475345303
-#the folowing rsf is calculated for M44 on 19B01
-rsf	=	0.990577169303
-#the following F_cal value is for M44, trusted on 19B01
-F_cal	=	5.24475345303
-#the following F_cal value is for M44, extrapolated from trusted values based on RSF from NIST on 19B01
-F_cal	=	5.24475345303
-#the folowing rsf is calculated for M44 on 19B01
-rsf	=	0.990577169303
-#the following F_cal value is for M44, trusted on 19B01
-F_cal	=	5.24475345303
-#the following F_cal value is for M44, extrapolated from trusted values based on RSF from NIST on 19B01
-F_cal	=	5.24475345303
-#the folowing rsf is calculated for M44 on 19B01
-rsf	=	0.990577169303
-#the following F_cal value is for M44, trusted on 19B01
-F_cal	=	5.24475345303
-#the following F_cal value is for M44, extrapolated from trusted values based on RSF from NIST on 19B01
-F_cal	=	5.24475345303
-#the folowing rsf is calculated for M44 on 19B01
-rsf	=	0.990577169303
-#the following F_cal value is for M44, trusted on 19B01
-F_cal	=	5.24475345303
-#the following F_cal value is for M44, extrapolated from trusted values based on RSF from NIST on 19B01
-F_cal	=	5.24475345303
-#the folowing rsf is calculated for M44 on 19B01
-rsf	=	0.990577169303
-#the following F_cal value is for M44, trusted on 19B01
-F_cal	=	5.24475345303
-#the following F_cal value is for M44, extrapolated from trusted values based on RSF from NIST on 19B01
-F_cal	=	5.24475345303
-#the folowing rsf is calculated for M44 on 19B01
-rsf	=	0.990577169303
-#the following F_cal value is for M44, trusted on 19B01
-F_cal	=	5.24475345303
-#the following F_cal value is for M44, extrapolated from trusted values based on RSF from NIST on 19B01
-F_cal	=	5.24475345303
+
