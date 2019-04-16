@@ -129,6 +129,8 @@ def timestring_to_epoch_time(timestring, date=None, tz=None, verbose=True,
                       'when you say ' + timestamp + '. It didn\'t match \.' +
                       timestamp_match + '\'. Assuming you want 00:00:00')
             timestamp = '00:00:00'
+    else:
+        timestamp = timestring
 
     if date is None:
         if verbose:
@@ -142,7 +144,7 @@ def timestring_to_epoch_time(timestring, date=None, tz=None, verbose=True,
         date = 'today'
     if date == 'today':
         date = time.strftime('%Y/%m/%d')
-
+    print('timestring = ' + timestring) # debugging
     if tz is None:
         if '-' in date:
             date = date.replace('-','/') #18D08
@@ -710,11 +712,12 @@ def text_to_data(file_lines, title=None,
 
     if data_type == 'EC':           #so that synchronize can combine current data from different EC-lab techniques
         if '<I>/mA' in dataset['data_cols'] and 'I/mA' not in dataset['data_cols']:
-            dataset['data_cols'].add('I/mA').copy() # who knows what trouble I'd eventually get into otherwise
-            dataset['I/mA'] = dataset['<I>/mA'] #so that synchronize can combine current data from different EC-lab techniques
+            #so that synchronize can combine current data from different EC-lab techniques
+            dataset['data_cols'].add('I/mA')
+            dataset['I/mA'] = dataset['<I>/mA'].copy()
         if '<Ewe>/V' in dataset['data_cols'] and 'Ewe/V' not in dataset['data_cols']:
-            dataset['data_cols'].add('Ewe/V').copy()
-            dataset['Ewe/V'] = dataset['<Ewe>/V']
+            dataset['data_cols'].add('Ewe/V')
+            dataset['Ewe/V'] = dataset['<Ewe>/V'].copy()
 
     if verbose:
         print('\nfunction \'text_to_data\' finished!\n\n')
@@ -778,24 +781,47 @@ def load_from_file(full_path_name='current', title='file', tstamp=None, timestam
     return dataset
 
 
-def import_EC_set(directory, EC_file=None, tag='01',
+def load_EC_set(directory, EC_files=None, tag='01', suffix=None, data_type='EC',
                   verbose=True, tz=None):
+    '''
+    inputs:
+        directory - path to folder containing your data, string
+
+        EC_file - list of EC_files, list
+            OR
+        tag - shared start of EC files you want to load and combine, str AND
+        suffix - ending of files, by default .mpt
+
+        data_type - type of EC data. By default 'EC', meaning Biologic EC-Lab files
+        tz - timezone, usually not needed
+        verbose - makes the function talk to you.
+    output
+        EC_data - a dataset with the data from all specified EC files combined
+            and sorted based on time. Additional columns loop_number and
+            file_number are added to the dataset if relevant.
+    '''
     if verbose:
         print('\n\nfunction \'load_EC_set\' at your service!\n')
     from .Combining import synchronize, sort_time
 
+    if suffix is None:
+        if data_type == 'EC':
+            suffix = '.mpt'
+        elif data_type == 'CHI':
+            suffix = '.txt'
+
     lslist = os.listdir(directory)
 
-    if EC_file is None:
-        EC_file = [f for f in lslist if f[:2] == tag and f[-4:] == '.mpt']
-    elif type(EC_file) is str:
-        EC_file = [EC_file]
+    if EC_files is None:
+        EC_files = [f for f in lslist if f[:len(tag)] == tag and f[-4:] == suffix]
+    elif type(EC_files) is str:
+        EC_files = [EC_files]
     EC_datas = []
-    for f in EC_file:
+    for f in EC_files:
         try:
-            EC_datas += [load_from_file(directory + os.sep + f, data_type='EC', tz=tz, verbose=verbose)]
+            EC_datas += [load_from_file(directory + os.sep + f, data_type=data_type, tz=tz, verbose=verbose)]
         except OSError:
-            print('problem with ' + f + '. Continuing.')
+            print('WARNING: problem importing ' + f + '. Continuing.')
     EC_data = synchronize(EC_datas, verbose=verbose, append=True, t_zero='first', tz=tz)
     if 'loop number' in EC_data['data_cols']:
         sort_time(EC_data, verbose=verbose) #note, sort_time no longer returns!
@@ -804,8 +830,11 @@ def import_EC_set(directory, EC_file=None, tag='01',
          print('\nfunction \'load_EC_set\' finished!\n\n')
     return EC_data
 
-def load_EC_set(*args, **kwargs):
-    print('load_EC_set has been renamed import_EC_set')
+def import_EC_set(*args, **kwargs):
+    '''
+    See EC_MS.load_EC_set
+    '''
+    print('import_EC_set has been renamed load_EC_set')
     return import_EC_set(*args, **kwargs)
 
 

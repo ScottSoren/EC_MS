@@ -230,6 +230,10 @@ def activity_steps(data, mols, cycles, cycle_str='selector',
     if verbose:
         print('\n\nfunction \'evaluate_datapoints\' at your service!\n')
     # ----- parse inputs -------- #
+    try:
+        iter(mols)
+    except TypeError:
+        mols = [mols]
     mdict = dict([(m.name, m) for m in mols])
 
     if mode in ['average', 'averaging', 'mean']:
