@@ -52,6 +52,30 @@ def smooth(y, n_points):
     return y_smooth
 
 
+def plot_EC_vs_t(data, t_str='time/s', J_str=None, V_str=None, 
+                 V_color='k', J_color='r', ax='new',
+                 verbose=True, **kwargs):
+    if J_str is None or V_str is None:
+        V_str_0, J_str_0 = sync_metadata(data)
+        if J_str is None:
+            J_str = J_str_0
+        if V_str is None:
+            V_str = V_str_0
+    t, V, J = data[t_str], data[V_str], data[J_str]
+    if ax == 'new':
+        fig, ax1 = plt.subplots()
+        ax2 = ax1.twinx()
+    else:
+        ax1 = ax[0]
+        ax2 = ax[1]
+    ax1.plot(t, V, color=V_color, **kwargs)
+    ax2.plot(t, J, color=J_color, **kwargs)
+    ax1.set_xlabel(t_str)
+    ax1.set_ylabel(V_str)
+    ax2.set_ylabel(J_str)
+    return [ax1, ax2]
+    
+
 def plot_vs_potential(CV_and_MS_0,
                       colors={'M2':'b','M4':'m','M18':'y','M28':'0.5','M32':'k'},
                       tspan=None, RE_vs_RHE=None, A_el=None, cycles='all',

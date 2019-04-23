@@ -79,7 +79,7 @@ def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True,
     mask = np.any(np.array([cycle_numbers == c for c in cycles]), axis=0)
     #list comprehension is awesome.
     t_cut = EC_data['time/s'][mask]
-    tspan = [t_cut[0], t_cut[-1]]
+    tspan = np.array([t_cut[0], t_cut[-1]])
 
 
     # ------- cutit! ------------- #
@@ -485,6 +485,8 @@ def make_selector(data, sel_str='selector', cols=[]):
             changes = np.logical_or(changes, n_down<n)
     selector = np.cumsum(changes)
     data[sel_str] = selector
+    data['data_cols'].add(sel_str)
+    data['col_types'][sel_str] = 'EC'
     return sel_str
 
 
@@ -728,7 +730,10 @@ def get_through_sweep(data=None, t_str=None, V_str=None, t=None, V=None, t_i=0,
     # parse inputs:
     if t is None:
         if t_str is None:
-            t_str = data['t_str']
+            try:
+                t_str = data['t_str']
+            except KeyError:
+                t_str = 'time/s'
         t = data[t_str]
     if V is None:
         if V_str is None:

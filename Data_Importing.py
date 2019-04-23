@@ -41,7 +41,8 @@ def parse_timezone(tz=None):
         return tz
 
 def parse_date(line):
-    date_match = '([0-9]{2}[/-]){2}[0-9]{4}'          #matches dates like '01/15/2018' or '09-07-2016'
+    date_match = '([0-9]{2}[/\-\.]){2}[0-9]{4}'          
+    # ^ matches dates like '01/15/2018' or '09-07-2016' or '04.20.2019'. Saw that last one in Degenhart's EC-Lab data
     #^  mm/dd/yyyy, as EC lab does
     # older EC-Lab seems to have dashes in date, and newer has slashes.
     # Both seem to save month before day, regardless of where the data was taken or .mpt exported.
@@ -689,7 +690,7 @@ def text_to_data(file_lines, title=None,
                         dataset['data_cols'].remove(col)
                     else:
                         if verbose and not col in commacols:
-                            print('ValueError on value ' + x + ' in column ' + col + ' line ' + str(nl) +
+                            print('ValueError on value ' + str(x) + ' in column ' + col + ' line ' + str(nl) +
                                   '\n Checking if you''re using commas as decimals in that column... ')
                         if not col in commacols:
                             if verbose:
@@ -782,7 +783,7 @@ def load_from_file(full_path_name='current', title='file', tstamp=None, timestam
 
 
 def load_EC_set(directory, EC_files=None, tag='01', suffix=None, data_type='EC',
-                  verbose=True, tz=None):
+                  verbose=True, tz=None, exclude=[]):
     '''
     inputs:
         directory - path to folder containing your data, string
@@ -814,6 +815,10 @@ def load_EC_set(directory, EC_files=None, tag='01', suffix=None, data_type='EC',
 
     if EC_files is None:
         EC_files = [f for f in lslist if f[:len(tag)] == tag and f[-4:] == suffix]
+        if type(exclude) is str:
+            exclude = [exclude]
+        for excl in exclude:
+            EC_files = [f for f in EC_files if not excl in f]
     elif type(EC_files) is str:
         EC_files = [EC_files]
     EC_datas = []
