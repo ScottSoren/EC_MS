@@ -160,8 +160,8 @@ def remove_delay(CV_data):
     return CV_data
 
 
-def CV_difference(cycles_data, redox=1, Vspan=[0.5, 1.0],
-                  ax=None, color='g', verbose=True):
+def CV_difference(cycles_data=None, cycles=None, redox=1, Vspan=[0.5, 1.0],
+                  ax=None, color='g', cycle_str='selector', verbose=True):
     '''
     This will calculate the difference in area between two cycles in a CV,
     written for CO stripping 16J26. If ax is given, the difference will be
@@ -191,6 +191,13 @@ def CV_difference(cycles_data, redox=1, Vspan=[0.5, 1.0],
     Q = []
     JV = []
     ts = []
+
+    if cycles is not None:
+        data = cycles_data
+        cycles_data = []
+        for cycle in cycles:
+            cycles_data += [select_cycles(data, cycles=[cycle], cycle_str=cycle_str)]
+
     for cycle_data in cycles_data:
         #print(type(cycles_data)) # debugging
         V_str, J_str = sync_metadata(cycle_data, verbose=verbose)
@@ -250,8 +257,15 @@ def CV_difference(cycles_data, redox=1, Vspan=[0.5, 1.0],
             ax = plt.figure().add_subplot(111)
             ax.set_xlabel(V_str)
             ax.set_ylabel(J_str)
+            ax.plot(Vs[0], Js[0], 'k-')
+            ax.plot(Vs[1], Js[1], 'r--')
+            ax.set_xlabel(V_str)
+            ax.set_ylabel(J_str)
+
         ax.fill_between(V, Js[0], Js[1], where=Js[0]>Js[1],
                         facecolor=color, interpolate=True)
+        ax.fill_between(V, Js[0], Js[1], where=Js[0]<Js[1],
+                        facecolor=color, alpha=0.5, hatch='//', interpolate=True)
     if verbose:
         print('\nfunction \'CV_difference\' finished!\n\n')
 
@@ -486,7 +500,8 @@ def make_selector(data, sel_str='selector', cols=[]):
     selector = np.cumsum(changes)
     data[sel_str] = selector
     data['data_cols'].add(sel_str)
-    data['col_types'][sel_str] = 'EC'
+    if 'col_types' in data: # Not the case for old .pkl's.
+        data['col_types'][sel_str] = 'EC'
     return sel_str
 
 

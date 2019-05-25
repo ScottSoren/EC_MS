@@ -1304,7 +1304,7 @@ def trigger_cal(data, triggers=None, pseudotimecol=None, pt_str=None,
     data['t_str'] = timecol
     data['pt_str'] = pseudotimecol
     if timecol not in data['data_cols']:
-        data['data_cols'] += [t_str]
+        data['data_cols'].add(t_str)
     if pseudotimecol not in data['data_cols']:
         data['data_cols'] += [pt_str]
     if verbose:

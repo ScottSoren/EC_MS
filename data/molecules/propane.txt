@@ -2,8 +2,13 @@
 name: propane
 formula: C3H8
 sigma_100eV	=	8.392
+sigma_70eV	=	8.619
+
 primary: M29
 
+molecule_diameter	=	4.30e-10  #https://en.wikipedia.org/wiki/Kinetic_diameter, 19E19
+dynamic_viscosity	=	8.15e-6 #https://encyclopedia.airliquide.com/propane, 19E19
+density_RTP	=	1.96
 
 Spectrum
 	Title: NIST_18D10

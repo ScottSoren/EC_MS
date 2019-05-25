@@ -124,10 +124,7 @@ def RSF_to_F_cal(*args, **kwargs):
 
 
 
-def recalibrate(quantify = [('H2','M2'), ('He','M4'), ('CH4','M15'), ('H2O','M18'),
-                             ('N2','M28'), ('CO','M28'), ('C2H4','M26'), ('C2H6','M30'),
-                             ('O2','M32'), ('Ar','M40'), ('CO2','M44'), ('Cl2','M70'),],
-                                #molecules we want to calc F_cal (at the given mass) for by extrapolation
+def recalibrate(quantify = {},  #molecules we want to calc F_cal (at the given mass) for by extrapolation
                 trust = None, # says what to trust, e.g., 'internal', 'external', or 'all'
                 trusted = [], # list of Molecule objects with trusted F_cal
                 internal = [], # list of Molecule objects with F_cal from internal calibration
@@ -182,6 +179,11 @@ def recalibrate(quantify = [('H2','M2'), ('He','M4'), ('CH4','M15'), ('H2O','M18
 
     # prepare mdict, put trusted stuff in it
     mdict = {}  # to be returned by the function
+    if quantify in ['all', 'standard']:
+        quantify = [('H2','M2'), ('He','M4'), ('CH4','M15'), ('H2O','M18'),
+                    ('N2','M28'), ('CO','M28'), ('C2H4','M26'), ('C2H6','M30'),
+                    ('O2','M32'), ('Ar','M40'), ('CO2','M44'), ('Cl2','M70'),]
+
     if type(quantify) is list:
         quantify = dict(quantify)
     quantmols = list(quantify.keys())

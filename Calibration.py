@@ -121,7 +121,7 @@ def ML_strip_cal(CV_and_MS, cycles=[1,2], t_int=200, cycle_str='cycle number',
     if ax2 is not None:
         ax2.plot(x,y*1e9, 'k-')
         #ax2.plot(x, [background*1e9]*len(x), 'k-')
-        ax2.fill_between(x, background*1e9, y*1e9, where=y>background,
+        ax2.fill_between(x, background*1e9, y*1e9, #where=y>background,
                          facecolor='g', interpolate=True)
         if plot_instantaneous:
             ax2.plot(t, y_el*1e9, 'r--')    #Without mass transport
@@ -367,7 +367,7 @@ def point_calibration(data, mol, mass='primary', cal_type='internal',
     else:
         x, y = get_signal(data, mass, tspan=[tspan[0], tspan[1]+tail])
         #S = np.trapz(y-y0, x) #/ (x[-1] - x[1])
-        S = np.mean(y) #more accurate for few, evenly spaced datapoints
+        S = np.mean(y) - y0#more accurate for few, evenly spaced datapoints
 
     if cal_type == 'internal':
         if type(tspan) in [int, float]:
@@ -397,6 +397,9 @@ def point_calibration(data, mol, mass='primary', cal_type='internal',
     F_cal = S/n
     m.F_cal = F_cal
 
+    print('point_calibration() results: S = ' + str(S) + ' , n = ' + str(n) +
+          ', F_cal = ' + str(F_cal))
+
     return m
 
 
@@ -408,6 +411,7 @@ def calibration_curve(data, mol, mass='primary', n_el=-2,
                       find_min=False, t_min_buffer=5, V_min_buffer=5,
                       background=None, t_bg=None, tspan_plot=None,
                       remove_EC_bg=False, color=None,
+                      force_through_zero=False,
                       ax='new', J_color='0.5', unit=None,
                       out='Molecule', verbose=True
                       ):
@@ -597,7 +601,8 @@ def calibration_curve(data, mol, mass='primary', n_el=-2,
                 y_bg = bg*np.ones(y.shape)
             else:
                 y_bg = bg
-            ax1[0].fill_between(x, y, y_bg, where=y>y_bg, color=color, alpha=0.5)
+            ax1[0].fill_between(x, y, y_bg, #where=y>y_bg,
+               color=color, alpha=0.5)
             J = I * 1e3 / data['A_el']
             J_bg = np.zeros(J.shape)
             ax1[2].fill_between(t, J, J_bg, color=J_color, alpha=0.5)
@@ -613,8 +618,11 @@ def calibration_curve(data, mol, mass='primary', n_el=-2,
     if remove_EC_bg:
         ns = ns - min(ns)
 
-    pfit = np.polyfit(ns, Ys, deg=1)
-    F_cal = pfit[0]
+    if force_through_zero:
+        F_cal = sum(Ys) / sum(ns) # I'd actually be surprised if any fitting beat this
+    else:
+        pfit = np.polyfit(ns, Ys, deg=1)
+        F_cal = pfit[0]
 
     m.F_cal = F_cal
 
@@ -649,9 +657,17 @@ def calibration_curve(data, mol, mass='primary', n_el=-2,
         #align_zero(ax2a, ax2b)
         ax2 += [ax2a, ax2b]
     if ax2c is not None:
-        Y_pred_plot = F_cal * ns_plot + pfit[1]
         ax2c.plot(ns_plot, Ys_plot, '.', color=color, markersize=10)
-        ax2c.plot(ns_plot, Y_pred_plot, '--', color=color)
+        # plot the best-fit line
+        if force_through_zero:
+            ns_pred_plot = np.sort(np.append(0, ns_plot))
+            Y_pred_plot = F_cal * ns_pred_plot
+        else:
+            ns_pred_plot = np.sort(ns_plot)
+            Y_pred_plot = F_cal * ns_pred_plot + pfit[1]
+        #print('ns_pred_plot = ' + str(ns_pred_plot)) # debugging
+        #print('Y_pred_plot = ' + str(Y_pred_plot)) # debugging
+        ax2c.plot(ns_pred_plot, Y_pred_plot, '--', color=color)
         if mode == 'average':
             ax2c.set_xlabel('<I>/(' + str(n_el) + '$\mathcal{F}$) / [' + unit + 'mol s$^{-1}$]')
             ax2c.set_ylabel('<' + mass + ' signal> / ' + unit + 'A')
@@ -681,7 +697,7 @@ def save_calibration_results(mdict, f):
     calibration_results = {}
     for mol, m in mdict.items():
         result = {}
-        for attr in ['primary', 'F_cal', 'cal_mat']:
+        for attr in ['primary', 'F_cal', 'cal_mat', 'formula']:
             if hasattr(m, attr):
                 result[attr] = getattr(m, attr)
         calibration_results[mol] = result
@@ -692,6 +708,11 @@ def save_calibration_results(mdict, f):
         pickle.dump(calibration_results, f) # save it
 
 def load_calibration_results(f, verbose=True):
+    '''
+    Given the name of a pickle file saved by save_calibration_results(),
+    opens the dictionary stored in the pickle file and does its best to
+    convert the information stored in its values into molecule objects.
+    '''
     if verbose:
         print('\n\nfunction \'load_calibration_results\' at your service!\n')
     if type(f) is str:
@@ -705,7 +726,11 @@ def load_calibration_results(f, verbose=True):
         try:
             m = Molecule(mol, verbose=verbose)
         except FileNotFoundError:  # this happens if any molecule names were changed
-            m = result
+            try:
+                m = Molecule(result['formula'], verbose=verbose)
+                m.name = mol
+            except (KeyError, FileNotFoundError):
+                m = result
         else:
             for attr, value in result.items():
                 setattr(m, attr, value)

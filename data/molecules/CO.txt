@@ -5,6 +5,8 @@ M	=	28.009999999999998
 D	=	1.92e-09
 kH	=	43.5
 sigma_100eV	=	2.616
+sigma_70eV	=	2.516
+
 spectrum
 	Title: NIST_16L14
 	M12	=	4.700470047

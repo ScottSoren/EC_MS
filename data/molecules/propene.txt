@@ -1,8 +1,13 @@
 #cleaned up 17I23
 name: propene
 formula: C3H6
-sigma_100eV	=	8.736
+sigma_100eV	=	8.477
+sigma_70eV	=	8.736
 primary: M41
+
+molecule_diameter	=	4.50e-10  #https://en.wikipedia.org/wiki/Kinetic_diameter, 19E19
+dynamic_viscosity	=	8.85e-6 #https://encyclopedia.airliquide.com/propene, 19E19
+density_RTP	=	1.83
 
 
 Spectrum

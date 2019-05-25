@@ -4,7 +4,8 @@ formula: Ar
 M	=	39.948
 D	=	2e-09
 kH	=	29.4
-sigma_100eV	=	2.982
+sigma_100eV	=	2.78 	# from Harshit N Kothari. J. Phys., Vol. 79, No. 3, September 2012
+sigma_70eV	=	2.60
 spectrum
 	Title: NIST_16L14
 	M20	=	14.6214621462

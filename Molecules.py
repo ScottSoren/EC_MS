@@ -88,7 +88,11 @@ class Molecule:
         os.chdir(cwd)
 
         if self.M == 0:
+            print('setting self.M from formula') # debugging
             self.M = Chem.get_mass(self.formula)
+        if not hasattr(self, 'molecule_mass'):
+            print('setting self.molecule_mass from self.M') # debugging
+            self.molecule_mass = self.M/Chem.NA
 
         self.transmission_function = None
         #self.color = self.get_color()
@@ -318,7 +322,7 @@ class Molecule:
             y += [value]
         y = np.array(y) / max(y) * top
         x = np.array(x)
-        ax.bar(x - 1/2, y)
+        ax.bar(x, y)
         ax.set_xticks(x)
         ax.set_xticklabels([str(m) for m in x])
         ax.set_title('literature QMS spectrum for ' + self.name)
