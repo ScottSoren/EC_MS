@@ -1,4 +1,6 @@
-# created 17I23
+# created 19C07
+# Alexander Krabbe's EC-MS O2 calibration chip!
+
 w_cap	=	6e-06
 h_cap	=	6e-06
 l_cap	=	0.00333

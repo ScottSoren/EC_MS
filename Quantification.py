@@ -444,7 +444,7 @@ def get_signal(MS_data, mass, tspan=None,
         if background is None:
             background = 'constant'
         if background=='start':
-            background = y[0]
+            background = np.average(y[:endpoints])
         elif background=='constant':
             if type(removebackground) is float:
                 background = removebackground * min(y)

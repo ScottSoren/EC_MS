@@ -491,6 +491,7 @@ class Molecule:
         pass
 
     def get_bg(self, *args, **kwargs):
+        kwargs.update(unit='mol/s')
         x, y = self.get_flux(*args, **kwargs, removebackground=False)
         background = np.mean(y)
         self.background = background
@@ -534,17 +535,21 @@ class Molecule:
             else:
                 tspan = 'tspan'
         if type(tspan) is str and not tspan=='all':
-            tspan = MS_data[tspan]
+            try:
+                tspan = MS_data[tspan]
+            except KeyError:
+                tspan = 'all'
 
         if x is None:
             if density is None:
                 x = MS_data[self.primary + '-x']
-                mask = np.logical_and(tspan[0]<x, x<tspan[-1])
-                # Don't cut off outer endpoints before evt interpolation (if used by plot_vs_potential)
-                extra_left = np.append(mask[1:], False)
-                extra_right = np.append(False, mask[:-1])
-                mask = np.logical_or(extra_left, extra_right)
-                x = x[mask]
+                if not tspan == 'all':
+                    mask = np.logical_and(tspan[0]<x, x<tspan[-1])
+                    # Don't cut off outer endpoints before evt interpolation (if used by plot_vs_potential)
+                    extra_left = np.append(mask[1:], False)
+                    extra_right = np.append(False, mask[:-1])
+                    mask = np.logical_or(extra_left, extra_right)
+                    x = x[mask]
             else:
                 x = np.linspace(tspan[0], tspan[-1], density*np.floor(tspan[-1] - tspan[0]))
             # ^ approx 5 datapoints a second
@@ -556,13 +561,14 @@ class Molecule:
             s = np.interp(x, x0, s0)
             y += s * C # units: [A] * [mol/C] = [mol/s]
 
+
+        if removebackground is None:
+            removebackground = (background is not None)
+
         if (background is None or background is 'preset') and hasattr(self, 'background'):
             background = self.background
         elif background == 'preset':
             background = None
-
-        if removebackground is None and background is not None:
-            removebackground = True
 
         if removebackground:
             if background is None:

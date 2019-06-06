@@ -1,7 +1,7 @@
 
 
-
-
+p = 100000
+T = 298.15
 
 #micro capillary
 w_cap = 5e-6

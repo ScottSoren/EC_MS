@@ -52,7 +52,7 @@ def smooth(y, n_points):
     return y_smooth
 
 
-def plot_EC_vs_t(data, t_str='time/s', J_str=None, V_str=None, 
+def plot_EC_vs_t(data, t_str='time/s', J_str=None, V_str=None,
                  V_color='k', J_color='r', ax='new',
                  verbose=True, **kwargs):
     if J_str is None or V_str is None:
@@ -74,7 +74,7 @@ def plot_EC_vs_t(data, t_str='time/s', J_str=None, V_str=None,
     ax1.set_ylabel(V_str)
     ax2.set_ylabel(J_str)
     return [ax1, ax2]
-    
+
 
 def plot_vs_potential(CV_and_MS_0,
                       colors={'M2':'b','M4':'m','M18':'y','M28':'0.5','M32':'k'},
@@ -420,7 +420,8 @@ def smooth_data(data, points=3, cols=None, verbose=True):
 
 def plot_signal(MS_data,
                 masses = 'all',
-                tspan=None, ax='new', unit='nA', removebackground=False,
+                tspan=None, ax='new', unit='nA',
+                removebackground=None, background=None,
                 logplot=True, saveit=False, leg=False, name=None,
                 override=False, verbose=True):
     '''
@@ -460,7 +461,8 @@ def plot_signal(MS_data,
         try:
             x, y = get_signal(MS_data, mass, unit=unit, tspan=tspan,
                               override=override, verbose=verbose,
-                              removebackground=removebackground)
+                              removebackground=removebackground,
+                              background=background)
         except KeyError:
             print('Can\'t get signal for ' + str(mass))
             continue
@@ -484,8 +486,8 @@ def plot_masses(*args, **kwargs):
     return plot_signal(*args, **kwargs)
 
 def plot_flux(MS_data, mols={'H2':'b', 'CH4':'r', 'C2H4':'g', 'O2':'k'},
-            tspan='tspan_2', ax='new',
-            removebackground=True, background='constant',
+            tspan=None, ax='new',
+            removebackground=False, background='constant',
             A_el=None, unit='nmol/s', smooth_points=0,
             logplot=True, leg=False,
             override=False, verbose=True):
@@ -684,8 +686,6 @@ def plot_experiment(EC_and_MS,
             masses = masses_left
     except (IndexError, TypeError):
         pass
-    if removebackground is None:
-        removebackground = quantified
     if masses_left is not None and masses is None:
         masses = masses_left
     if removebackground == 'right':
@@ -719,13 +719,13 @@ def plot_experiment(EC_and_MS,
         plot_signal(EC_and_MS, masses=masses, tspan=tspan,
                     ax=ax[0], leg=leg, logplot=logplot[0], unit=unit,
                     override=override, verbose=verbose,
-                    removebackground=removebackground_left)
+                    removebackground=removebackground_left, background=background)
         if masses_right is not None:
             ax += [ax[0].twinx()]
             plot_signal(EC_and_MS, masses=masses_right, tspan=tspan,
                         ax=ax[-1], leg=leg, logplot=logplot[0],  unit=unit,
                         override=override, verbose=verbose,
-                        removebackground=removebackground_right)
+                        removebackground=removebackground_right, background=background)
     if not overlay:
         ax[0].set_xlabel('')
         ax[0].xaxis.tick_top()

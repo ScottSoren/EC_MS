@@ -1,0 +1,30 @@
+# created 19F06
+p	=	100000
+T	=	298.15
+w_cap	=	5e-06
+h_cap	=	3e-06
+l_cap	=	0.00733697390534
+w_out	=	0.0001
+d_thro	=	0.0
+a_thro: _throu/2
+h_thro	=	0.0
+V_thro: a_throu)**2*pi*h_throu
+d_cha	=	0.0
+a_cha: _cham/2
+w_cha: (d_cham/2)**2*pi)**0.5
+h_cha: e-6
+l_cha: _cham
+V_cha: _cham*(1-support_pillar_fraction)
+support_pillar_fractio	=	0.1
+V_tota: _cham+V_throu+V_out
+num_i: 
+out_po: 
+w_i	=	0.0
+h_i: _cap
+l_i	=	0.0006
+a_i: (w_in*h_in)/pi)**0.5
+w_flo	=	0.0
+h_flo	=	0.0
+l_flo	=	0.0
+a_flo: (w_in*h_in)/pi)**0.5
+V_dot_mai	=	1.66e-08
