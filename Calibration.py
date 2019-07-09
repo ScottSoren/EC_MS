@@ -22,6 +22,7 @@ if os.path.split(os.getcwd())[1] == 'EC_MS':
     import Chem
     from EC import plot_CV_cycles, CV_difference, sync_metadata, select_cycles
     from Molecules import Molecule
+    from Combining import cut_dataset
     from Chips import Chip
     from Quantification import get_signal, get_current, get_potential
     print(os.getcwd())
@@ -30,6 +31,7 @@ else:                           #then we use relative import
     from . import Chem
     from .EC import plot_CV_cycles, CV_difference, sync_metadata, select_cycles
     from .Molecules import Molecule
+    from .Combining import cut_dataset
     from .Chips import Chip
     from .Quantification import get_signal, get_current, get_potential
     from .Plotting import colorax, align_zero, plot_experiment, plot_signal
@@ -407,6 +409,7 @@ def point_calibration(data, mol, mass='primary', cal_type='internal',
 def calibration_curve(data, mol, mass='primary', n_el=-2,
                       cycles=None, cycle_str='selector',
                       mode='average', t_int=15, t_tail=30, t_pre=15,
+                      t_i=None, t_f=None,
                       find_max=False, t_max_buffer=5, V_max_buffer=5,
                       find_min=False, t_min_buffer=5, V_min_buffer=5,
                       background=None, t_bg=None, tspan_plot=None,
@@ -450,7 +453,8 @@ def calibration_curve(data, mol, mass='primary', n_el=-2,
     By default, it returns the molecule
 
     '''
-
+    if verbose:
+        print('\n\nfunction \'calibration_curve\' at your service!\n')
     # ----- parse inputs -------- #
     m = Molecule(mol)
     if mass == 'primary':
@@ -533,6 +537,14 @@ def calibration_curve(data, mol, mass='primary', n_el=-2,
 
     for cycle in cycles:
         c = select_cycles(data, [cycle], cycle_str=cycle_str, verbose=verbose)
+
+        if t_i is not None or t_f is not None:
+            tspan_cut = [c['time/s'][0], c['time/s'][-1]]
+            if t_i is not None:
+                tspan_cut[0] += t_i
+            if t_f is not None:
+                tspan_cut[-1] -= t_f
+            c = cut_dataset(c, tspan=tspan_cut)
 
         if find_max:
             t_v, v = get_potential(c)
@@ -684,6 +696,7 @@ def calibration_curve(data, mol, mass='primary', n_el=-2,
     possible_outs = {'ax':[ax1, ax2], 'fig':[fig1, fig2], 'Molecule':m,
                      'Is':Is, 'Qs':Qs, 'F_cal':F_cal, 'Vs':Vs,
                      'ns':ns, 'Ys':Ys}
+
     if type(out) is str:
         outs = possible_outs[out]
     else:

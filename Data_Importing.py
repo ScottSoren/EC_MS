@@ -41,7 +41,7 @@ def parse_timezone(tz=None):
         return tz
 
 def parse_date(line):
-    date_match = '([0-9]{2}[/\-\.]){2}[0-9]{4}'          
+    date_match = '([0-9]{2}[/\-\.]){2}[0-9]{4}'
     # ^ matches dates like '01/15/2018' or '09-07-2016' or '04.20.2019'. Saw that last one in Degenhart's EC-Lab data
     #^  mm/dd/yyyy, as EC lab does
     # older EC-Lab seems to have dashes in date, and newer has slashes.
@@ -82,7 +82,7 @@ def parse_date(line):
 
 
 def timestring_to_epoch_time(timestring, date=None, tz=None, verbose=True,
-                             out='tstamp'):
+                             form='%Y/%m/%d %H:%M:%S', out='tstamp'):
     '''
     A way to convert a number of timestrings read from my data into a standard-formatted
     date and time, and then to an epoch (unix) time.
@@ -117,6 +117,7 @@ def timestring_to_epoch_time(timestring, date=None, tz=None, verbose=True,
 
     if len(timestring) > 8:
         try:
+           # print(timestring) # debugging
             timestamp = re.search(timestamp_match, timestring).group()
             hh = int(timestamp[0:2])
             if 'PM' in timestring and not hh==12:
@@ -145,14 +146,14 @@ def timestring_to_epoch_time(timestring, date=None, tz=None, verbose=True,
         date = 'today'
     if date == 'today':
         date = time.strftime('%Y/%m/%d')
-    print('timestring = ' + timestring) # debugging
+    #print('timestring = ' + timestring) # debugging
     if tz is None:
         if '-' in date:
             date = date.replace('-','/') #18D08
-        struct = time.strptime(date + ' ' + timestamp, '%Y/%m/%d %H:%M:%S')
+        struct = time.strptime(date + ' ' + timestamp, form)
         tstamp = time.mktime(struct)
     else:
-        dt_naive = datetime.datetime.strptime(date + ' ' + timestamp, '%Y/%m/%d %H:%M:%S')
+        dt_naive = datetime.datetime.strptime(date + ' ' + timestamp, form)
         dt = tz.localize(dt_naive)
         tstamp = (dt - epoch).total_seconds()
 
@@ -475,11 +476,11 @@ def text_to_data(file_lines, title=None,
 
     loop = False
 
-    if data_type == 'SPEC':
+    if data_type == 'SPEC' or data_type == 'ULM':
         N_head = 1 #the column headers are the first line
         if sep is None:
             sep = ','
-    elif data_type == 'SI':  # Spectro Inlets data
+    elif data_type == 'SI' or data_type == 'MKS':  # Spectro Inlets data
         sep = '\t' # despite it being a .csv, the separator is a tab.
     elif data_type == 'RGA':
         sep = ','
@@ -493,6 +494,8 @@ def text_to_data(file_lines, title=None,
 
     if sep is None:  #EC and MS data all work with '\t'
         sep = '\t'
+
+    print('N_head = ' + str(N_head)) # debugging
 
     n_blank = 0
     got_col_headers = False
@@ -581,6 +584,12 @@ def text_to_data(file_lines, title=None,
                         if len(preheader) == 0:
                             col_preheaders[i] = col_preheaders[i-1]
 
+            elif data_type == 'MKS': # old Spectro Inlets MS data format
+                # this actually records absolute time (in a fucked up format),
+                # so no need to read the timestring.
+                if '[Scan Data' in line: # then the data is coming.
+                    N_head = nl + 2
+
             elif data_type == 'RGA':
                 if len(line.strip())==0:
                     n_blank += 1
@@ -641,6 +650,9 @@ def text_to_data(file_lines, title=None,
             else:
                 col_headers = [col.strip() for col in l.split(sep=sep)]
 
+            if data_type == 'MKS':
+                col_headers = [col.strip('"') for col in col_headers]
+
             if data_type == 'SI':
                 for i, col in enumerate(col_headers):
                     col_headers[i] = col_preheaders[i] +' - ' + col
@@ -667,10 +679,23 @@ def text_to_data(file_lines, title=None,
 
         else:                   # data, baby!
             line_data = [dat.strip() for dat in l.split(sep=sep)]
+
+            if data_type == 'MKS':
+                timestring = line_data[0].replace('.', ':')[1:-1]
+                if 'Annotations' in timestring: # last line actually doesn't have data
+                    continue
+                yyyy, dd, mm = timestring[6:10], timestring[0:2], timestring[3:5]
+                timestring = yyyy + '/' + mm + '/' + dd + timestring[-9:]
+                t = timestring_to_epoch_time(timestring)
+                line_data[0] = str(t)
+
             if not len(line_data) == len(col_headers):
                 #print('Mismatch between col_headers and data on line ' + str(nl) + ' of ' + title) #debugging
                 pass
             for col, x in zip(col_headers, line_data):
+                if not col in dataset['data_cols']:
+                    # don't try adding data to a column that has already been determined not to have data!
+                    continue
                 try:
                     x = float(x)
                 except ValueError:
@@ -698,6 +723,11 @@ def text_to_data(file_lines, title=None,
                             commacols += [col]
                 dataset[col].append(x)
 
+    if data_type == 'MKS':
+        tstamp = dataset['Time'][0]
+        dataset['Time'] -= np.array(dataset['Time']) - tstamp
+        tstamp = epoch_time_to_timestamp(tstamp)
+        date = None
     if loop:
         dataset['data_cols'].add('loop number')
     dataset['title'] = title
@@ -776,6 +806,9 @@ def load_from_file(full_path_name='current', title='file', tstamp=None, timestam
         rename_CHI_cols(dataset)
         dt = dataset['time/s'][-1] - dataset['time/s'][0]
         timeshift(dataset, dt)
+    elif data_type == 'ULM':
+        from .Combining import rename_ULM_cols
+        rename_ULM_cols(dataset)
 
     if verbose:
         print('\nfunction \'load_from_file\' finished!\n\n')

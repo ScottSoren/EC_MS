@@ -20,10 +20,12 @@ if os.path.split(os.getcwd())[1] == 'EC_MS':
                                 #then we're running from inside the package
     from Plotting import plot_experiment
     from EC import select_cycles
+    from Combining import cut_dataset
     from Quantification import get_flux, get_potential, get_current
 else:                           #then we use relative import
     from .Plotting import plot_experiment
     from .EC import select_cycles
+    from .Combining import cut_dataset
     from .Quantification import get_flux, get_potential, get_current
 
 
@@ -190,10 +192,10 @@ def integrate_transient(x, y, tspan=None, t_transient=None, t_steady='half',
 
 
 def activity_steps(data, mols, cycles, cycle_str='selector',
-                   mode='average', t_int=15, t_tail=30, t_pre=15,
+                   mode='average', t_int=15, t_tail=30, t_pre=15, t_i=None, t_f=None,
                    find_max=False, t_max_buffer=5, V_max_buffer=5,
                    find_min=False, t_min_buffer=5, V_min_buffer=5,
-                   background=None, t_bg=None, unit='pmol/s',
+                   background=None, t_bg=None, t_bg_r=None, unit='pmol/s',
                    ax='new', tspan_plot=None, verbose=True,
                    ):
     '''
@@ -211,6 +213,10 @@ def activity_steps(data, mols, cycles, cycle_str='selector',
     maximum value, and cuts of t_max_buffer, and then uses this timespan as above.
     Correspondingly for find_min, V_min_buffer, and t_min_buffer.
 
+    if t_i or t_f is not None, then it cuts the dataset according to [t_i, t_f] first.
+    [But, actually looking at it, that might not be necessary. Just giving a negative
+    number to t_tail or t_pre would have the same effect in a less convoluted way.]
+
     A timespan for which to get the background signals at each of the masses
     can be given as t_bg. Alternately, background can be set to 'linear' in
     which case it draws a line connecting the signals just past the endpoints
@@ -220,15 +226,15 @@ def activity_steps(data, mols, cycles, cycle_str='selector',
     that are integrated/averaged.
 
     The function returns a dictionary including:
-        'Qs': the integrated charges or averaged currents for each cycle
+        'Qs': the integrated charges (in C) or averaged currents (in A) for each cycle
         'ns': dictionary containing, for each molecule, the integrated amounts
-            or average flux for each cycle
-        'Vs': the average potential for each cycle
+            or average flux for each cycle, in specified unit (default: pmol/s)
+        'Vs': the average potential for each cycle, in V
         'ax': the axes on which the function plotted.
 
     '''
     if verbose:
-        print('\n\nfunction \'evaluate_datapoints\' at your service!\n')
+        print('\n\nfunction \'activity_steps\' at your service!\n')
     # ----- parse inputs -------- #
     try:
         iter(mols)
@@ -263,6 +269,14 @@ def activity_steps(data, mols, cycles, cycle_str='selector',
     ns = dict([(mol, np.array([])) for mol in mdict.keys()])
     for cycle in cycles:
         c = select_cycles(data, [cycle], cycle_str=cycle_str, verbose=verbose)
+
+        if t_i is not None or t_f is not None:
+            tspan_cut = [c['time/s'][0], c['time/s'][-1]]
+            if t_i is not None:
+                tspan_cut[0] += t_i
+            if t_f is not None:
+                tspan_cut[-1] -= t_f
+            c = cut_dataset(c, tspan=tspan_cut)
 
         if find_max:
             t_v, v = get_potential(c)
@@ -307,7 +321,14 @@ def activity_steps(data, mols, cycles, cycle_str='selector',
 
         for mol, m in mdict.items():
             x, y0 = m.get_flux(c, tspan=tspan, unit=unit, verbose=verbose)
-            bg = bgs[mol]
+            if t_bg_r is not None:
+                t_bg = [t_start + t_bg_r[0], t_start + t_bg_r[-1]]
+                x_bg, y_bg = m.get_flux(data, tspan=t_bg, unit=unit)
+                if ax is not None:
+                    ax[0].plot(x_bg, y_bg, color=m.get_color(), linewidth=2)
+                bg = np.mean(y_bg)
+            else:
+                bg = bgs[mol]
             y = y0 - bg
             if mode == 'average':
                 yy = np.mean(y)
@@ -320,7 +341,7 @@ def activity_steps(data, mols, cycles, cycle_str='selector',
                 except TypeError:
                     bg = bg * np.ones(y0.shape)
                 color = m.get_color()
-                ax[0].fill_between(x, y0, bg, where=y0>bg, color=color, alpha=0.5)
+                ax[0].fill_between(x, y0, bg, color=color, alpha=0.5)
         if ax is not None:
             ax[1].plot(t_v, v, 'k-', linewidth=3)
             J = I * 1e3 / data['A_el']
@@ -328,7 +349,7 @@ def activity_steps(data, mols, cycles, cycle_str='selector',
             ax[2].fill_between(t, J, bg_J, color='0.5', alpha=0.5)
 
     if verbose:
-        print('\nfunction \'evaluate_datapoints\' finished!\n\n')
+        print('\nfunction \'activity_steps\' finished!\n\n')
 
     return {'Qs':Qs, 'ns':ns, 'Vs':Vs, 'ax':ax}
 

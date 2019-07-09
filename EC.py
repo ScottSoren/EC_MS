@@ -1015,6 +1015,11 @@ def get_capacitance(data, V_DL=[0.3, 0.6], V_str=None, J_str=None, t_i=0):
     scan_rate = (V[I_finish_an] - V[I_start_an])/(t[I_finish_an] - t[I_start_an])*1e3 # mV/s
 
     cap = (J_an - J_cat)/2 / scan_rate # [mA/cm^2] / [mV/s] = [ (C/s)/(V/s) /cm^2] = F/cm^2
+
+    print('scan rate = ' + str(scan_rate) + ' mV/s')
+    print('J_an = ' + str(J_an) + ' mA/cm^2 , J_cat = ' + str(J_cat) + ' mV/s')
+    print('cap = ' + str(cap) + ' F/cm^2')
+
     return cap
 
 def correct_ohmic_drop(data, R_ohm=0):

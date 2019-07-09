@@ -106,8 +106,14 @@ def synchronize(data_objects, t_zero=None, append=None, file_number_type=None,
             objects_with_data += [dataset]
             datasets += [data]
 
-    if append is None: #by default, append if all datasets are same type
-        append = len({d['data_type'] for d in datasets}) == 1
+    if append is None: # by default, append if all datasets are same type
+                        # and share at least some data columns names
+        data_cols_list = [d['data_cols'] for d in datasets]
+        append = (
+                (len({d['data_type'] for d in datasets}) == 1) and
+                (len(set.intersection(*data_cols_list)) > 0)
+                 )
+
     if t_zero is None:
         if append:
             t_zero = 'begin' # t=0 at start of earliest dataset (beginning of union)
@@ -739,6 +745,32 @@ def rename_SI_cols(data, removenans=True):
         remove_nans(data)
     data['data_type'] = 'combined' # since now it has data columns of various types
 
+
+
+def rename_ULM_cols(data):
+    '''
+    ----------- add SurfCat names to data columns so Scott's functions will work -------
+            # note, this does not take extra memory, as new names refer to same data.
+    '''
+    # get the masses:
+    masses = set([])
+    mass_cols = set([col for col in data['data_cols'] if 'ion_current' in col])
+    for col in mass_cols:
+        a = re.search('M[0-9]+', col)
+        if a is not None:
+            masses.add(a.group())
+    for mass in masses:  # add columns with SurfCat names to dataset for MS data
+        xcol, ycol = mass + '-x', mass + '-y' # SurfCat MS data
+        ULMcol = 'ion_current_' + mass + '_sBG_ALS_sub'
+        data[xcol], data[ycol] = data['time'], data[ULMcol]
+        data['data_cols'] = data['data_cols'].union({xcol, ycol})
+
+    data['Ewe/V'] = data['potential']
+    data['I/mA'] = data['current1_mA']
+    data['time/s'] = data['time'] # SurfCat EC time is called 'time/s'.
+    data['data_cols'] = data['data_cols'].union({'Ewe/V', 'I/mA', 'time/s'})
+
+
 def rename_RGA_cols(data):
     '''
     names columns of RGA data like they would be from PyExpLabSys+cinfdata
@@ -1264,9 +1296,10 @@ def trigger_cal(data, triggers=None, pseudotimecol=None, pt_str=None,
         if index in pt_indeces:
             if verbose:
                 print('Multiple triggers seem to correspond to the file start at ' +
-                      str(pt_point) + '. I\'ll assume the first ones ' +
-                      'were false starts and just keep the last one.')
-            pt_points[pt_indeces==index] = pt_point # if so, use tghe new shift_time
+                      str(pt_point) + '. I\'ll assume the last ones ' +
+                      'were noise and just keep the first one.')
+            #pt_points[pt_indeces==index] = pt_point # use the new shift_time
+            pass # leave it, just use the old shift time
         else: #otherwise add it to the vectors.
             pt_points = np.append(pt_points, pt_point)
             pt_indeces = np.append(pt_indeces, index)

@@ -46,11 +46,12 @@ class Molecule:
     results for quantification. Objects of this class will link to data stored
     in a text file in ./data/
     '''
-    def __init__(self, name, formula=None, writenew=True, verbose=True):
+    def __init__(self, name, formula=None, writenew=True, verbose=True, primary=None, F_cal=None):
         self.name = name
         self.cal = {}
         self.__str__ = '<' + name + ', instance of EC_MS class \'Molecule\'>'
-        self.primary = None     #the primary mass to measure at
+        self.primary = primary     #the primary mass to measure at
+        self.F_cal = F_cal
         self.calibrations = []      #will store calibration data
         self.attr_status = {'D':0,'kH':0,'n_el':0}
         if formula is None:
@@ -194,7 +195,7 @@ class Molecule:
                 self.add_calibration(value)
             if 'Spectrum' in key:
                 self.spectrum = value
-            else:
+            elif (not hasattr(self, key)) or (getattr(self, key) is None):
                 setattr(self, key, value)
 
         if 'F_cal' not in dir(self) and 'primary' in dir(self):
@@ -491,11 +492,22 @@ class Molecule:
         pass
 
     def get_bg(self, *args, **kwargs):
+        '''
+        args and kwargs are given to self.get_flux()
+        sets self.background to the average signal from this call to get_flux()
+        returns background
+        '''
         kwargs.update(unit='mol/s')
         x, y = self.get_flux(*args, **kwargs, removebackground=False)
         background = np.mean(y)
         self.background = background
         return background
+
+    def get_background(self, *args, **kwargs):
+        '''
+        see self.get_bg
+        '''
+        return self.get_bg(*args, **kwargs)
 
     def get_color(self):
         try:
@@ -561,7 +573,8 @@ class Molecule:
             s = np.interp(x, x0, s0)
             y += s * C # units: [A] * [mol/C] = [mol/s]
 
-
+        if t_bg is not None and background is None: # 19G01, I wonder why/how this wasn't here before
+            background = 'constant'
         if removebackground is None:
             removebackground = (background is not None)
 

@@ -1,5 +1,4 @@
 sigma_100eV # Total ionization cross sections in Ang^2 and at 100 eV incident electron energy
-#
 # From NIST: http://physics.nist.gov/PhysRefData/Ionization/molTable.html
 	H2 = 0.969
 	O2 = 2.621
@@ -18,6 +17,7 @@ sigma_100eV # Total ionization cross sections in Ang^2 and at 100 eV incident el
 	Ar = 2.982
 # from Rejoub et al 2003, http://aip.scitation.org/doi/pdf/10.1063/1.1531631
 	ethanol = 7.8
+	methanol = 5.2 # Yogesh Kumar et al, 2019, Atoms. The Electron Impact Ionization Cross Sections of Methanol, Ethanol and 1-Propanol.
 
 
 #From NIST: http://webbook.nist.gov/chemistry/form-ser.html
@@ -37,6 +37,7 @@ Spectra
 	ethanol: 12,20 13,139 14,145 15,664 17,70 18,55 19,279 24,61 25,246 26,985 27,2241 28,345 29,2985 30,812 31,9999 33,31 41,137 42,474 43,1144 44,71 45,5149 46,2163 47,73
 	propene: 1,320 2,40 12,90 13,140 14,340 15,550 16,20 19,220 20,180 21,10 24,30 25,180 26,1051 27,3873 28,140 36,180 37,1271 38,1942 39,7257 40,2913 41,9999 42,7036 43,230 44,10
 	propane: 12,30 13,60 14,220 15,721 16,40 19,70 20,80 21,10 24,10 25,50 26,911 27,4194 28,5875 29,9999 30,220 36,30 37,300 38,530 39,1892 40,280 41,1341 42,601 43,2312 44,2742 45,90
+	methanol: 2,30 12,20 13,60 14,169 15,1239 16,10 17,30 18,70 19,10 28,459 29,4459 30,649 31,9999 32,7439 33,119 34,10
 	
 
 

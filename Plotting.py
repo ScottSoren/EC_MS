@@ -80,7 +80,7 @@ def plot_vs_potential(CV_and_MS_0,
                       colors={'M2':'b','M4':'m','M18':'y','M28':'0.5','M32':'k'},
                       tspan=None, RE_vs_RHE=None, A_el=None, cycles='all',
                       ax1='new', ax2='new', ax=None, #spec='k-',
-                      overlay=0, logplot = [1,0], leg=False,
+                      overlay=0, logplot=False, leg=False,
                       verbose=True, removebackground=None, background=None,
                       masses=None, masses_left=None, masses_right=None,
                       mols=None, mols_left=None, mols_right=None,
@@ -170,7 +170,10 @@ def plot_vs_potential(CV_and_MS_0,
     #get time variable and plotting indexes
     t = CV_and_MS[t_str]
     if tspan is None:                  #then use the whole range of overlap
-        tspan = CV_and_MS['tspan']
+        try:
+            tspan = CV_and_MS['tspan']
+        except KeyError:
+            tspan = [min(t), max(t)]
 
     mask = np.logical_and(tspan[0]<t, t<tspan[-1])
 
@@ -421,7 +424,7 @@ def smooth_data(data, points=3, cols=None, verbose=True):
 def plot_signal(MS_data,
                 masses = 'all',
                 tspan=None, ax='new', unit='nA',
-                removebackground=None, background=None,
+                removebackground=None, background=None, t_bg=None,
                 logplot=True, saveit=False, leg=False, name=None,
                 override=False, verbose=True):
     '''
@@ -461,10 +464,17 @@ def plot_signal(MS_data,
         try:
             x, y = get_signal(MS_data, mass, unit=unit, tspan=tspan,
                               override=override, verbose=verbose,
-                              removebackground=removebackground,
+                              removebackground=removebackground, t_bg=t_bg,
                               background=background)
+            if len(x) == 0:
+                print('WARNING: no data for ' + mass)
+                continue
         except KeyError:
-            print('Can\'t get signal for ' + str(mass))
+            print('WARNING: Can\'t get signal for ' + str(mass))
+            continue
+        if len(x) == 0:
+            print('WARNING: get_signal returned vector of zero length for ' +
+                  mass + '. plot_signal is skipping that mass.')
             continue
         lines[mass] = ax.plot(x, y, color, label = mass)
         #as it is, lines is not actually used for anything
@@ -487,7 +497,7 @@ def plot_masses(*args, **kwargs):
 
 def plot_flux(MS_data, mols={'H2':'b', 'CH4':'r', 'C2H4':'g', 'O2':'k'},
             tspan=None, ax='new',
-            removebackground=False, background='constant',
+            removebackground=False, background='constant', endpoints=5, t_bg=None,
             A_el=None, unit='nmol/s', smooth_points=0,
             logplot=True, leg=False,
             override=False, verbose=True):
@@ -522,7 +532,8 @@ def plot_flux(MS_data, mols={'H2':'b', 'CH4':'r', 'C2H4':'g', 'O2':'k'},
     for (mol, color) in mols.items():
         try:
             [x,y] = get_flux(MS_data, mol, unit=unit, tspan=tspan,
-                             removebackground=removebackground, background=background,
+                             removebackground=removebackground, background=background, t_bg=t_bg,
+                             endpoints=endpoints,
                              override=override, verbose=verbose)
             if smooth_points:
                 y = smooth(y, smooth_points)
@@ -558,7 +569,7 @@ def plot_experiment(EC_and_MS,
                     tspan=None, overlay=False, logplot=[True,False], verbose=True,
                     plotpotential=True, plotcurrent=True, ax='new', emphasis='MS',
                     RE_vs_RHE=None, A_el=None,
-                    removebackground=None, background='constant',
+                    removebackground=None, background=None, endpoints=5, t_bg=None,
                     saveit=False, name=None, leg=False, unit=None,
                     masses='all', masses_left=None, masses_right=None,
                     mols=None, mols_left=None, mols_right=None,
@@ -569,7 +580,14 @@ def plot_experiment(EC_and_MS,
                     override=False,
                     ):
     '''
+    TODO: write proper documentation!
     this plots signals or fluxes on one axis and current and potential on other axesaxis
+
+    background can be:
+        'constant' - subtracts minimum value or given value
+        'linear' - linear background extrapolated between endpoints
+        'preset' - finds backgrounds in molecule objects.
+    By default, no background is subtracted.
     '''
     if name is None:
         try:
@@ -670,6 +688,9 @@ def plot_experiment(EC_and_MS,
         masses = [key[:-2] for key in EC_and_MS.keys() if key[0]=='M' and key[-2:]=='-y']
     print('quantified = ' + str(quantified)) # debugging
 
+    if removebackground is None and background is None and t_bg is None:
+        removebackground = False
+
     try:
         if type(mols[0]) in (list, tuple):
             mols_left = mols[0]
@@ -703,15 +724,16 @@ def plot_experiment(EC_and_MS,
     if quantified:
         if unit is None:
             unit = 'pmol/s'
+        print('removebackground = ' + str(removebackground)) # debugging
         plot_flux(EC_and_MS, mols=mols, tspan=tspan, A_el=A_el,
                   ax=ax[0], leg=leg, logplot=logplot[0], unit=unit,
-                  removebackground=removebackground_left, background=background,
+                  removebackground=removebackground_left, background=background, endpoints=endpoints, t_bg=t_bg,
                   override=override, smooth_points=smooth_points, verbose=verbose)
         if mols_right is not None:
             ax += [ax[0].twinx()]
             plot_flux(EC_and_MS, mols=mols_right, tspan=tspan, A_el=A_el,
                       ax=ax[-1], leg=leg, logplot=logplot[0], unit=unit,
-                      removebackground=removebackground_right, background=background,
+                      removebackground=removebackground_right, background=background, endpoints=endpoints, t_bg=t_bg,
                       override=override, smooth_points=smooth_points, verbose=verbose)
     else:
         if unit is None:
@@ -719,13 +741,13 @@ def plot_experiment(EC_and_MS,
         plot_signal(EC_and_MS, masses=masses, tspan=tspan,
                     ax=ax[0], leg=leg, logplot=logplot[0], unit=unit,
                     override=override, verbose=verbose,
-                    removebackground=removebackground_left, background=background)
+                    removebackground=removebackground_left, background=background, t_bg=t_bg)
         if masses_right is not None:
             ax += [ax[0].twinx()]
             plot_signal(EC_and_MS, masses=masses_right, tspan=tspan,
                         ax=ax[-1], leg=leg, logplot=logplot[0],  unit=unit,
                         override=override, verbose=verbose,
-                        removebackground=removebackground_right, background=background)
+                        removebackground=removebackground_right, background=background, t_bg=t_bg)
     if not overlay:
         ax[0].set_xlabel('')
         ax[0].xaxis.tick_top()

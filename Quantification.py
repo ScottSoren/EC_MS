@@ -17,10 +17,11 @@ from .Combining import cut
 from .Object_Files import lines_to_dictionary, date_scott
 from .EC import sync_metadata
 from . import Chem
-data_directory = os.path.expanduser('~/Dropbox/python_master/EC_MS/data/')
 
-
+molecule_directory = os.path.dirname(os.path.realpath(__file__)) + os.sep + 'data' + os.sep + 'molecules'
+data_directory = os.path.dirname(os.path.realpath(__file__)) + os.sep + 'data'
 preferencedir = os.path.dirname(os.path.realpath(__file__)) + os.sep + 'preferences'
+
 with open(preferencedir + os.sep + 'standard_colors.txt','r') as f:
     lines = f.readlines()
     standard_colors = lines_to_dictionary(lines)['standard colors']
@@ -35,7 +36,7 @@ def rewrite_spectra(NIST_file='default', RSF_file='default', mols='all',
     '''
     if writesigma or writespectra:
         if NIST_file == 'default':
-            NIST_file = data_directory + 'NIST_spectra_data.txt'
+            NIST_file = data_directory + os.sep + 'NIST_spectra_data.txt'
         with open(NIST_file, 'r') as f:
             lines = f.readlines()
         structure = lines_to_dictionary(lines)
@@ -45,7 +46,11 @@ def rewrite_spectra(NIST_file='default', RSF_file='default', mols='all',
         for (mol, sigma) in sigma_dict.items():
             if not (mols == 'all' or mol in mols):
                 continue
-            m = Molecule(mol)
+            try:
+                m = Molecule(mol)
+            except FileNotFoundError:
+                with open(molecule_directory + os.sep + mol + '.txt', 'w') as f:
+                    f.write('name: ' + mol)
             if hasattr(m, 'sigma') and m.sigma is not None:
                 if not overwrite:
                     continue
@@ -74,7 +79,7 @@ def rewrite_spectra(NIST_file='default', RSF_file='default', mols='all',
             m.write(l)
     if writeRSF:
         if RSF_file == 'default':
-            RSF_file = data_directory + 'Relative_Sensativity_Factors.txt'
+            RSF_file = data_directory + os.sep + 'Relative_Sensativity_Factors.txt'
         with open(RSF_file) as f:
             lines = f.readlines()
         structure = lines_to_dictionary(lines)
@@ -410,6 +415,10 @@ def get_signal(MS_data, mass, tspan=None,
     x = MS_data[mass + '-x']
     y = MS_data[mass + '-y']
 
+    if len(x) == 0:
+        print('WARNIGN: no data for ' + mass)
+        return x, y
+
     if unit[-1] == 'A':
         if unit[:-1] == 'n' or unit[:-1] == 'nano':
             y = y*1e9
@@ -437,6 +446,12 @@ def get_signal(MS_data, mass, tspan=None,
             except ValueError:
                 print('WARNING: couldn\'t cut according to tspan=' + str(tspan))
 
+    if len(x) == 0:
+        print('WARNING: no signal in the requested tspan for ' + mass)
+        return [x, y]
+
+    if background is None and t_bg is not None:
+        background = 'constant'
     if removebackground is None:
         removebackground = not (background is None)
 
