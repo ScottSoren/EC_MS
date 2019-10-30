@@ -65,7 +65,9 @@ class Chip:
             else:
                 self.write(name=name)
 
-        for key, value in kwargs.items():
+        parameters = self.parameters
+        parameters.update(kwargs)
+        for key, value in parameters.items():
             setattr(self, key, value)
             if updatefile:
                 self.write((key, value))

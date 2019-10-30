@@ -81,7 +81,8 @@ def plot_vs_potential(CV_and_MS_0,
                       tspan=None, RE_vs_RHE=None, A_el=None, cycles='all',
                       ax1='new', ax2='new', ax=None, #spec='k-',
                       overlay=0, logplot=False, leg=False,
-                      verbose=True, removebackground=None, background=None,
+                      verbose=True,
+                      removebackground=None, background=None, endpoints=3,
                       masses=None, masses_left=None, masses_right=None,
                       mols=None, mols_left=None, mols_right=None,
                       unit=None, smooth_points=0,
@@ -144,10 +145,10 @@ def plot_vs_potential(CV_and_MS_0,
                 ax1 = plt.subplot(gs[0, 0])
                 ax2 = plt.subplot(gs[1:3, 0])
             else:
-                gs = gridspec.GridSpec(2, 1)
+                gs = gridspec.GridSpec(8, 1)
                 #gs.update(hspace=0.025)
-                ax1 = plt.subplot(gs[0, 0])
-                ax2 = plt.subplot(gs[1, 0])
+                ax1 = plt.subplot(gs[0:4, 0])
+                ax2 = plt.subplot(gs[4:8, 0])
     if type(logplot) is int:
         logplot = [logplot,logplot]
     if logplot[0]:
@@ -283,7 +284,7 @@ def plot_vs_potential(CV_and_MS_0,
             for (key, color) in colors.items():
                 if quantified:
                     (x,y) = get_flux(CV_and_MS, mol=key, tspan=tspan,
-                    removebackground=removebackground, background=background,
+                    removebackground=removebackground, background=background, endpoints=endpoints,
                     unit=unit, verbose=True)
                     if type(key) is not str:
                         key = str(key) # in case key had been a Molecule object
@@ -627,10 +628,10 @@ def plot_experiment(EC_and_MS,
                 ax = [plt.subplot(gs[0, 0])]
                 ax += [plt.subplot(gs[1:3, 0])]
             else:
-                gs = gridspec.GridSpec(2, 1)
+                gs = gridspec.GridSpec(8, 1)
                 #gs.update(hspace=0.025)
-                ax = [plt.subplot(gs[0, 0])]
-                ax += [plt.subplot(gs[1, 0])]
+                ax = [plt.subplot(gs[0:4, 0])]
+                ax += [plt.subplot(gs[4:8, 0])]
             if plotcurrent and plotpotential:
                 ax += [ax[1].twinx()]
                 ax[1].set_zorder(ax[2].get_zorder()+1) #doesn't work
@@ -938,7 +939,8 @@ def plot_datapoints(integrals, colors, ax='new', label='', X=None, X_str='V',
 
 def plot_operation(cc=None, t=None, j=None, z=None, tspan=None, results=None,
                    plot_type='heat', ax='new', colormap='inferno', aspect='auto',
-                   unit='pmol/s', color='g', dimensions=None, verbose=True):
+                   unit='pmol/s', color='g', colorbar=True,
+                   dimensions=None, verbose=True):
     if verbose:
         print('\n\nfunction \'plot_operation\' at your service!\n')
     # and plot!
@@ -1017,13 +1019,14 @@ def plot_operation(cc=None, t=None, j=None, z=None, tspan=None, results=None,
 #        cax = divider.append_axes("right", size="5%", pad=0.05)
 #https://stackoverflow.com/questions/18195758/set-matplotlib-colorbar-size-to-match-graph
 
-        cbar = plt.colorbar(img, ax=ax1)
-        cbar.set_label('concentration / [mM]')
-        if dimensions[0] == 't':
-            ax1.set_xlabel('time / [s]')
-        elif dimensions[0] == 'x':
-            ax1.set_xlabel('position / [mm]')
-        ax1.set_ylabel('position / [um]')
+        if colorbar:
+            cbar = plt.colorbar(img, ax=ax1)
+            cbar.set_label('concentration / [mM]')
+            if dimensions[0] == 't':
+                ax1.set_xlabel('time / [s]')
+            elif dimensions[0] == 'x':
+                ax1.set_xlabel('position / [mm]')
+            ax1.set_ylabel('position / [um]')
 
 #        print('plot_type = ' + plot_type)
         if plot_type == 'both':
@@ -1040,9 +1043,10 @@ def plot_operation(cc=None, t=None, j=None, z=None, tspan=None, results=None,
             ax1.set_xlim(tspan)
             print('returning three axes!')
             axes = [ax1, ax2, ax3]
-        else:
+        elif colorbar:
             axes = [ax1, cbar]
-
+        else:
+            axes = ax1
     if verbose:
         print('\nfunction \'plot_operation\' finished!\n\n')
     return axes

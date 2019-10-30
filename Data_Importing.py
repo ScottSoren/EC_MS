@@ -816,7 +816,7 @@ def load_from_file(full_path_name='current', title='file', tstamp=None, timestam
 
 
 def load_EC_set(directory, EC_files=None, tag='01', suffix=None, data_type='EC',
-                  verbose=True, tz=None, exclude=[]):
+                  verbose=True, tz=None, exclude=[], fix_CP=False):
     '''
     inputs:
         directory - path to folder containing your data, string
@@ -857,9 +857,19 @@ def load_EC_set(directory, EC_files=None, tag='01', suffix=None, data_type='EC',
     EC_datas = []
     for f in EC_files:
         try:
-            EC_datas += [load_from_file(directory + os.sep + f, data_type=data_type, tz=tz, verbose=verbose)]
+            data = load_from_file(directory + os.sep + f,
+                                        data_type=data_type, tz=tz,
+                                        verbose=verbose)
         except OSError:
             print('WARNING: problem importing ' + f + '. Continuing.')
+            continue
+        if fix_CP and 'CP' in f:
+            try:
+                data['Ewe/V'] = data['Ewe-Ece/V'] + data['<Ece>/V']
+            except KeyError:
+                print('WARNING! Could not fix CP for ' + f + ' because missing ' +
+                      ' either Ece/V or Ewe-Ece/V')
+        EC_datas += [data]
     EC_data = synchronize(EC_datas, verbose=verbose, append=True, t_zero='first', tz=tz)
     if 'loop number' in EC_data['data_cols']:
         sort_time(EC_data, verbose=verbose) #note, sort_time no longer returns!
@@ -873,7 +883,7 @@ def import_EC_set(*args, **kwargs):
     See EC_MS.load_EC_set
     '''
     print('import_EC_set has been renamed load_EC_set')
-    return import_EC_set(*args, **kwargs)
+    return load_EC_set(*args, **kwargs)
 
 
 def download_cinfdata_set(setup='sniffer', group_id=None, grouping_column=None, **kwargs):
@@ -1162,3 +1172,130 @@ def save_results_as_text(name, cols='all', **kwargs):
 
     with open(name, 'w') as f:
         f.writelines(lines)
+
+
+def import_folder(directory, tags=None, MS_file=None, verbose=True):
+    '''
+    Copined 19G24 from commit  Submitting Trimarco2018 e12b8e9 on Dec 19, 2017
+
+    import everything you need from directory at once.
+    tags = None imports as one dataset
+    tags = 'all' separates by EC file tag, imports evertything
+    tags = ['01','02'] imports two datasets, one for each tag
+    '''
+    from .Combining import synchronize
+
+    if verbose:
+        print('\n\nfunction \'imoprt_folder\' at your service!\n')
+        print('Importing from \'' + directory + '\'')
+
+    if directory[-1] == os.sep:
+        directory = directory[:-1] #import_set adds the os.sep
+
+    lslist = os.listdir(directory)
+
+    if MS_file is None:
+        MS_file = [f for f in lslist if 'QMS' in f]
+
+    #importing MS data here rather than in import_set to avoid redundant importing
+    MS_datas = [import_data(directory + os.sep + f,
+                            data_type='MS', verbose=verbose)
+                for f in MS_file]
+    MS_data = synchronize(MS_datas, verbose=verbose)
+    #if len(MS_datas) > 1:          #not necessary, as synchronize sorts by recstart
+        #sort_time(MS_data)
+
+    if tags is None:
+        EC_file = [f for f in lslist if '.mpt' in f]
+        Datasets = import_set(directory, MS_data=MS_data, EC_file=EC_file, verbose=verbose)
+       # sort_time(Datasets)  #probably not necessary, as synchronize sorts by recstart
+
+    else:
+        if tags == 'all':
+            taglist = {f[0:2] for f in lslist if f[-4:]=='.mpt'}
+        else:
+            taglist = tags #Renamed so I keep info on what tags originally was
+        Datasets = dict([(t, import_set(directory, MS_data=MS_data,
+                                        tag=t, verbose=verbose))
+                         for t in taglist])
+
+
+    if verbose:
+        print('\n\nfunction \'imoprt_folder\' finished!\n')
+    return Datasets
+
+
+def download_data(IDs='today',
+                  timestamps=None,
+                  data_type='fullscan',
+                  timestamp_interval=None,
+                  comment=None,
+                  connect={},
+                  verbose=True,
+                  ):
+    '''
+    Copied 19G25 from commit   17G28 better combining and plotting b70b43b on Jul 28, 2017
+    ... but it seems to be broken :( Not wasting time on this now.
+
+
+    Returns data columns matching a certain set of ID's.
+
+    '''
+    import sys
+    try:
+        import MySQLdb # known to pip as mysqlclient
+        #CONNECT_EXCEPTION = MySQLdb.OperationalError
+        #LOG.info('Using MySQLdb as the database module')
+        print('imported MySQLdb no problem!')
+    except ImportError:
+        try:
+            # .. if that fails, try with pymysql
+            import pymysql as MySQLdb
+            MySQLdb.install_as_MySQLdb()
+            #CONNECT_EXCEPTION = MySQLdb.err.OperationalError
+            #LOG.info('Using pymysql as the database module')
+            if sys.version_info.major > 2:
+                #LOG.info('pymysql is known to be broken with Python 3. Consider '
+                 #        'installing mysqlclient!')
+                pass
+        except:
+            print('Error, can\'t connect to database!')
+
+
+    connect_0 = dict(host='servcinf-sql',  # your host, usually localhost, servcinf would also work, but is slower (IPv6)
+                           #    port=9995,  # your forwording port
+                               user='cinf_reader',  # your username
+                               passwd='cinf_reader',  # your password
+                               db='cinfdata')  # name of the data base
+
+    for key, val in connect_0.items():
+        if key not in connect:
+            connect[key] = val
+
+    if data_type == 'fullscan':
+        data_string_template = 'SELECT x,y FROM xy_values_sniffer where measurement = {0} order by id'
+
+
+ #       try:
+    print('Connecting to CINF database...')
+    cnxn =  MySQLdb.connect(**connect)
+    cursor = cnxn.cursor()
+    print('Connection successful!')
+  #      except:
+   #         print('Connection failed!')
+
+    if type(IDs) is int:
+        IDs = [IDs]
+
+    datasets = {}
+    for ID in IDs:
+        data_string = data_string_template.format(str(ID))
+        cursor.execute(data_string)
+        raw_data = cursor.fetchall()
+        list_data = np.array(raw_data)
+        xy_data = np.swapaxes(list_data, 0, 1)
+        datasets[ID] = xy_data
+
+    return datasets
+
+

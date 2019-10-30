@@ -414,7 +414,7 @@ def calibration_curve(data, mol, mass='primary', n_el=-2,
                       find_min=False, t_min_buffer=5, V_min_buffer=5,
                       background=None, t_bg=None, tspan_plot=None,
                       remove_EC_bg=False, color=None,
-                      force_through_zero=False,
+                      force_through_zero=False, tail_on_EC=False,
                       ax='new', J_color='0.5', unit=None,
                       out='Molecule', verbose=True
                       ):
@@ -490,7 +490,7 @@ def calibration_curve(data, mol, mass='primary', n_el=-2,
         unit = ''
 
     # ---------- shit, lots of plotting options... ---------#
-    ax1, ax2a, ax2b, ax2c = None, None, None, None
+    ax1, ax2, ax2a, ax2b, ax2c = None, None, None, None, None
     fig1, fig2 = None, None
     if ax == 'new':
         ax1 = 'new'
@@ -504,33 +504,37 @@ def calibration_curve(data, mol, mass='primary', n_el=-2,
             try:
                 ax1, ax2 = ax
             except (TypeError, IndexError):
-                print('WARNING: calibration_curve couldn\'t use the give axes')
+                print('WARNING: calibration_curve couldn\'t use the given axes')
     if ax1 == 'new':
         ax1 = plot_experiment(data, masses=[mass], tspan=tspan_plot,
-                              emphasis=None, removebackground=False, unit='A')
+                              emphasis=None, removebackground=False, unit='pA')
         fig1 = ax1[0].get_figure()
-    else:
+    elif ax1 is not None:
         try:
             ax1a = ax1[0]
         except TypeError:
             ax1a = ax1
         plot_signal(data, masses=[mass], tspan=tspan_plot,
-                    removebackground=False, unit='A', ax=ax1a)
+                    removebackground=False, unit='pA', ax=ax1a)
     if ax2 == 'new':
         fig2, [ax2a, ax2c] = plt.subplots(ncols=2)
         ax2b = ax2a.twinx()
         fig2.set_figwidth(fig1.get_figheight()*3)
-    else:
+    elif ax2 is not None:
         try:
             iter(ax2)
         except TypeError:
             ax2c = ax2
         else:
-            try:
-                ax2a, ax2b, ax2c = ax2
-            except (TypeError, IndexError):
-                print('WARNING: calibration_curve couldn\'t use the give ax2')
+            if len(ax2) == 1:
+                ax2c = ax2[0]
+            else:
+                try:
+                    ax2a, ax2b, ax2c = ax2
+                except (TypeError, IndexError, ValueError):
+                    print('WARNING: calibration_curve couldn\'t use the given ax2')
 
+    print(str([ax1, [ax2a, ax2b, ax2c]])) # debugging
 
     # ----- cycle through and calculate integrals/averages -------- #
     Ys, ns, Vs, Is, Qs = [], [], [], [], []
@@ -574,7 +578,11 @@ def calibration_curve(data, mol, mass='primary', n_el=-2,
                               verbose=verbose)
             tspan = [t_start-t_pre, t_end+t_tail]
 
-        t, I = get_current(c, tspan=tspan, verbose=verbose)
+        if mode=='integral' and not tail_on_EC: # in general, we just want the primary cycle for current
+            t, I = get_current(c, tspan=[t_start, t_end])
+        else:
+            t, I = get_current(c, tspan=tspan, verbose=verbose)
+
         t_v, v = get_potential(c, tspan=tspan, verbose=verbose)
         x, y = get_signal(c, mass=mass, tspan=tspan, verbose=verbose, unit='A')
         if use_bg_fun: # has to work on x.
@@ -613,7 +621,7 @@ def calibration_curve(data, mol, mass='primary', n_el=-2,
                 y_bg = bg*np.ones(y.shape)
             else:
                 y_bg = bg
-            ax1[0].fill_between(x, y, y_bg, #where=y>y_bg,
+            ax1[0].fill_between(x, y*1e12, y_bg*1e12, #where=y>y_bg,
                color=color, alpha=0.5)
             J = I * 1e3 / data['A_el']
             J_bg = np.zeros(J.shape)
@@ -675,8 +683,8 @@ def calibration_curve(data, mol, mass='primary', n_el=-2,
             ns_pred_plot = np.sort(np.append(0, ns_plot))
             Y_pred_plot = F_cal * ns_pred_plot
         else:
-            ns_pred_plot = np.sort(ns_plot)
-            Y_pred_plot = F_cal * ns_pred_plot + pfit[1]
+            ns_pred_plot = np.sort(np.append(0, ns_plot))
+            Y_pred_plot = F_cal * ns_pred_plot #+ pfit[1] # it's actually best to use this line.
         #print('ns_pred_plot = ' + str(ns_pred_plot)) # debugging
         #print('Y_pred_plot = ' + str(Y_pred_plot)) # debugging
         ax2c.plot(ns_pred_plot, Y_pred_plot, '--', color=color)
@@ -710,7 +718,7 @@ def save_calibration_results(mdict, f):
     calibration_results = {}
     for mol, m in mdict.items():
         result = {}
-        for attr in ['primary', 'F_cal', 'cal_mat', 'formula']:
+        for attr in ['primary', 'F_cal', 'cal_mat', 'formula', 'real_name']:
             if hasattr(m, attr):
                 result[attr] = getattr(m, attr)
         calibration_results[mol] = result
@@ -719,6 +727,8 @@ def save_calibration_results(mdict, f):
             pickle.dump(calibration_results, f) # save it
     else: # then it must be a file
         pickle.dump(calibration_results, f) # save it
+
+
 
 def load_calibration_results(f, verbose=True):
     '''
@@ -740,13 +750,12 @@ def load_calibration_results(f, verbose=True):
             m = Molecule(mol, verbose=verbose)
         except FileNotFoundError:  # this happens if any molecule names were changed
             try:
-                m = Molecule(result['formula'], verbose=verbose)
+                m = Molecule(result['real_name'], verbose=verbose)
                 m.name = mol
             except (KeyError, FileNotFoundError):
                 m = result
-        else:
-            for attr, value in result.items():
-                setattr(m, attr, value)
+        for attr, value in result.items():
+            setattr(m, attr, value)
         mdict[mol] = m
     if verbose:
         print('\nfunction \'load_calibration_results\' finished!\n\n')

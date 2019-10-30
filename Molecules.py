@@ -48,19 +48,14 @@ class Molecule:
     '''
     def __init__(self, name, formula=None, writenew=True, verbose=True, primary=None, F_cal=None):
         self.name = name
+        self.real_name = name # for a trick with Calibration.load_calibration_results()
         self.cal = {}
         self.__str__ = '<' + name + ', instance of EC_MS class \'Molecule\'>'
         self.primary = primary     #the primary mass to measure at
         self.F_cal = F_cal
         self.calibrations = []      #will store calibration data
         self.attr_status = {'D':0,'kH':0,'n_el':0}
-        if formula is None:
-            self.attr_status['formula'] = 0 #so that it asks me for a formula when initializing the file.
-            self.attr_status['M'] = 0
-            self.formula = name #but just put the name for now.
-            self.M = Chem.get_mass(self.formula)
-        else:
-            self.formula = formula
+        self.formula = formula
         # 0 for undefined, 1 for loaded from file, 2 for set by function
         file_name = self.name + '.txt'
         cwd = os.getcwd()
@@ -88,12 +83,20 @@ class Molecule:
                     return None
         os.chdir(cwd)
 
+        if self.formula is None:
+            self.attr_status['formula'] = 0 #so that it asks me for a formula when initializing the file.
+            self.attr_status['M'] = 0
+            self.formula = name #but just put the name for now.
+
+        print('name = ' + str(self.name) + ' , formula = ' + str(self.formula)) # debugging
+        self.M = Chem.get_mass(self.formula)
         if self.M == 0:
-            print('setting self.M from formula') # debugging
-            self.M = Chem.get_mass(self.formula)
+            print('WARNING: could not get molecular mass for ' + self.name + ' !!!')
+
         if not hasattr(self, 'molecule_mass'):
-            print('setting self.molecule_mass from self.M') # debugging
-            self.molecule_mass = self.M/Chem.NA
+            print('setting self.molecule_mass from self.M!') # debugging
+            self.molecule_mass = self.M * Chem.amu
+            print('molecule_mass = ' + str(self.molecule_mass))
 
         self.transmission_function = None
         #self.color = self.get_color()
@@ -310,7 +313,8 @@ class Molecule:
 
         return self.RSF[mass]
 
-    def plot_spectrum(self, top=100, ax='new'):
+    def plot_spectrum(self, top=100, offset=0, width=0.5, ax='new',
+                      color='k', spec={}):
         if ax == 'new':
             fig1 = plt.figure()
             ax = fig1.add_subplot(111)
@@ -323,7 +327,7 @@ class Molecule:
             y += [value]
         y = np.array(y) / max(y) * top
         x = np.array(x)
-        ax.bar(x, y)
+        ax.bar(x+offset, y, width=width, color=color, **spec)
         ax.set_xticks(x)
         ax.set_xticklabels([str(m) for m in x])
         ax.set_title('literature QMS spectrum for ' + self.name)
@@ -740,92 +744,4 @@ def add_script_to_datafiles(path, file_name, attrs='all', mdict={}, mols='all'):
 if __name__ == '__main__':
 
 
-    plt.close('all')
-
-
-    reset17I21 = True
-    if reset17I21:
-        #clean up old useless calibrations etc,
-        #add new data to data files, from Daniel's script
-
-        mols = ['Ar', 'C2H4', 'C2H6', 'CH4', 'N2','O2',
-                'Cl2', 'CO', 'CO2', 'H2', 'H2O', 'He',
-                'acetaldehyde', 'ethanol',
-                'air','Henriksen2009',
-                ]
-
-        mdict = dict((mol, Molecule(mol)) for mol in mols)
-
-
-        #CLEANUP:
-
-        keep = ['name', 'formula', 'M', 'D', 'kH', #'primary',
-                'sigma_100eV', 'spectrum', 'RSF_Hiden', ('Hiden', 'RSF_Hiden')]
-
-        reset_datafiles(mols=mols, attrs=keep, mdict=mdict)
-
-
-        #ADD NEW DATA:
-        file_name = 'Membrane_chip.py'
-        path = '/home/scott/Dropbox/python_master/data'
-
-        new = (('m', 'molecule_mass'), ('s', 'molecule_diameter'),
-               ('eta', 'dynamic_viscosity'), ('rho', 'density_RTP'),
-               ('D', 'D_gas_RTP'))
-
-        add_script_to_datafiles(path, file_name, attrs=new, mdict=mdict)
-
-
-
-
-    testtxt = False
-    if testtxt:
-        H2 = Molecule('H2')
-        print(H2.F_cal)
-        H2.F_cal = 1.111
-        H2.rewrite('data/test.txt')
-        test = Molecule('test')
-        print(test.F_cal)
-        test.calibration_fit()
-
-
-    plotcals=False
-    if plotcals:
-        mols = {'CO2':('brown', 10),'H2':('b', 1),'O2':('k', 1)}
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
-        for (mol, (color, plotfactor)) in mols.items():
-            m = Molecule(mol)
-            m.calibration_fit(ax=ax, color=color, plotfactor=plotfactor)
-        ax.set_title('')
-    #plt.savefig('Internal_calibrations.png')
-
-
-
-    #mol = Molecule('C2H4')
-    #mol.plot_spectrum()
-    #mol = Molecule('C2H6')
-    #mol.plot_spectrum()
-
-
-    if True: # write primary to molecules based on spectrum
-        mols = ['Ar', 'C2H4', 'C2H6', 'CH4', 'N2','O2',
-                'Cl2', 'CO', 'CO2', 'H2', 'H2O', 'He',
-                'acetaldehyde', 'ethanol',
-                'air','Henriksen2009',
-                ]
-
-        for mol in mols:
-            m = Molecule(mol)
-            try:
-                mass, value = zip(*[(k, v) for (k, v) in m.spectrum.items() if type(v) in [int, float]])
-            except AttributeError:
-                continue
-            if len(value)>0:
-                i = np.argsort(np.array(value))
-                primary = mass[i[-1]]
-                print(mol + ' ' + primary)
-
-                m.primary = primary
-                m.write(attr='primary')
-
+    pass

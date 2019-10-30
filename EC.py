@@ -41,7 +41,7 @@ EC_cols_0 = ['mode', 'ox/red', 'error', 'control changes', 'time/s', 'control/V'
            ] # exotic J_str's. I need to change how this works!]
 
 
-def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True,
+def select_cycles(EC_data_0, cycles=None, cycle=1, t_zero=None, verbose=True,
                   cycle_str=None, cutMS=True, data_type='CV', override=False):
     '''
     This function selects one or more cycles from EC_data_0.
@@ -63,29 +63,43 @@ def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True,
     #it looks like I actually want Ns for CA's and cycle number for CV's.
     #How to determine which
     if cycle_str is None:
-        if 'cycle number' in EC_data['data_cols']:
+        if 'selector' in EC_data['data_cols']:
+            cycle_str = 'selector'
+        elif 'cycle number' in EC_data['data_cols']:
             cycle_str = 'cycle number'
         elif 'Ns' in EC_data['data_cols']:
             cycle_str = 'Ns'
         else:
             print('no cycle numbers detected!')
+    if verbose:
+        print('selecting according to column \'' + cycle_str + '\'')
 
     cycle_numbers = EC_data[cycle_str]
 
+    try:
+        t_str = EC_data['t_str'] # we want to use the corrected time, 'time/s*', if there's been a trigger calibration
+    except KeyError:
+        t_str = 'time/s'
 
     #N = len(cycle_numbers) #unneeded
+    if cycles is None and cycle is not None:
+        cycles = cycle
     if type(cycles)==int:
         cycles = [cycles]
+
+    print('cycles = ' + str(cycles)) # debugging
     mask = np.any(np.array([cycle_numbers == c for c in cycles]), axis=0)
     #list comprehension is awesome.
-    t_cut = EC_data['time/s'][mask]
+    t_cut = EC_data[t_str][mask]
     tspan = np.array([t_cut[0], t_cut[-1]])
+    print('tspan = ' + str(tspan))
 
 
     # ------- cutit! ------------- #
     if cutMS:
         EC_data = cut_dataset(EC_data_0, tspan=tspan, verbose=verbose,
-                              time_masks={'time/s':mask})
+                              #time_masks={t_str:mask}
+                              )
     else:
         for col in EC_data['data_cols']:
             if get_type(col, EC_data) == 'EC':
@@ -115,8 +129,9 @@ def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True,
                 #e.g. t_zero = '3' sets t=0 to the start of the third cycle,
                 #regardless of the selected cycles
                 if type(n) is not int:
+                    print('raising NameError') # debugging
                     raise NameError
-                t_zero = next(EC_data['time/s'][i] for i,c in enumerate(EC_pdata[cycle_str]) if c==n)
+                t_zero = next(EC_data['time/s'][i] for i,c in enumerate(EC_data[cycle_str]) if c==n)
 
             except NameError:
                 #this should be the case if t_zero=='start'
@@ -142,7 +157,9 @@ def select_cycles(EC_data_0, cycles=1, t_zero=None, verbose=True,
         print('function \'select_cycles\' finished!\n\n')
     return EC_data
 
-
+def select_cycle(*args, **kwargs):
+    #print("function 'select_cycle' is passing arguments on to 'select_cycles'.")
+    return select_cycles(*args, **kwargs)
 
 def remove_delay(CV_data):
     '''
@@ -366,7 +383,8 @@ def clip_cycles(dataset, cycles=1, V_clip=0, redox=1, V_str=None, t_str='time/s'
             I_finish = len(V) - 1 #group the rest in one incomplete cycle
             endit = True
         #print('I_finish = ' + str(I_finish)) # debugging
-        t_finish = t[I_finish]
+        #t_finish = t[I_finish]
+        t_finish = t[I_finish + 1] # 19J02
         if verbose:
             print('t_finish = ' + str(t_finish) + ', V_finish = ' + str(V[I_finish]))
         tspan = [t_start, t_finish]
@@ -499,7 +517,10 @@ def make_selector(data, sel_str='selector', cols=[]):
             changes = np.logical_or(changes, n_down<n)
     selector = np.cumsum(changes)
     data[sel_str] = selector
-    data['data_cols'].add(sel_str)
+    try:
+        data['data_cols'].add(sel_str)
+    except AttributeError:
+        data['data_cols'] = set(data['data_cols'])
     if 'col_types' in data: # Not the case for old .pkl's.
         data['col_types'][sel_str] = 'EC'
     return sel_str
@@ -807,9 +828,10 @@ def get_through_sweep(data=None, t_str=None, V_str=None, t=None, V=None, t_i=0,
 
 def get_shunt_current_line(data, V_DL, t_i=0,
                            t_str=None, V_str=None, I_str=None, N=100, ax=None,
+                           plot_factor=1, out='pfit',
                            verbose=True):
     '''
-
+    Returns the polynomial 
     '''
     if t_str is None:
         try:
@@ -866,17 +888,23 @@ def get_shunt_current_line(data, V_DL, t_i=0,
             J_str = I_str
         if ax == 'new':
             fig, ax = plt.subplots()
-        ax.plot(V_interp, I_avg/A_el, 'r')
-        ax.plot(V_an, I_an/A_el, 'k')
-        ax.plot(V_cat, I_cat/A_el, 'k')
-        ax.plot(V_interp, I_an_interp/A_el, 'k--')
-        ax.plot(V_interp, I_cat_interp/A_el, 'k--')
+            ax.plot(V_an, I_an/A_el*plot_factor, 'k')
+            ax.plot(V_cat, I_cat/A_el*plot_factor, 'k')
+            ax.plot(V_interp, I_an_interp/A_el*plot_factor, 'k--')
+            ax.plot(V_interp, I_cat_interp/A_el*plot_factor, 'k--')
+        ax.plot(V_interp, I_avg/A_el*plot_factor, 'r')
         x = [np.min(V_interp), np.max(V_interp)]
         y = (x - pfit[1])/pfit[0]
-        ax.plot(x, y/A_el, 'g')
+        ax.plot(x, y/A_el*plot_factor, 'g')
         ax.set_xlabel(V_str)
         ax.set_ylabel(J_str)
-    return pfit, t_f
+    
+    out_dict = {'pfit':pfit, 't_f':t_f, 'shunt':pfit[0], 'intercept':pfit[1]}
+    if type(out) is str:
+        outs = out_dict[out]
+    else:
+        outs = [out_dict[o] for o in out]
+    return outs
 
 
 
@@ -992,7 +1020,8 @@ def time_from_scanrate(data, v_scan=None, t_str='time/s', t_i=0, V_str=None):
 
 
 
-def get_capacitance(data, V_DL=[0.3, 0.6], V_str=None, J_str=None, t_i=0):
+def get_capacitance(data, V_DL=[0.3, 0.6], V_str=None, J_str=None, t_i=0,
+                    out='cap'):
     '''
     Returns capacitance in F/cm^2
     '''
@@ -1016,11 +1045,89 @@ def get_capacitance(data, V_DL=[0.3, 0.6], V_str=None, J_str=None, t_i=0):
 
     cap = (J_an - J_cat)/2 / scan_rate # [mA/cm^2] / [mV/s] = [ (C/s)/(V/s) /cm^2] = F/cm^2
 
+
     print('scan rate = ' + str(scan_rate) + ' mV/s')
-    print('J_an = ' + str(J_an) + ' mA/cm^2 , J_cat = ' + str(J_cat) + ' mV/s')
+    print('J_an = ' + str(J_an) + ' mA/cm^2 , J_cat = ' + str(J_cat) + ' mA')
     print('cap = ' + str(cap) + ' F/cm^2')
 
-    return cap
+    out_dict = {'cap':cap, 'scan_rate':scan_rate, 'J_an':J_an, 'J_cat':J_cat,
+                'J':(J_an - J_cat)/2
+                }
+
+    if type(out) is str:
+        outs = out_dict[out]
+    else:
+        outs = [out_dict[o] for o in out]
+
+    return outs
+
+def capacitance_curve(data=None, cycles_data=None, cycles=None, cycle_str=None,
+                      V_DL=[0.3, 0.6], V_str=None, J_str=None, ax1=None, ax2=None,
+                      ax='new', out='cap', color_list=None):
+    '''
+    Calculates the capacitance as the slope of the line-of-best-fit through 
+    a plot of (J_an - J_cat)/2 vs scan rate for specified cycles. By default
+    returns the capacitance in Farrads per cm^2. By default plots the selected
+    cycles (as J vs V) and their (J_an - J_cat)/2 vs scan rate.
+    '''
+
+    if V_str is None or J_str is None:
+        V_str_1, J_str_1 = sync_metadata(data)
+    if V_str is None:
+        V_str = V_str_1
+    if J_str is None:
+        J_str = J_str_1
+
+    if cycles_data is None:
+        cycles_data = [select_cycle(data, cycle_str=cycle_str, cycle=c)
+                       for c in cycles]
+
+    if ax=='new' or ax1=='new':
+        fig1, ax1 = plt.subplots()
+    if ax=='new' or ax2=='new':
+        fig2, ax2 = plt.subplots()
+    ax = [ax1, ax2]
+    if color_list is None:
+        color_list = ['k', 'b', 'c', 'g', 'y', 'r', 'm']
+
+    scan_rates = np.array([])
+    Js = np.array([])
+
+    for cycle_data in cycles_data:
+        scan_rate, J = get_capacitance(cycle_data, V_DL=V_DL, V_str=V_str, J_str=J_str, out=['scan_rate', 'J'])
+        scan_rates = np.append(scan_rates, scan_rate)
+        Js = np.append(Js, J)
+        if ax1 is not None:
+            ax1.plot(cycle_data[V_str], cycle_data[J_str], color=color_list[0], label=str(np.round(scan_rate)) + ' mV/s')
+            color_list = color_list[1:] + [color_list[0]]
+        #print('scan_rates = ' + str(scan_rates) + ', Js = ' + str(Js)) # debugging
+
+    cap, intercept = np.polyfit(scan_rates, Js, deg=1)
+    if ax1 is not None:
+        ax1.set_xlabel(V_str)
+        ax1.set_ylabel(J_str)
+        ax1.legend()
+    if ax2 is not None:
+        ax2.plot(scan_rates, Js, 'k.', markersize=15)
+        x_fit = np.array([0, max(scan_rates)])
+        y_fit = x_fit * cap
+        ax2.plot(x_fit, y_fit, 'r--') # line of best fit, shifted to go through origin (shows possible offset)
+        ax2.set_xlabel('scan rate / [mV s$^{-1}$]')
+        ax2.set_ylabel('1/2 $\Delta$ ' + J_str)
+
+    print('cap = ' + str(cap) + ', intercept = ' + str(intercept))
+
+    out_dict = {'cap':cap, 'scan_rates':scan_rates, 'Js':Js, 'ax':ax
+                }
+
+    if type(out) is str:
+        outs = out_dict[out]
+    else:
+        outs = [out_dict[o] for o in out]
+
+    return outs
+
+
 
 def correct_ohmic_drop(data, R_ohm=0):
     V_str, J_str = sync_metadata(data)

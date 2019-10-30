@@ -205,7 +205,7 @@ def recalibrate(quantify = {},  #molecules we want to calc F_cal (at the given m
         print('converting external from dict to list')
         trusted = list(trusted.values())
     if len(trusted) == 0 and trust is None:
-        trusted = 'internal'
+        trusted = internal
     for m in external + internal + trusted:
         try:
             name = m.name
@@ -321,10 +321,7 @@ def recalibrate(quantify = {},  #molecules we want to calc F_cal (at the given m
             mass = quantify[name]
         else:
             mass = m.primary
-        try:
-            color = m.get_color()
-        except AttributeError:
-            color=standard_colors[mass]
+        color = m.get_color()
 
         # calculate RSF
         rsf = m.get_RSF(RSF_source=RSF_source, transmission_function=T, mass=mass)
@@ -341,12 +338,13 @@ def recalibrate(quantify = {},  #molecules we want to calc F_cal (at the given m
             F_cal = F_cals[name]
         elif name in quantmols:
             F_cal = r * rsf  #the extrapolation!
-            if ax is not None:
-                print('plotting ' + name + ' as a color=' + color + ' dot.')
-                ax.plot(rsf, F_cal, '.', color=color, markersize=10)
-                if labels:
-                    ax.annotate(name + ' at m/z=' + mass[1:],
-                                xy=[rsf+0.05, F_cal], color=color)
+
+        if name in quantmols and ax is not None:
+            print('plotting ' + name + ' as a color=' + color + ' dot.')
+            ax.plot(rsf, r * rsf, '.', color=color, markersize=10)
+            if labels:
+                ax.annotate(name + ' at m/z=' + mass[1:],
+                            xy=[rsf+0.05, F_cal], color=color)
             print(name + ': F_cal = ' + str(F_cal))
 
             # write it to the Molecule object
@@ -520,6 +518,7 @@ def get_flux(MS_data, mol, **kwargs):
 
 def get_current(EC_data, tspan='tspan', unit='A', verbose=False):
     '''
+    Returns current in requested unit (default is A) over a requested tspan.
     I'm not happy with this function. I need to completely upgrade the way
     mass-, area-, and otherwise normalized currents and units are handled.
     This should work for now.

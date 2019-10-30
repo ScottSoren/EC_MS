@@ -396,6 +396,7 @@ def synchronize(data_objects, t_zero=None, append=None, file_number_type=None,
 
         # now we're ready to go through the columns and actually process the data
         #for smooth entry into combined_data
+        #print('ENTERING THE LOOP WHERE I THINK THE PROBLEM IS!!!') # debugging
         for col in dataset['data_cols']:
             data = dataset[col]
             # processing: cutting
@@ -431,7 +432,27 @@ def synchronize(data_objects, t_zero=None, append=None, file_number_type=None,
                           ' not in dataset. Not adding ' + col + ' to the combined dataset.')
                     continue
                 if l0 > l1: #this is the case if the previous dataset was missing col but not timecol
-                    filler = np.array([0] * (l0 - l1))
+                    if col in ['Ewe/V', '<Ewe>/V']:
+                        if False: # debugging. This particular problem (0's for Ewe/V in CP datasets)
+                                    # turns out to be an EC-Lab text export bug, not my bug!
+                            print('col = ' + col + '. \ndataset[\'data_cols\'] = ' + str(dataset['data_cols']) +
+                                  '.\ncombined_data[\'data_cols\'] = ' + str(combined_data['data_cols']) +
+                                  '\nl1 = ' + str(l1) + '\nl0 = ' + str(l0)) # debugging DEBUGGING!
+                            from matplotlib import pyplot as plt
+                            fig, ax = plt.subplots()
+                            ax.plot(dataset[timecol], dataset[col], 'k')
+                            if col in combined_data:
+                                ax.plot(combined_data[timecol], combined_data[col], 'r')
+                            ax.set_ylabel(col)
+                    if col == 'Ewe/V' and '<Ewe>/V' in combined_data:  # we don't want to extend 'Ewe/V' with zeros!
+                        filler = dataset['<Ewe>/V'][l1:]
+                        print('copying <Ewe>/V to Ewe/V to keep the latter the right length.')
+                    elif col == '<Ewe>/V' and 'Ewe/V' in combined_data:  # we don't want to extend 'Ewe/V' with zeros!
+                        filler = dataset['Ewe/V'][l1:]
+                        print('copying Ewe/V to <Ewe>/V to keep the latter the right length.')
+                    else:
+                        filler = np.array([0] * (l0 - l1))
+                    print('Filling column ' + col + ' to keep in line with timecol ' + timecol + '!!!') # debugging
                     olddata = np.append(olddata, filler)
                     # ^ and now len(olddata) = len(combined_data[timecol])
                     # now, fill in file number according to datasets of type file_number_type
@@ -506,7 +527,16 @@ def synchronize(data_objects, t_zero=None, append=None, file_number_type=None,
         except KeyError:
             print('can\'t find timecol for {}. skipping.'.format(col))
         if l0 > l1:
-            filler = np.array([0] * (l0 - l1))
+            if col == 'Ewe/V' and '<Ewe>/V' in dataset:  # we don't want to extend 'Ewe/V' with zeros!
+                filler = dataset['<Ewe>/V'][l1:]
+                print('copying <Ewe>/V to Ewe/V to keep the latter the right length.')
+            elif col == '<Ewe>/V>' and 'Ewe/V' in dataset:  # we don't want to extend 'Ewe/V' with zeros!
+                filler = dataset['Ewe/V'][l1:]
+                print('copying Ewe/V to <Ewe>/V to keep the latter the right length.')
+            else:
+                filler = np.array([0] * (l0 - l1))
+            print('Filling column ' + col + ' to keep in line with timecol ' + timecol + '!!!') # debugging
+
             combined_data[col] = np.append(combined_data[col], filler)
 
     # store the name
@@ -865,7 +895,7 @@ def is_time(col, data=None, verbose=False):
     if verbose:
         print('\nfunction \'is_time\' checking \'' + col + '\'!')
     timecol = get_timecol(col, data, verbose=verbose)
-    return timecol == col
+    return timecol == col[:len(timecol)] # so that a * at the end doesn't mess it up
 
 def is_MS_data(col):
     if re.search(r'^M[0-9]+-[xy]', col):
@@ -1267,6 +1297,10 @@ def trigger_cal(data, triggers=None, pseudotimecol=None, pt_str=None,
         data[timecol] = pt + offset
         data['pt_str'] = pseudotimecol
         data['t_str'] = timecol
+        try:
+            data['col_types'][timecol] = data['col_types'][pseudotimecol]
+        except KeyError:
+            print('WARNING! Missing data[\'col_types\'][pseudotimecol]')
         return timecol
 
 
