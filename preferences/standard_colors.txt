@@ -12,6 +12,7 @@ standard colors
 	M30: darkorange
 	M31: yellowgreen
 	M43: tan
+	M45: darkgreen
 	M34: r
 	M36: g
 	M46: purple

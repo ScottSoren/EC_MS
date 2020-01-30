@@ -1,0 +1,12 @@
+
+Documentation!!!!
+
+
+----- long-term code organization and improvements ------
+
+Replace ObjectFiles stuff with JSON. see:
+https://stackabuse.com/reading-and-writing-json-to-a-file-in-python/
+
+Object orientation: Write a class for DataSet making it more convenient to use than the present dictionary type. Make it back-compatible so that datasets worked if used like the old dictionairies. 
+
+

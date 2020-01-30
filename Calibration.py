@@ -334,7 +334,7 @@ def chip_calibration(data, mol='O2', F_cal=None, primary=None, tspan=None,
 
 
 def point_calibration(data, mol, mass='primary', cal_type='internal',
-                      tspan=None, n_el=None, tail=0, tspan_bg=None,
+                      tspan=None, n_el=None, tail=0, t_bg=None, tspan_bg=None,
                       chip=None, composition=None, carrier=None,
                       ):
     '''
@@ -358,6 +358,8 @@ def point_calibration(data, mol, mass='primary', cal_type='internal',
     #get average signal
     if tspan is None:
         tspan = data['tspan']
+    if tspan_bg is None and t_bg is not None:
+        tspan_bg = t_bg
     if tspan_bg is not None:
         x_bg, y_bg = get_signal(data, mass, tspan=tspan_bg)
         y0 = np.mean(y_bg)
@@ -517,9 +519,11 @@ def calibration_curve(data, mol, mass='primary', n_el=-2,
         plot_signal(data, masses=[mass], tspan=tspan_plot,
                     removebackground=False, unit='pA', ax=ax1a)
     if ax2 == 'new':
-        fig2, [ax2a, ax2c] = plt.subplots(ncols=2)
+        fig2, ax2a = plt.subplots()
+        fig2c, ax2c = plt.subplots()
+        #fig2, [ax2a, ax2c] = plt.subplots(ncols=2)
         ax2b = ax2a.twinx()
-        fig2.set_figwidth(fig1.get_figheight()*3)
+        #fig2.set_figwidth(fig1.get_figheight()*3)
     elif ax2 is not None:
         try:
             iter(ax2)

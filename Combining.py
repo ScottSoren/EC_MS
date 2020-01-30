@@ -209,9 +209,16 @@ def synchronize(data_objects, t_zero=None, append=None, file_number_type=None,
         t_f = 0             # will increase to the latest finish of time data in the dataset
 
         hasdata[nd] = False
-        for col in dataset['data_cols']:
+        data_cols = dataset['data_cols'].copy()
+        for col in data_cols:
             #print('col = ' + str(col)) # debugging
-            if is_time(col, dataset):
+            try:
+                istime = is_time(col, dataset)
+            except TypeError:
+                print('WARNING! can\'t tell if ' + col + ' is time. Removing from data_cols.')
+                dataset['data_cols'].remove(col)
+                continue
+            if istime:
                 try:
                     t_s = min(t_s, t_0 + dataset[col][0])
                     # ^ earliest start of time data in dataset in epoch time
@@ -785,6 +792,7 @@ def rename_ULM_cols(data):
     # get the masses:
     masses = set([])
     mass_cols = set([col for col in data['data_cols'] if 'ion_current' in col])
+    data['timecols'] = dict([(col, 'time') for col in data['data_cols']])
     for col in mass_cols:
         a = re.search('M[0-9]+', col)
         if a is not None:
@@ -939,6 +947,8 @@ def get_type(col, dataset=None):
     return 'EC' #'Xray' # to be refined later...
 
 def get_timecol(col=None, dataset=None, data_type=None, verbose=False):
+    if dataset is not None and 'timecols' in dataset and col in dataset['timecols']:
+        timecol = dataset['timecols'][col]
     if data_type is None:
         data_type = get_type(col, dataset)
     if data_type == 'EC':

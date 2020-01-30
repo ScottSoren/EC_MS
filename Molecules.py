@@ -502,7 +502,12 @@ class Molecule:
         returns background
         '''
         kwargs.update(unit='mol/s')
+        if 't_bg' in kwargs and 'tspan' not in kwargs:
+            kwargs['tspan'] = kwargs['t_bg']
         x, y = self.get_flux(*args, **kwargs, removebackground=False)
+        if False: # debugging
+            fig, ax = plt.subplots()
+            ax.plot(x, y, self.get_color())
         background = np.mean(y)
         self.background = background
         return background
@@ -599,11 +604,16 @@ class Molecule:
                 if type(removebackground) is float:
                     background = removebackground * min(y)
                 elif t_bg is not None:
-                    try:
-                        mask = np.logical_and(t_bg[0]<x, x<t_bg[-1])
-                        background = np.mean(y[mask])
-                    except TypeError:
-                        background = np.interp(t_bg, x, y)
+                    if t_bg[0]>x[0] and t_bg[-1]<x[-1]:
+                        try:
+                            mask = np.logical_and(t_bg[0]<x, x<t_bg[-1])
+                            background = np.mean(y[mask])
+                        except TypeError:
+                            background = np.interp(t_bg, x, y)
+                    else:
+                        background = self.get_bg(MS_data, tspan=t_bg, density=density,
+                                                 unit=unit, verbose=verbose, override=override,
+                                                 endpoints=endpoints)
                 else:
                     background = min(y)
                 if not hasattr(self, 'background') or self.background is None:

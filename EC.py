@@ -831,7 +831,8 @@ def get_shunt_current_line(data, V_DL, t_i=0,
                            plot_factor=1, out='pfit',
                            verbose=True):
     '''
-    Returns the polynomial 
+    Returns the polynomial describing the line thgought the center of
+    the double-layer defined by V_DL.
     '''
     if t_str is None:
         try:
@@ -898,7 +899,7 @@ def get_shunt_current_line(data, V_DL, t_i=0,
         ax.plot(x, y/A_el*plot_factor, 'g')
         ax.set_xlabel(V_str)
         ax.set_ylabel(J_str)
-    
+
     out_dict = {'pfit':pfit, 't_f':t_f, 'shunt':pfit[0], 'intercept':pfit[1]}
     if type(out) is str:
         outs = out_dict[out]
@@ -910,16 +911,21 @@ def get_shunt_current_line(data, V_DL, t_i=0,
 
 def correct_shunt(data, tspan='all', R_shunt=None, V_intercept=None, pfit=None,
                   t_str=None, V_str=None, I_str=None, J_str=None, verbose=True,
+                  V_DL=None,
                   **kwargs):
     '''
+
+    Requires pfit or R_shunt and V_intercept, which are calculated by the
+    function EC_MS.EC.get_shunt_current_line.
     '''
     if verbose:
         print('correcting shunt!')
     if pfit is None and R_shunt is None and V_intercept is None:
         #print(I_str)  #debugging
-        pfit, t_f = get_shunt_current_line(data,
-                                      t_str=t_str, V_str=V_str, I_str=I_str,
-                                      verbose=verbose, **kwargs)
+        pfit = get_shunt_current_line(data, out='pfit',
+                                  t_str=t_str, V_str=V_str, I_str=I_str,
+                                  verbose=verbose, V_DL=V_DL, **kwargs)
+
     if R_shunt is None:
         R_shunt = pfit[0]  # CE-ground shunt resistance in kOhm
     if V_intercept is None:
@@ -1065,7 +1071,7 @@ def capacitance_curve(data=None, cycles_data=None, cycles=None, cycle_str=None,
                       V_DL=[0.3, 0.6], V_str=None, J_str=None, ax1=None, ax2=None,
                       ax='new', out='cap', color_list=None):
     '''
-    Calculates the capacitance as the slope of the line-of-best-fit through 
+    Calculates the capacitance as the slope of the line-of-best-fit through
     a plot of (J_an - J_cat)/2 vs scan rate for specified cycles. By default
     returns the capacitance in Farrads per cm^2. By default plots the selected
     cycles (as J vs V) and their (J_an - J_cat)/2 vs scan rate.

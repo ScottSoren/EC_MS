@@ -82,11 +82,11 @@ def plot_vs_potential(CV_and_MS_0,
                       ax1='new', ax2='new', ax=None, #spec='k-',
                       overlay=0, logplot=False, leg=False,
                       verbose=True,
-                      removebackground=None, background=None, endpoints=3,
+                      removebackground=None, background=None, t_bg=None, endpoints=3,
                       masses=None, masses_left=None, masses_right=None,
                       mols=None, mols_left=None, mols_right=None,
                       unit=None, smooth_points=0,
-                      emphasis='MS',
+                      emphasis='ms',
                       J_str=None, V_str=None,
                       fig=None, spec={}, t_str=None):
     '''
@@ -133,7 +133,7 @@ def plot_vs_potential(CV_and_MS_0,
                 gs = gridspec.GridSpec(3, 1)
                 #gs.update(hspace=0.025)
                 ax1 = plt.subplot(gs[0:2, 0])
-                ax2 = plt.subplot(gs[2, 0])
+                ax2 = plt.subplot(gs[2:3, 0])
             elif emphasis == 'ms':
                 gs = gridspec.GridSpec(5, 1)
                 #gs.update(hspace=0.025)
@@ -283,16 +283,20 @@ def plot_vs_potential(CV_and_MS_0,
                         colors[m] = color
             for (key, color) in colors.items():
                 if quantified:
-                    (x,y) = get_flux(CV_and_MS, mol=key, tspan=tspan,
-                    removebackground=removebackground, background=background, endpoints=endpoints,
-                    unit=unit, verbose=True)
+                    x, y = get_flux(CV_and_MS, mol=key, tspan=tspan,
+                                    removebackground=removebackground, background=background,
+                                    endpoints=endpoints, t_bg=t_bg,
+                                    unit=unit, verbose=verbose,)
                     if type(key) is not str:
                         key = str(key) # in case key had been a Molecule object
                     Y_str = key + '_' + unit
                 else:
 
                     Y_str = key + '_' + unit    #
-                    x, y = get_signal(CV_and_MS, mass=key, tspan=tspan, unit=unit)
+                    x, y = get_signal(CV_and_MS, mass=key, tspan=tspan,
+                                      removebackground=removebackground, background=background,
+                                      endpoints=endpoints, t_bg=t_bg,
+                                      unit=unit, verbose=verbose,)
 
                 try:
                     y_plot = np.interp(t_plot, x, y)  #obs! np.interp has a has a different argument order than Matlab's interp1
@@ -422,7 +426,7 @@ def smooth_data(data, points=3, cols=None, verbose=True):
 
     return data
 
-def plot_signal(MS_data,
+def plot_signal(MS_data, spec={},
                 masses = 'all',
                 tspan=None, ax='new', unit='nA',
                 removebackground=None, background=None, t_bg=None,
@@ -477,7 +481,7 @@ def plot_signal(MS_data,
             print('WARNING: get_signal returned vector of zero length for ' +
                   mass + '. plot_signal is skipping that mass.')
             continue
-        lines[mass] = ax.plot(x, y, color, label = mass)
+        lines[mass] = ax.plot(x, y, color, label=mass, **spec)
         #as it is, lines is not actually used for anything
     if leg:
         if type(leg) is not str:
@@ -500,7 +504,7 @@ def plot_flux(MS_data, mols={'H2':'b', 'CH4':'r', 'C2H4':'g', 'O2':'k'},
             tspan=None, ax='new',
             removebackground=False, background='constant', endpoints=5, t_bg=None,
             A_el=None, unit='nmol/s', smooth_points=0,
-            logplot=True, leg=False,
+            logplot=True, leg=False, spec={},
             override=False, verbose=True):
     '''
     Plots the molecular flux to QMS in nmol/s for each of the molecules in
@@ -546,7 +550,7 @@ def plot_flux(MS_data, mols={'H2':'b', 'CH4':'r', 'C2H4':'g', 'O2':'k'},
         else:
             l = mol.name
         print('color={}'.format(color)) # debugging
-        ax.plot(x, y, color=color, label=l)
+        ax.plot(x, y, color=color, label=l, **spec)
     if leg:
         if type(leg) is not str:
             leg = 'lower right'
@@ -568,7 +572,7 @@ def plot_flux(MS_data, mols={'H2':'b', 'CH4':'r', 'C2H4':'g', 'O2':'k'},
 def plot_experiment(EC_and_MS,
                     colors=None,
                     tspan=None, overlay=False, logplot=[True,False], verbose=True,
-                    plotpotential=True, plotcurrent=True, ax='new', emphasis='MS',
+                    plotpotential=True, plotcurrent=True, ax='new', emphasis='ms',
                     RE_vs_RHE=None, A_el=None,
                     removebackground=None, background=None, endpoints=5, t_bg=None,
                     saveit=False, name=None, leg=False, unit=None,
@@ -578,7 +582,7 @@ def plot_experiment(EC_and_MS,
                     V_color='k', J_color='0.5', V_label=None, J_label=None,
                     t_str=None, J_str=None, V_str=None,
                     fig=None, return_fig=False, smooth_points=0,
-                    override=False,
+                    override=False, spec={},
                     ):
     '''
     TODO: write proper documentation!
@@ -612,11 +616,10 @@ def plot_experiment(EC_and_MS,
             ax += [ax[0].twinx()]
         else:
             if emphasis == 'MS':
-                gs = gridspec.GridSpec(3, 1)
+                gs = gridspec.GridSpec(12, 1)
                 #gs.update(hspace=0.025)
-                #gs.update(hspace=0.05)
-                ax = [plt.subplot(gs[0:2, 0])]
-                ax += [plt.subplot(gs[2, 0])]
+                ax = [plt.subplot(gs[0:8, 0])]
+                ax += [plt.subplot(gs[8:12, 0])]
             elif emphasis == 'ms':
                 gs = gridspec.GridSpec(5, 1)
                 #gs.update(hspace=0.025)
@@ -639,7 +642,10 @@ def plot_experiment(EC_and_MS,
 
     # --------- get tspan, V_str, and J_str from input and/or dataset -------- #
     if tspan is None:                  #then use the range of overlap
-        tspan = EC_and_MS['tspan'] #changed from 'tspan_2' 17H09
+        try:
+            tspan = EC_and_MS['tspan'] #changed from 'tspan_2' 17H09
+        except KeyError:
+            tspan = 'all'
     if type(tspan) is str and not tspan=='all':
         tspan = EC_and_MS[tspan]
     if type(logplot) is not list:
@@ -692,6 +698,8 @@ def plot_experiment(EC_and_MS,
     if removebackground is None and background is None and t_bg is None:
         removebackground = False
 
+    if type(mols) is dict:
+        mols = list(mols.values())
     try:
         if type(mols[0]) in (list, tuple):
             mols_left = mols[0]
@@ -726,26 +734,26 @@ def plot_experiment(EC_and_MS,
         if unit is None:
             unit = 'pmol/s'
         print('removebackground = ' + str(removebackground)) # debugging
-        plot_flux(EC_and_MS, mols=mols, tspan=tspan, A_el=A_el,
+        plot_flux(EC_and_MS, mols=mols, tspan=tspan, A_el=A_el, spec=spec,
                   ax=ax[0], leg=leg, logplot=logplot[0], unit=unit,
                   removebackground=removebackground_left, background=background, endpoints=endpoints, t_bg=t_bg,
                   override=override, smooth_points=smooth_points, verbose=verbose)
         if mols_right is not None:
             ax += [ax[0].twinx()]
-            plot_flux(EC_and_MS, mols=mols_right, tspan=tspan, A_el=A_el,
+            plot_flux(EC_and_MS, mols=mols_right, tspan=tspan, A_el=A_el, spec=spec,
                       ax=ax[-1], leg=leg, logplot=logplot[0], unit=unit,
                       removebackground=removebackground_right, background=background, endpoints=endpoints, t_bg=t_bg,
                       override=override, smooth_points=smooth_points, verbose=verbose)
     else:
         if unit is None:
             unit = 'pA'
-        plot_signal(EC_and_MS, masses=masses, tspan=tspan,
+        plot_signal(EC_and_MS, masses=masses, tspan=tspan, spec=spec,
                     ax=ax[0], leg=leg, logplot=logplot[0], unit=unit,
                     override=override, verbose=verbose,
                     removebackground=removebackground_left, background=background, t_bg=t_bg)
         if masses_right is not None:
             ax += [ax[0].twinx()]
-            plot_signal(EC_and_MS, masses=masses_right, tspan=tspan,
+            plot_signal(EC_and_MS, masses=masses_right, tspan=tspan, spec=spec,
                         ax=ax[-1], leg=leg, logplot=logplot[0],  unit=unit,
                         override=override, verbose=verbose,
                         removebackground=removebackground_right, background=background, t_bg=t_bg)
@@ -800,7 +808,7 @@ def plot_experiment(EC_and_MS,
             i_ax = 2
         else:
             i_ax = 1
-        ax[i_ax].plot(t, J, color=J_color, label=J_label)
+        ax[i_ax].plot(t, J, color=J_color, label=J_label, **spec)
         ax[i_ax].set_ylabel(J_str)
         ax[i_ax].set_xlabel('time / [s]')
         xlim = ax[i_ax-1].get_xlim()
@@ -816,7 +824,7 @@ def plot_experiment(EC_and_MS,
 
     if plotpotential:
         i_ax = 1
-        ax[i_ax].plot(t, V, color=V_color, label=V_label)
+        ax[i_ax].plot(t, V, color=V_color, label=V_label, **spec)
         ax[i_ax].set_ylabel(V_str)
         if len(logplot) >2:
             if logplot[2]:
@@ -826,7 +834,9 @@ def plot_experiment(EC_and_MS,
         colorax(ax[i_ax], V_color, 'left')
         ax[i_ax].tick_params(axis='both', direction='in') #17K28
 
+    ax[0].set_xlabel(t_str)
     if plotcurrent or plotpotential:
+        ax[0].xaxis.set_label_position('top')
         ax[1].set_xlabel(t_str)
         if tspan is not None and not type(tspan) is str:
             ax[1].set_xlim(tspan)

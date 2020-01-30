@@ -453,6 +453,7 @@ def get_signal(MS_data, mass, tspan=None,
     if removebackground is None:
         removebackground = not (background is None)
 
+    #print('background = ' + str(background)) # debugging
     if removebackground:
         if background is None:
             background = 'constant'
@@ -463,9 +464,15 @@ def get_signal(MS_data, mass, tspan=None,
                 background = removebackground * min(y)
             elif t_bg is not None:
                 try:
-                    mask = np.logical_and(t_bg[0]<x, x<t_bg[-1])
-                    background = np.mean(y[mask])
+                    if verbose:
+                        print('Averaging background at t_bg = ' + str(t_bg))
+                    #mask = np.logical_and(t_bg[0]<x, x<t_bg[-1])
+                    x_bg, y_bg = get_signal(MS_data, mass=mass, tspan=t_bg,
+                                            removebackground=False, unit=unit)
+                    background = np.mean(y_bg)
                 except TypeError:
+                    if verbose:
+                        print('Interpolating background at t_bg = ' + str(t_bg))
                     background = np.interp(t_bg, x, y)
             else:
                 background = min(y)
@@ -477,12 +484,13 @@ def get_signal(MS_data, mass, tspan=None,
             y_end = [np.average(y[:endpoints]), np.average(y[-endpoints:])]
             background = np.interp(x, x_end, y_end)
 
+    #print('background = ' + str(background)) # debugging
     if plotit:
         if ax=='new':
             fig, ax = plt.subplots()
         ax.plot(x, y, 'k')
         if removebackground:
-            ax.plot(x, background, 'r--')
+            ax.plot(x, background*np.ones(x.shape), 'r--')
             if fillcolor:
                 ax.fill_between(x, background, y, where=y>background, color=fillcolor)
         #ax.set_title(mass)
