@@ -414,6 +414,7 @@ def calibration_curve(data, mol, mass='primary', n_el=-2,
                       t_i=None, t_f=None,
                       find_max=False, t_max_buffer=5, V_max_buffer=5,
                       find_min=False, t_min_buffer=5, V_min_buffer=5,
+                      tspans = None,
                       background=None, t_bg=None, tspan_plot=None,
                       remove_EC_bg=False, color=None,
                       force_through_zero=False, tail_on_EC=False,
@@ -424,7 +425,10 @@ def calibration_curve(data, mol, mass='primary', n_el=-2,
     Powerful function for integrating a molecule when the assumption of
     100% faradaic efficiency can be made.
 
-    Requires a dataset, and cycle numbers, which by default refer to data['selector']
+    Requires a dataset, and indication of where the calibration points are.
+    This can be either:
+    (A), tspans, a list of tuples of (<start>, <finish>) times of the calibration points
+    (B) cycle numbers, which by default refer to data['selector']
 
     if mode='average', it integrates over the last t_int of each cycle. If
     mode='integral', it integrates from t_pre before the start until t_tail
@@ -543,8 +547,14 @@ def calibration_curve(data, mol, mass='primary', n_el=-2,
     # ----- cycle through and calculate integrals/averages -------- #
     Ys, ns, Vs, Is, Qs = [], [], [], [], []
 
+    if tspans is not None:
+        cycles = tspans
+
     for cycle in cycles:
-        c = select_cycles(data, [cycle], cycle_str=cycle_str, verbose=verbose)
+        if tspans is None:
+            c = select_cycles(data, [cycle], cycle_str=cycle_str, verbose=verbose)
+        else:
+            c = cut_dataset(data, tspan=cycle)
 
         if t_i is not None or t_f is not None:
             tspan_cut = [c['time/s'][0], c['time/s'][-1]]
@@ -627,7 +637,10 @@ def calibration_curve(data, mol, mass='primary', n_el=-2,
                 y_bg = bg
             ax1[0].fill_between(x, y*1e12, y_bg*1e12, #where=y>y_bg,
                color=color, alpha=0.5)
-            J = I * 1e3 / data['A_el']
+            try:
+                J = I * 1e3 / data['A_el']
+            except KeyError:
+                J = I * 1e3
             J_bg = np.zeros(J.shape)
             ax1[2].fill_between(t, J, J_bg, color=J_color, alpha=0.5)
 

@@ -600,10 +600,10 @@ class Molecule:
             elif background in ['finish', 'end', 'last']:
                 background = np.mean(y[-endpoints:])
             elif background=='constant':
-                print('using minimum value as constant background for ' + self.name)
                 if type(removebackground) is float:
                     background = removebackground * min(y)
                 elif t_bg is not None:
+                    print('defining signal at t in  ' + str(t_bg) + ' as background for ' + self.name)
                     if t_bg[0]>x[0] and t_bg[-1]<x[-1]:
                         try:
                             mask = np.logical_and(t_bg[0]<x, x<t_bg[-1])
@@ -615,6 +615,7 @@ class Molecule:
                                                  unit=unit, verbose=verbose, override=override,
                                                  endpoints=endpoints)
                 else:
+                    print('using minimum value as constant background for ' + self.name)
                     background = min(y)
                 if not hasattr(self, 'background') or self.background is None:
                     self.background = background

@@ -748,7 +748,7 @@ def rename_SI_cols(data, removenans=True):
         col = 'test'
         if not get_type(col_0, data) == 'SI':
             continue
-        if col_0[0:2] == 'C0':
+        if re.search('^C[0-9]+', col_0):
             try:
                 mass = re.search(r'M[0-9]+', col_0).group()
             except AttributeError:
@@ -759,7 +759,7 @@ def rename_SI_cols(data, removenans=True):
             else:
                 col = mass + '-y'
             col_type = 'MS'
-        elif 'potentiostat' in col_0:
+        elif re.search('^pot', col_0):
             for c0, c in [('Time', 'time/s'), ('Voltage','Ewe/V'), ('Current', 'I/mA'),
                           ('Cycle', 'cycle number')]:
                 if c0 in col_0:
