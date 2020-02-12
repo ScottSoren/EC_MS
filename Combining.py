@@ -630,7 +630,10 @@ def purge_column(dataset, col, purge=True, verbose=True):
     if not purge:
         return
     print('removing ' + col + ' entirely.')
-    dataset.pop(col)
+    try:
+        dataset.pop(col)
+    except KeyError:
+        print('hmmm... it may have already been removed.')
     if col in dataset['data_cols']:
         dataset['data_cols'].remove(col)
 

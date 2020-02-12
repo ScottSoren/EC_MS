@@ -23,7 +23,9 @@ from .Combining import cut_dataset, get_timecol, is_time, get_type
 
 
 E_string_list = ['Ewe/V', '<Ewe>/V', '|Ewe|/V']
+# ^ different thinigs from BioLogic that should be read as potential
 V_string_default = 'U vs RHE / [V]'
+# ^
 I_string_list = ['I/mA', '<I>/mA', '|EI|/mA']
 J_string_default = 'J / [mA cm$^{-2}$]'
 
@@ -39,6 +41,12 @@ EC_cols_0 = ['mode', 'ox/red', 'error', 'control changes', 'time/s', 'control/V'
            V_string_default, J_string_default,
            'I/ECSA / [mA/m^2]'
            ] # exotic J_str's. I need to change how this works!]
+
+
+#class CyclicVoltammagram(Dataset):
+#    def __init__():
+#        pass
+
 
 
 def select_cycles(EC_data_0, cycles=None, cycle=1, t_zero=None, verbose=True,
@@ -177,8 +185,10 @@ def remove_delay(CV_data):
     return CV_data
 
 
-def CV_difference(cycles_data=None, cycles=None, redox=1, Vspan=[0.5, 1.0],
-                  ax=None, color='g', cycle_str='selector', verbose=True):
+def CV_difference(cycles_data=None, cycles=None, cycle_1=None, cycle_2=None,
+                  redox=1, Vspan=[0.5, 1.0], unit='C',
+                  ax=None, color='g', alpha=0,
+                  cycle_str='selector', verbose=True):
     '''
     This will calculate the difference in area between two cycles in a CV,
     written for CO stripping 16J26. If ax is given, the difference will be
@@ -208,6 +218,9 @@ def CV_difference(cycles_data=None, cycles=None, redox=1, Vspan=[0.5, 1.0],
     Q = []
     JV = []
     ts = []
+
+    if cycles is None and cycle_1 is not None and cycle_2 is not None:
+        cycles = [cycle_1, cycle_2]
 
     if cycles is not None:
         data = cycles_data
@@ -240,7 +253,7 @@ def CV_difference(cycles_data=None, cycles=None, redox=1, Vspan=[0.5, 1.0],
         Q += [q[I_keep[-1]] - q[I_keep[0]]]
         JV += [np.trapz(J, V)]
 
-    dQ = Q[0] - Q[1]
+    dQ = Q[0] - Q[1] # in C
     dJV = JV[0] - JV[1]
 
     if verbose:
@@ -266,7 +279,7 @@ def CV_difference(cycles_data=None, cycles=None, redox=1, Vspan=[0.5, 1.0],
             V = Vs[0]
     else:
         V = (Vs[0] + Vs[1]) / 2
-    J_diff = Js[0] - Js[1] #note this is all optimized for CO stripping
+    #J_diff = Js[0] - Js[1] #note this is all optimized for CO stripping
     t = ts[0]
 
     if ax:
@@ -280,13 +293,18 @@ def CV_difference(cycles_data=None, cycles=None, redox=1, Vspan=[0.5, 1.0],
             ax.set_ylabel(J_str)
 
         ax.fill_between(V, Js[0], Js[1], where=Js[0]>Js[1],
-                        facecolor=color, interpolate=True)
+                        facecolor=color, interpolate=True, alpha=alpha)
         ax.fill_between(V, Js[0], Js[1], where=Js[0]<Js[1],
-                        facecolor=color, alpha=0.5, hatch='//', interpolate=True)
+                        facecolor=color, alpha=alpha, hatch='//', interpolate=True)
     if verbose:
         print('\nfunction \'CV_difference\' finished!\n\n')
 
-    return dQ, [t, V, J_diff]
+    if unit=='mC':
+        dQ = dQ*1e3
+    if 'cm^2' in unit:
+        dQ = dQ/A_el
+
+    return dQ#, [t, V, J_diff]
 
 
 def get_ro(data, n_man=5, V_str=None, ro_str=None):

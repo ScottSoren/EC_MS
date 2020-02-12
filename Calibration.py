@@ -16,25 +16,14 @@ from __future__ import division, print_function
 import os, sys, pickle
 import numpy as np
 from matplotlib import pyplot as plt
-
-if os.path.split(os.getcwd())[1] == 'EC_MS':
-                                #then we're running from inside the package
-    import Chem
-    from EC import plot_CV_cycles, CV_difference, sync_metadata, select_cycles
-    from Molecules import Molecule
-    from Combining import cut_dataset
-    from Chips import Chip
-    from Quantification import get_signal, get_current, get_potential
-    print(os.getcwd())
-    sys.exit()
-else:                           #then we use relative import
-    from . import Chem
-    from .EC import plot_CV_cycles, CV_difference, sync_metadata, select_cycles
-    from .Molecules import Molecule
-    from .Combining import cut_dataset
-    from .Chips import Chip
-    from .Quantification import get_signal, get_current, get_potential
-    from .Plotting import colorax, align_zero, plot_experiment, plot_signal
+                      #then we use relative import
+from . import Chem
+from .EC import plot_CV_cycles, CV_difference, sync_metadata, select_cycles
+from .Molecules import Molecule
+from .Combining import cut_dataset
+from .Chips import Chip
+from .Quantification import get_signal, get_current, get_potential
+from .Plotting import colorax, align_zero, plot_experiment, plot_signal
 
 def ML_strip_cal(CV_and_MS, cycles=[1,2], t_int=200, cycle_str='cycle number',
              mol='CO2', mass='primary', n_el=None,

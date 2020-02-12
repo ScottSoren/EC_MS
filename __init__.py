@@ -22,5 +22,6 @@ from EC_MS.Calibration import *
 from EC_MS.Electrolytes import *
 from EC_MS.Datapoints import *
 from EC_MS.Potentiostat import *
+from EC_MS.dataset import *
 import EC_MS.Chem as Chem
 

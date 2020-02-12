@@ -88,7 +88,8 @@ def plot_vs_potential(CV_and_MS_0,
                       unit=None, smooth_points=0,
                       emphasis='ms',
                       J_str=None, V_str=None,
-                      fig=None, spec={}, t_str=None):
+                      fig=None, spec={}, t_str=None,
+                      **kwargs):
     '''
     This will plot current and select MS signals vs E_we, as is the
     convention for cyclic voltammagrams. added 16I29
@@ -102,10 +103,19 @@ def plot_vs_potential(CV_and_MS_0,
         logplot = [logplot, False]
     if removebackground is None:
         removebackground = not logplot[0]
+
+    spec.update(kwargs) # extra arguments are passed to plt.plot
+
     #prepare axes. This is ridiculous, by the way.
     CV_and_MS = CV_and_MS_0.copy() #17C01
-    if not cycles == 'all':
-        CV_and_MS = select_cycles(CV_and_MS, cycles, verbose=verbose)
+    if CV_and_MS['data_type'][0:2] == 'EC':
+        ax = plot_vs_potential_EC(data=CV_and_MS,
+                      tspan=tspan, RE_vs_RHE=RE_vs_RHE, A_el=A_el,
+                      cycles='all', ax=ax, #spec='k-',
+                      J_str=J_str, V_str=V_str, t_str=t_str,
+                      fig=fig, spec=spec,
+                      verbose=verbose,)
+        return ax
 
     if ax == 'new':
         ax1 = 'new'
@@ -331,6 +341,56 @@ def plot_vs_potential(CV_and_MS_0,
 
         #parameter order of np.interp is different than Matlab's interp1
     return axes
+
+
+
+def plot_vs_potential_EC(data,
+                      tspan=None, RE_vs_RHE=None, A_el=None, cycles='all',
+                      ax='new', #spec='k-',
+                      verbose=True,
+                      J_str=None, V_str=None,
+                      fig=None, spec={}, t_str=None):
+
+
+    if ax is None or ax == 'new':
+        fig, ax = plt.subplots()
+
+    V_str, J_str = sync_metadata(data, RE_vs_RHE=RE_vs_RHE, A_el=A_el,
+                                 V_str=V_str, J_str=J_str)
+
+    V = data[V_str]
+    J = data[J_str]
+    if t_str is None:
+        if 't_str' in data:
+            t_str = data['t_str']
+        else:
+            t_str = 'time/s'
+
+    #get time variable and plotting indexes
+    t = data[t_str]
+    if tspan is None:                  #then use the whole range of overlap
+        try:
+            tspan = data['tspan']
+        except KeyError:
+            tspan = [min(t), max(t)]
+
+    mask = np.logical_and(tspan[0]<t, t<tspan[-1])
+
+    #plot EC-lab data
+    ec_spec = spec.copy()
+    print(ec_spec) # debugging
+    if 'color' not in ec_spec.keys():
+        ec_spec['color'] = 'k'
+
+    V_plot, J_plot = V[mask], J[mask]
+    ax.plot(V_plot,J_plot, **ec_spec)
+        #maybe I should use EC.plot_cycles to have different cycles be different colors. Or rewrite that code here.
+    ax.set_xlabel(V_str)
+    ax.set_ylabel(J_str)
+
+    if verbose:
+        print('\nfunction \'plot_vs_potential_EC\' finished!\n\n')
+    return ax
 
 
 def plot_vs_time(Dataset, cols_1='input', cols_2='input', verbose=1):
@@ -568,6 +628,117 @@ def plot_flux(MS_data, mols={'H2':'b', 'CH4':'r', 'C2H4':'g', 'O2':'k'},
         print('\nfunction \'plot_flux\' finished!\n\n')
     return ax
 
+def plot_experiment_EC(data,
+                        tspan=None, verbose=True,
+                        RE_vs_RHE=None, A_el=None, ax='new',
+                        #mols will overide masses will overide colors
+                        V_color=None, J_color=None, V_label=None, J_label=None,
+                        t_str=None, J_str=None, V_str=None,
+                        fig=None, spec={},
+                        ):
+    if ax == 'new':
+        fig, ax1 = plt.subplots()
+        ax2 = ax1.twinx()
+        ax = [ax1, ax2]
+
+
+    # --------- get tspan, V_str, and J_str from input and/or dataset -------- #
+    if tspan is None:                  #then use the range of overlap
+        try:
+            tspan = data['tspan'] #changed from 'tspan_2' 17H09
+        except KeyError:
+            tspan = 'all'
+    if type(tspan) is str and not tspan=='all':
+        tspan = data[tspan]
+
+    if t_str is None:
+        if 't_str' in data:
+            t_str = data['t_str']
+        else:
+            t_str = 'time/s'
+    if V_str is None or J_str is None or RE_vs_RHE is not None or A_el is not None:
+        V_str_0, J_str_0 = sync_metadata(data, RE_vs_RHE=RE_vs_RHE, A_el=A_el, verbose=verbose)
+        #added 16J27... problem caught 17G26, fixed in sync_metadata
+    if V_str is None: #this way I can get it to plot something other than V and J.
+        V_str = V_str_0
+    if J_str is None:
+        J_str = J_str_0
+
+    if A_el in data:
+        A_el = data['A_el']
+    else:
+        A_el = 1
+
+
+    # ---------- make sure I can plot the electrochemistyr data --------- #
+    plotpotential = True
+    plotcurrent = True
+    try:
+        t = data[t_str]
+    except KeyError:
+        print('data doesn\'t contain \'' + str(t_str) + '\', i.e. t_str. Can\'t plot EC data.')
+        plotpotential = False
+        plotcurrent = False
+    try:
+        V = data[V_str]
+    except KeyError:
+        print('data doesn\'t contain \'' + str(V_str) + '\', i.e. V_str. Can\'t plot that data.')
+        plotpotential = False
+    try:
+        J = data[J_str]
+    except KeyError:
+        print('data doesn\'t contain \'' + str(J_str) + '\', i.e. J_str. Can\'t plot that data.')
+        plotcurrent = False
+
+
+    # -------- cut the electrochemistry data according to tspan ------ #
+    if type(tspan) is not str and (plotcurrent or plotpotential):
+        mask = np.logical_and(tspan[0]<t, t<tspan[-1])
+        t = t[mask]
+        #print(np.where(mask)) #debugging
+        if plotpotential:
+            V = V[mask]
+        if plotcurrent:
+            J = J[mask]
+
+
+    # ---------- and plot the electrochemistry data! --------------- #
+    if plotcurrent:
+        if plotpotential:
+            i_ax = 1
+        else:
+            i_ax = 0
+        ax[i_ax].plot(t, J, color=J_color, label=J_label, **spec)
+        ax[i_ax].set_ylabel(J_str)
+        ax[i_ax].set_xlabel('time / [s]')
+        xlim = ax[i_ax-1].get_xlim()
+        ax[i_ax].set_xlim(xlim)
+
+        if i_ax == 2:
+            colorax(ax[i_ax], J_color, 'right')
+        else:
+            colorax(ax[i_ax], J_color, 'left')
+        ax[i_ax].tick_params(axis='both', direction='in') #17K28
+
+    if plotpotential:
+        i_ax = 0
+        ax[i_ax].plot(t, V, color=V_color, label=V_label, **spec)
+        ax[i_ax].set_ylabel(V_str)
+        xlim = ax[i_ax-1].get_xlim()
+        ax[i_ax].set_xlim(xlim)
+        colorax(ax[i_ax], V_color, 'left')
+        ax[i_ax].tick_params(axis='both', direction='in') #17K28
+
+    ax[0].set_xlabel(t_str)
+    if plotcurrent or plotpotential:
+        ax[0].xaxis.set_label_position('top')
+        ax[1].set_xlabel(t_str)
+        if tspan is not None and not type(tspan) is str:
+            ax[1].set_xlim(tspan)
+
+    # -------- finishing up -------- #
+    print('\nfunction \'plot_experiment_EC\' finished!\n\n')
+    return ax
 
 def plot_experiment(EC_and_MS,
                     colors=None,
@@ -602,6 +773,17 @@ def plot_experiment(EC_and_MS,
 
     if verbose:
         print('\n\nfunction \'plot_experiment\' at your service!\n Plotting from: ' + name)
+
+
+    if EC_and_MS['data_type'][0:2] == 'EC':
+        ax = plot_experiment_EC(EC_and_MS,
+                    tspan=tspan, verbose=verbose,
+                    RE_vs_RHE=RE_vs_RHE, A_el=A_el, ax=ax,
+                    #mols will overide masses will overide colors
+                    V_color=V_color, J_color=J_color, V_label=V_label, J_label=J_label,
+                    t_str=t_str, J_str=J_str, V_str=V_str,
+                    fig=None, spec={},)
+        return ax
 
     # ----------- prepare the axes on which to plot ------------ #
     if ax == 'new':
