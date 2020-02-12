@@ -1071,7 +1071,7 @@ def import_set(directory, MS_file='QMS.txt', MS_data=None, t_zero='start',
     return data
 
 
-def save_as_text(filename, dataset, cols=[], mols=[], tspan='all', header=None,
+def save_as_text(filename, dataset, cols='all', mols=[], tspan='all', header=None,
                  N_chars=None, timecols={}, **kwargs):
     '''
     kwargs is fed directly to Molecule.get_flux()
@@ -1084,6 +1084,8 @@ def save_as_text(filename, dataset, cols=[], mols=[], tspan='all', header=None,
     elif type(header) is str:
         lines += [header]
 
+    if cols == 'all':
+        cols = list(dataset['data_cols'])
     if N_chars is None:
         N_chars = max([len(col) for col in cols])
 
