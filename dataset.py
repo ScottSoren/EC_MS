@@ -14,7 +14,7 @@ from matplotlib import cm as colormap
 
 from .EC import sync_metadata, make_selector, select_cycles
 from .Data_Importing import load_from_file
-from .Combining import synchronize, cut_dataset
+from .Combining import synchronize, cut_dataset, sort_time
 from .Plotting import plot_experiment, plot_vs_potential
 from .EC import correct_ohmic_drop, CV_difference
 
@@ -85,16 +85,19 @@ class Dataset:
             self.data = get_data_from_file(file_name)
         elif folder is not None:
             # ^ ...or a bunch of files in a folder
+            print('Importing from a folder!!!')
             files = os.listdir() # note, we are already in the folder
             if tag is not None:
                 files = [f for f in files if re.search('^' + tag, f)]
             if file_type is not None:
                 files = [f for f in files if re.search(file_type + '$', f)]
+            print(files) # debugging
             datas = []
             for file in files:
                 data = get_data_from_file(file, verbose=verbose)
                 datas += [data]
             self.data = synchronize(datas, verbose=verbose)
+            sort_time(self.data)
         else:
             print('Warning!!! Please specify file_name and/or folder.' +
                   ' Returning an empty dataset')

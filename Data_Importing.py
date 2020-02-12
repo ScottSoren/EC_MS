@@ -408,6 +408,8 @@ def import_text(full_path_name='current', verbose=True):
         full_path_name = os.getcwd()
 
     [directory_name, file_name] = os.path.split(full_path_name)
+    if directory_name == '':
+        directory_name = '.'
     original_directory = os.getcwd()
     os.chdir(directory_name)
 
@@ -773,6 +775,8 @@ def load_from_file(full_path_name='current', title='file', tstamp=None, timestam
         print('\n\nfunction \'load_from_file\' at your service!\n')
     if title == 'file':
         folder, title = os.path.split(full_path_name)
+    if folder == '':
+        folder = '.'
     file_lines = import_text(full_path_name, verbose)
     dataset = text_to_data(file_lines=file_lines, title=title, data_type=data_type,
                            timestamp=timestamp, tz=tz, tstamp=tstamp,
