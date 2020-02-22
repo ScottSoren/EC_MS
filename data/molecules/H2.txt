@@ -3,7 +3,7 @@ name: H2
 formula: H2
 M	=	2.016
 D	=	4.5e-09
-kH	=	52.0
+kH	=	52.0 # = concentration_g / concentration_l, dimensionless
 sigma_100eV	=	0.969
 spectrum
 	Title: NIST_16L14
@@ -16,57 +16,4 @@ dynamic_viscosity	=	8.900000000000001e-06
 density_RTP	=	0.08988
 D_gas_RTP	=	0.00014900000000000002
 primary: M2
-#the folowing rsf is calculated for M2 on 19B01
-rsf	=	1.55525405996
-#the following F_cal value is for M2, trusted on 19B01
-F_cal	=	7.13367034929
-#the following F_cal value is for M2, extrapolated from trusted values based on RSF from NIST on 19B01
-F_cal	=	7.13367034929
-#the folowing rsf is calculated for M2 on 19B01
-rsf	=	1.55525405996
-#the following F_cal value is for M2, trusted on 19B01
-F_cal	=	7.13367034929
-#the following F_cal value is for M2, extrapolated from trusted values based on RSF from NIST on 19B01
-F_cal	=	7.13367034929
-#the folowing rsf is calculated for M2 on 19B01
-rsf	=	1.55525405996
-#the following F_cal value is for M2, trusted on 19B01
-F_cal	=	7.13367034929
-#the following F_cal value is for M2, extrapolated from trusted values based on RSF from NIST on 19B01
-F_cal	=	7.13367034929
-#the folowing rsf is calculated for M2 on 19B01
-rsf	=	1.55525405996
-#the following F_cal value is for M2, trusted on 19B01
-F_cal	=	7.13367034929
-#the following F_cal value is for M2, extrapolated from trusted values based on RSF from NIST on 19B01
-F_cal	=	7.13367034929
-#the folowing rsf is calculated for M2 on 19B01
-rsf	=	1.55525405996
-#the following F_cal value is for M2, trusted on 19B01
-F_cal	=	7.13367034929
-#the following F_cal value is for M2, extrapolated from trusted values based on RSF from NIST on 19B01
-F_cal	=	7.13367034929
-#the folowing rsf is calculated for M2 on 19B01
-rsf	=	1.55525405996
-#the following F_cal value is for M2, trusted on 19B01
-F_cal	=	7.13367034929
-#the following F_cal value is for M2, extrapolated from trusted values based on RSF from NIST on 19B01
-F_cal	=	7.13367034929
-#the folowing rsf is calculated for M2 on 19B01
-rsf	=	1.55525405996
-#the following F_cal value is for M2, trusted on 19B01
-F_cal	=	7.13367034929
-#the following F_cal value is for M2, extrapolated from trusted values based on RSF from NIST on 19B01
-F_cal	=	7.13367034929
-#the folowing rsf is calculated for M2 on 19B01
-rsf	=	1.55525405996
-#the following F_cal value is for M2, trusted on 19B01
-F_cal	=	7.13367034929
-#the following F_cal value is for M2, extrapolated from trusted values based on RSF from NIST on 19B01
-F_cal	=	7.13367034929
-#the folowing rsf is calculated for M2 on 19B01
-rsf	=	1.55525405996
-#the following F_cal value is for M2, trusted on 19B01
-F_cal	=	7.13367034929
-#the following F_cal value is for M2, extrapolated from trusted values based on RSF from NIST on 19B01
-F_cal	=	7.13367034929
+

@@ -27,6 +27,9 @@ with open(preferencedir + os.sep + 'standard_colors.txt','r') as f:
     standard_colors = lines_to_dictionary(lines)['standard colors']
 
 
+    
+
+
 def rewrite_spectra(NIST_file='default', RSF_file='default', mols='all',
                     writesigma=False, overwrite=False, writespectra=False,
                     writeRSF=False):
@@ -66,7 +69,8 @@ def rewrite_spectra(NIST_file='default', RSF_file='default', mols='all',
                     continue
             masses = []
             rel_vals = []
-            spectrum = {'Title': 'NIST_18D10'}
+            date = date_scott()
+            spectrum = {'Title': 'NIST_' + date}
             for spec in specline.split(' '):
                 (mz, v) = spec.split(',')
                 masses += ['M' + mz]

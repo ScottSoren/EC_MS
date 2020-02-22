@@ -4,14 +4,30 @@ Created on Tue Nov  1 22:28 2016
 
 @author: scott
 
+[
+     20B14:
+    This module basically implements my own version of JSON, which I did not
+    know about when I wrote it. It is in ToDo.txt to change uses of Object_Files
+    to uses of JSON. 
+    Because:
+        
+Simple is better than complex.
+There should be one-- and preferably only one --obvious way to do it.
+Special cases aren't special enough to break the rules.
+If the implementation is hard to explain, it's a bad idea.
+    ]
+
 This module provides badass functions for coordinating between complex
 objects and easily readable files. The compromise for so awesome a toolbox
 is that the tools themselves aren't easily readible. Good luck!
 
+
+
+
 """
 
 from __future__ import print_function, division
-import re
+import os, re
 import datetime
 
 
@@ -109,6 +125,7 @@ def structure_to_lines(structure, nest=0, indent='\t', toplevel=False,
 
 def dictionary_to_lines(dictionary, indent='\t'):
     return structure_to_lines(dictionary, toplevel=True)
+
 
 
 def grouped_lines_to_structure(lines, indent='\t'):
@@ -294,29 +311,58 @@ def date_scott(date='today')  :
 
 
 
-if __name__ == '__main__':
-    from Molecules import Molecule
-    #make an 'H2' molecule from the data file
-    a = Molecule('H2')
-    a.birthday = date_scott() #today is it's birthday!
-    a.mood = 'Happy'    #make it happy
-    #write everything about the happy H2 molecule to a file
-    f = open('data/test.txt', 'w')
-    attributes_to_file(f, a)
-    f.close()
-    #make a CO2 molecule from the data file...
-    b = Molecule('CO2')
-    print(b.name)
-    #... and confuse the shit out it!
-    f = open('data/test.txt', 'r')
-    file_to_attributes(f, b) #its attributes are reset with the H2 data
-    f.close()
-    print(b.name) #now it thinks it's H2.
-    print(b.__str__) #but deep down it's not
-    print(b.mood) #At least it's happy!
-    b.reset()
-    print(b.name) #and now it's back to normal.
+def write_to_file(self, a=None, attr=None, data_directory='./data', *args, **kwargs):
+        '''
 
+        this is supposed to be a versitile tool for writing to the Molecule's
+        data file. Whether the added intricacy will be worth the lines of code
+        it saves, I can't tell yet.
+
+        Writes in one of the following ways:
+
+        1. If the name of an attribute is given, that attribute is written.
+        2. If a is a string, simply write a to the molecule's datafile.
+        3. If a is a function, then it's a function that writes what you want
+           to the data file given in the first argument
+        4. If a is a dictionary, list, or tuple, convert it to lines according to
+           the system encoded in Object_Files.
+        5. If a is not given but keyword arguments are, write **kwargs to the
+           data file according to the system encoded in Object_Files.
+        '''
+
+
+        if attr is not None:
+            a = (attr, getattr(self, attr))
+        elif a is None:
+            if len(kwargs) == 0:
+                print('nothing to write.')
+                return
+            else:
+                a = kwargs
+
+        cwd = os.getcwd()
+        os.chdir(data_directory)
+        file_name = self.name + '.txt'
+
+        with open(file_name, 'a') as f:
+            if callable(a):
+                a(f, *args, **kwargs)
+            elif type(a) is str:
+                if a[-1] != '\n':
+                    a += '\n'
+                f.write(a)
+            elif type(a) in (list, dict):
+                if 'key' in kwargs.keys():
+                    lines = structure_to_lines(a, preamble=kwargs['key'])
+                else:
+                    lines = structure_to_lines(a)
+                f.writelines(lines)
+            elif type(a) is tuple:
+                lines = structure_to_lines(a[1], preamble=a[0])
+                f.writelines(lines)
+            else:
+                print('Couldn''t write ' + str(a))
+        os.chdir(cwd)
 
 
 

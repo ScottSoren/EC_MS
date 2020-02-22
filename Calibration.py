@@ -757,9 +757,14 @@ def load_calibration_results(f, verbose=True):
         except FileNotFoundError:  # this happens if any molecule names were changed
             try:
                 m = Molecule(result['real_name'], verbose=verbose)
-                m.name = mol
             except (KeyError, FileNotFoundError):
+                print("... neither anything for the molecule's 'real_name'." +
+                      " Just returning what was in the pickle.")
                 m = result
+            else:
+                print("awesome! Managed to load Molecule from result['real_name'] = " +
+                      result['real_name'] + " instead")
+                m.name = mol
         for attr, value in result.items():
             setattr(m, attr, value)
         mdict[mol] = m

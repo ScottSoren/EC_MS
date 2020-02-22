@@ -1,0 +1,27 @@
+##TITLE=Hydrogen sulfide
+##JCAMP-DX=4.24
+##DATA TYPE=MASS SPECTRUM
+##OWNER=NIST Mass Spectrometry Data Center
+Collection (C) 2014 copyright by the U.S. Secretary of Commerce
+on behalf of the United States of America. All rights reserved.
+##CAS REGISTRY NO=7783-06-4
+##$NIST MASS SPEC NO=43
+##MOLFORM=H2 S
+##MW=34
+##$NIST SOURCE=MSDC
+##XUNITS=M/Z
+##YUNITS=RELATIVE INTENSITY
+##XFACTOR=1
+##YFACTOR=1
+##FIRSTX=32
+##LASTX=36
+##FIRSTY=4444
+##MAXX=36
+##MINX=32
+##MAXY=9999
+##MINY=250
+##NPOINTS=5
+##PEAK TABLE=(XY..XY)
+32,4444 33,4204 34,9999 35,250
+36,420
+##END=

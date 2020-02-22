@@ -15,16 +15,12 @@ import os
 import numpy as np
 from matplotlib import pyplot as plt
 from numbers import Number
+from functools import wraps
 
-if os.path.split(os.getcwd())[1] == 'EC_MS':
-                                #then we're running from inside the package
-    import Chem
-    from Object_Files import structure_to_lines, lines_to_dictionary
-    from Object_Files import lines_to_structure, date_scott, update_lines
-else:
-    from . import Chem
-    from .Object_Files import structure_to_lines, lines_to_dictionary
-    from .Object_Files import lines_to_structure, date_scott, update_lines
+from . import Chem
+from .Object_Files import structure_to_lines, lines_to_dictionary, write_to_file
+from .Object_Files import lines_to_structure, date_scott, update_lines
+from .MS import get_NIST_spectrum
 
 
 preferencedir = os.path.dirname(os.path.realpath(__file__)) + os.sep + 'preferences'
@@ -38,6 +34,7 @@ try:
     FileNotFoundError
 except NameError:
     FileNotFoundError = IOError
+MoleculeError = FileNotFoundError
 
 class Molecule:
     '''
@@ -63,30 +60,32 @@ class Molecule:
         try:
             with open(file_name,'r') as f:
                 self.file_lines = f.readlines()
-                if len(self.file_lines) == 0:
-                    print('The file for ' + name + ' is empty!')
-            self.reset(verbose=verbose)
-            self.file_lines = ['name: ' + self.name] + self.file_lines
         except FileNotFoundError: # I don't know the name of the error, so I'll have to actually try it first.
             os.chdir(cwd)
-            raise
-            print('no file found for ' + name)
-            if writenew:
-                string = input('Start new data file for \'' + self.name + '\'? (y/n)\n')
-                if string == 'n':
-                    return None
-                print('Writing new.\n')
-                self.write(self.write_new)
-            else:
-                string = input('Start Molecule object \'' + self.name + '\' from scratch? (y/n)')
-                if string == 'n':
-                    return None
+            print('Warning!!! No file found for Molecule ' + self.name)
+            self.has_file = False
+        else:
+            self.has_file = True
+            if len(self.file_lines) == 0:
+                print('The file for ' + name + ' is empty!')
+                raise MoleculeError
+            self.reset(verbose=verbose)
+            self.file_lines = ['name: ' + self.name] + self.file_lines
+       
         os.chdir(cwd)
 
         if self.formula is None:
             self.attr_status['formula'] = 0 #so that it asks me for a formula when initializing the file.
             self.attr_status['M'] = 0
             self.formula = name #but just put the name for now.
+        try:
+            self.spectrum = self.get_spectrum()
+        except MoleculeError:
+            print('Warning: __init__ function of Molecule ' + name + ' could not find spectrum()!!!')
+            if not self.has_file:
+                raise
+        if not self.has_file:
+            print('\n--- ' + self.name + ': Returning a Molecule object with only the spectrum --- \n')
 
         print('name = ' + str(self.name) + ' , formula = ' + str(self.formula)) # debugging
         self.M = Chem.get_mass(self.formula)
@@ -94,68 +93,17 @@ class Molecule:
             print('WARNING: could not get molecular mass for ' + self.name + ' !!!')
 
         if not hasattr(self, 'molecule_mass'):
-            print('setting self.molecule_mass from self.M!') # debugging
+            #print('setting self.molecule_mass from self.M!') # debugging
             self.molecule_mass = self.M * Chem.amu
-            print('molecule_mass = ' + str(self.molecule_mass))
+            #print('molecule_mass = ' + str(self.molecule_mass)) # debugging
 
         self.transmission_function = None
         #self.color = self.get_color()
 
 
-    def write(self, a=None, attr=None, *args, **kwargs):
-        '''
-
-        ... could move this to Object_Files, but a bit tricky
-
-        this is supposed to be a versitile tool for writing to the Molecule's
-        data file. Whether the added intricacy will be worth the lines of code
-        it saves, I can't tell yet.
-
-        Writes in one of the following ways:
-
-        1. If the name of an attribute is given, that attribute is written.
-        2. If a is a string, simply write a to the molecule's datafile.
-        3. If a is a function, then it's a function that writes what you want
-           to the data file given in the first argument
-        4. If a is a dictionary, list, or tuple, convert it to lines according to
-           the system encoded in Object_Files.
-        5. If a is not given but keyword arguments are, write **kwargs to the
-           data file according to the system encoded in Object_Files.
-        '''
-
-
-        if attr is not None:
-            a = (attr, getattr(self, attr))
-        elif a is None:
-            if len(kwargs) == 0:
-                print('nothing to write.')
-                return
-            else:
-                a = kwargs
-
-        cwd = os.getcwd()
-        os.chdir(data_directory)
-        file_name = self.name + '.txt'
-
-        with open(file_name, 'a') as f:
-            if callable(a):
-                a(f, *args, **kwargs)
-            elif type(a) is str:
-                if a[-1] != '\n':
-                    a += '\n'
-                f.write(a)
-            elif type(a) in (list, dict):
-                if 'key' in kwargs.keys():
-                    lines = structure_to_lines(a, preamble=kwargs['key'])
-                else:
-                    lines = structure_to_lines(a)
-                f.writelines(lines)
-            elif type(a) is tuple:
-                lines = structure_to_lines(a[1], preamble=a[0])
-                f.writelines(lines)
-            else:
-                print('Couldn''t write ' + str(a))
-        os.chdir(cwd)
+    @wraps(write_to_file)
+    def write(self, a=None, attr=None, data_directory=data_directory, *args, **kwargs):
+        return write_to_file(self, a=None, attr=None, data_directory=data_directory, *args, **kwargs)
 
 
     def rewrite(self, file='default'):
@@ -236,6 +184,20 @@ class Molecule:
           #  else:
           #      f.write(attr + '\t=\t' + str(self.attr) + '\n') #not necessary...
 
+
+    def get_spectrum(self):
+        if hasattr(self, 'spectrum'):
+            return self.spectrum
+        else: # that must mean there's no spectrum in the molecule's data file :(
+            # try and get the spectrum from the data.
+            try:
+                spectrum = get_NIST_spectrum(self)
+            except:
+                print('WARNING!!! Could not get spectrum for ' + self.real_name)
+                raise #MoleculeError('no spectrum for ' + self.real_name)
+            else:
+                return spectrum
+
     def get_RSF(self, RSF_source='NIST', mass='primary',
                 transmission_function=None, verbose=True):
         '''
@@ -314,12 +276,14 @@ class Molecule:
         return self.RSF[mass]
 
     def plot_spectrum(self, top=100, offset=0, width=0.5, ax='new',
-                      color='k', spec={}):
+                      color=None, spec={}):
         if ax == 'new':
             fig1 = plt.figure()
             ax = fig1.add_subplot(111)
         x = []
         y = []
+        if color is None:
+            color = self.get_color()
         for (mass, value) in self.spectrum.items():
             if mass == 'Title':
                 continue
@@ -327,7 +291,11 @@ class Molecule:
             y += [value]
         y = np.array(y) / max(y) * top
         x = np.array(x)
-        ax.bar(x+offset, y, width=width, color=color, **spec)
+        ax.bar(x+offset, y, 
+               width=width,
+               color=color, 
+               label=self.name,
+               **spec)
         ax.set_xticks(x)
         ax.set_xticklabels([str(m) for m in x])
         ax.set_title('literature QMS spectrum for ' + self.name)
@@ -750,9 +718,3 @@ def add_script_to_datafiles(path, file_name, attrs='all', mdict={}, mols='all'):
         mdict = add_to_datafiles(newvar, d, mdict, mols=mols)
 
 
-
-
-if __name__ == '__main__':
-
-
-    pass
