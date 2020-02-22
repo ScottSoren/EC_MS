@@ -499,7 +499,10 @@ def plot_signal(MS_data, spec={},
         try:
             name = MS_data['name']
         except KeyError:
-            name = MS_data['title']
+            try:
+                name = MS_data['title']
+            except KeyError:
+                name = ''
     if verbose:
         print('\n\nfunction \'plot_signal\' at your service! \n Plotting from: ' + name)
 
@@ -769,13 +772,17 @@ def plot_experiment(EC_and_MS,
         try:
             name = EC_and_MS['name']
         except KeyError:
-            name = EC_and_MS['title']
+            try:
+                name = EC_and_MS['title']
+            except KeyError:
+                name = ''
+
 
     if verbose:
         print('\n\nfunction \'plot_experiment\' at your service!\n Plotting from: ' + name)
 
 
-    if EC_and_MS['data_type'][0:2] == 'EC':
+    if 'data_type' in EC_and_MS and EC_and_MS['data_type'][0:2] == 'EC':
         ax = plot_experiment_EC(EC_and_MS,
                     tspan=tspan, verbose=verbose,
                     RE_vs_RHE=RE_vs_RHE, A_el=A_el, ax=ax,

@@ -598,6 +598,9 @@ def sync_metadata(data, RE_vs_RHE=None, A_el=None,
 
     # This is an excelent place to make old pickled data sets back-compatible
     # with new changes (i.e. data_cols is now a set) !
+    if not 'data_cols' in data:
+        print('WARNING!!! no data_cols in data. sync_metadata will make a sparsely populated one.')
+        data['data_cols'] = set()
     if type(data['data_cols']) is list:
         data['data_cols'] = set(data['data_cols'])
 
