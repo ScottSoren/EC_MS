@@ -13,7 +13,7 @@ from scipy.optimize import curve_fit
 
 
 from .Molecules import Molecule
-from .Combining import cut
+from .Combining import cut, get_cols_for_mass
 from .Object_Files import lines_to_dictionary, date_scott
 from .EC import sync_metadata
 from . import Chem
@@ -27,7 +27,7 @@ with open(preferencedir + os.sep + 'standard_colors.txt','r') as f:
     standard_colors = lines_to_dictionary(lines)['standard colors']
 
 
-    
+
 
 
 def rewrite_spectra(NIST_file='default', RSF_file='default', mols='all',
@@ -414,8 +414,9 @@ def get_signal(MS_data, mass, tspan=None,
     if verbose:
         print('geting signal for ' + mass)
 
-    x = MS_data[mass + '-x']
-    y = MS_data[mass + '-y']
+    xcol, ycol = get_cols_for_mass(mass, MS_data)
+    x = MS_data[xcol]
+    y = MS_data[ycol]
 
     if len(x) == 0:
         print('WARNIGN: no data for ' + mass)
@@ -542,9 +543,17 @@ def get_current(EC_data, tspan='tspan', unit='A', verbose=False):
     if '/' in unit: #then it's normalized in some way
         t, j = EC_data[t_str], EC_data[J_str]
     else:   # Then you want the raw current data
-        t, j = EC_data[t_str], EC_data[EC_data['I_str']]
+        try:
+            I_str = EC_data['I_str']
+        except KeyError:
+            I_str = 'I/mA'
+        t, j = EC_data[t_str], EC_data[I_str]
         if unit == 'A':
             j = j * 1e-3
+
+    if unit == 'A/m^2': # SI units
+        j = j * 10 # mA/cm^2 --> A/m^2
+
 
     print('Scott has not yet done something smart for current units. If you try' +
           ' anything unusual it will likely mess up!')

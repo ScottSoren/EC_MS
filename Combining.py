@@ -542,7 +542,7 @@ def synchronize(data_objects, t_zero=None, append=None, file_number_type=None,
                 print('copying Ewe/V to <Ewe>/V to keep the latter the right length.')
             else:
                 filler = np.array([0] * (l0 - l1))
-            print('Filling column ' + col + ' to keep in line with timecol ' + timecol + '!!!') # debugging
+            #print('Filling column ' + col + ' to keep in line with timecol ' + timecol + '!!!') # debugging
 
             combined_data[col] = np.append(combined_data[col], filler)
 
@@ -948,6 +948,20 @@ def get_type(col, dataset=None):
     print('WARNING: ' + col + ' is not recognized. Assuming type \'EC\'.\n ' +
                       ' Consider adding to EC_cols_0 in EC.py if so.')
     return 'EC' #'Xray' # to be refined later...
+
+
+def get_cols_for_mass(mass, dataset=None):
+    '''
+    Eventually this might make the 'rename_<format>_cols' functions obsolete.
+    '''
+    if dataset is None:
+        xcol, ycol = mass + '-x', mass + '-y'
+    elif 'mass_cols' in dataset:
+        xcol, ycol = dataset['mass_cols'][mass]
+    else:
+        ycol = mass + '-y'
+        xcol = get_timecol(ycol, dataset)
+    return xcol, ycol
 
 def get_timecol(col=None, dataset=None, data_type=None, verbose=False):
     if dataset is not None and 'timecols' in dataset and col in dataset['timecols']:

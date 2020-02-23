@@ -77,16 +77,17 @@ def plot_EC_vs_t(data, t_str='time/s', J_str=None, V_str=None,
 
 
 def plot_vs_potential(CV_and_MS_0,
-                      colors={'M2':'b','M4':'m','M18':'y','M28':'0.5','M32':'k'},
+                      colors=None,
                       tspan=None, RE_vs_RHE=None, A_el=None, cycles='all',
                       ax1='new', ax2='new', ax=None, #spec='k-',
-                      overlay=0, logplot=False, leg=False,
+                      overlay=0, logplot=True, leg=False,
                       verbose=True,
-                      removebackground=None, background=None, t_bg=None, endpoints=3,
-                      masses=None, masses_left=None, masses_right=None,
+                      removebackground=False, background=None, t_bg=None, endpoints=3,
+                      masses='all', masses_left=None, masses_right=None,
                       mols=None, mols_left=None, mols_right=None,
                       unit=None, smooth_points=0,
                       emphasis='ms',
+                      hspace=0.1, left_space=0.15, right_space=0.95, # for gridspec
                       J_str=None, V_str=None,
                       fig=None, spec={}, t_str=None,
                       **kwargs):
@@ -108,7 +109,7 @@ def plot_vs_potential(CV_and_MS_0,
 
     #prepare axes. This is ridiculous, by the way.
     CV_and_MS = CV_and_MS_0.copy() #17C01
-    if CV_and_MS['data_type'][0:2] == 'EC':
+    if 'data_type' in CV_and_MS and CV_and_MS['data_type'][0:2] == 'EC':
         ax = plot_vs_potential_EC(data=CV_and_MS,
                       tspan=tspan, RE_vs_RHE=RE_vs_RHE, A_el=A_el,
                       cycles='all', ax=ax, #spec='k-',
@@ -159,6 +160,8 @@ def plot_vs_potential(CV_and_MS_0,
                 #gs.update(hspace=0.025)
                 ax1 = plt.subplot(gs[0:4, 0])
                 ax2 = plt.subplot(gs[4:8, 0])
+            gs.update(hspace=hspace, left=left_space, right=right_space)
+
     if type(logplot) is int:
         logplot = [logplot,logplot]
     if logplot[0]:
@@ -252,6 +255,11 @@ def plot_vs_potential(CV_and_MS_0,
         else:
             quantified = True
             mols = colors
+
+        if not quantified and masses=='all':        # this is now the default!
+            masses = [key[:-2] for key in CV_and_MS.keys() if key[0]=='M' and key[-2:]=='-y']
+            colors_left = masses
+
         if (colors_left is not None and type(colors_left) is not list
             and type(colors_left) is not dict):
             colors_left = [colors_left]
@@ -259,6 +267,7 @@ def plot_vs_potential(CV_and_MS_0,
             and type(colors_right) is not dict):
             colors_right = [colors_right]
 #        print(type(colors))
+
 
         if unit is None:
             if quantified:
@@ -745,7 +754,8 @@ def plot_experiment_EC(data,
 
 def plot_experiment(EC_and_MS,
                     colors=None,
-                    tspan=None, overlay=False, logplot=[True,False], verbose=True,
+                    tspan=None, tspan_EC=None,
+                    overlay=False, logplot=[True,False], verbose=True,
                     plotpotential=True, plotcurrent=True, ax='new', emphasis='ms',
                     RE_vs_RHE=None, A_el=None,
                     removebackground=None, background=None, endpoints=5, t_bg=None,
@@ -757,6 +767,7 @@ def plot_experiment(EC_and_MS,
                     t_str=None, J_str=None, V_str=None,
                     fig=None, return_fig=False, smooth_points=0,
                     override=False, spec={},
+                    hspace=0.1, left_space=0.15, right_space=0.85, # for gridspec
                     ):
     '''
     TODO: write proper documentation!
@@ -828,6 +839,7 @@ def plot_experiment(EC_and_MS,
                 ax += [ax[1].twinx()]
                 ax[1].set_zorder(ax[2].get_zorder()+1) #doesn't work
                 ax[1].patch.set_visible(False) # hide the 'canvas'
+            gs.update(hspace=hspace, left=left_space, right=right_space)
 
     # --------- get tspan, V_str, and J_str from input and/or dataset -------- #
     if tspan is None:                  #then use the range of overlap
@@ -981,8 +993,10 @@ def plot_experiment(EC_and_MS,
 
 
     # -------- cut the electrochemistry data according to tspan ------ #
-    if type(tspan) is not str and (plotcurrent or plotpotential):
-        mask = np.logical_and(tspan[0]<t, t<tspan[-1])
+    if tspan_EC is None:
+        tspan_EC = tspan
+    if type(tspan_EC) is not str and (plotcurrent or plotpotential):
+        mask = np.logical_and(tspan_EC[0]<t, t<tspan_EC[-1])
         t = t[mask]
         #print(np.where(mask)) #debugging
         if plotpotential:

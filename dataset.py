@@ -15,7 +15,7 @@ from matplotlib import cm as colormap
 from .EC import sync_metadata, make_selector, select_cycles
 from .Data_Importing import load_from_file
 from .Combining import synchronize, cut_dataset, sort_time, get_timecol
-from .Plotting import plot_experiment, plot_vs_potential
+from .Plotting import plot_experiment, plot_vs_potential, plot_flux
 from .EC import correct_ohmic_drop, CV_difference
 from .Quantification import get_current, get_signal, get_potential
 
@@ -132,7 +132,8 @@ class Dataset:
             return self.data[self.V_str]
         elif attr == 'j':
             return self.data[self.J_str]
-
+        elif attr == 'data':
+            raise AttributeError('Dataset has no attribute ' + attr)
         try:
             print('getting attribute ' + attr + ' from self.data') # debugging
             #a = b # debugging
@@ -225,6 +226,10 @@ class Dataset:
     def plot_experiment(self, *args, **kwargs):
         return plot_experiment(self.data, *args, **kwargs)
 
+    @wraps(plot_flux)
+    def plot_flux(self, *args, **kwargs):
+        return plot_flux(self.data, *args, **kwargs)
+
     @wraps(plot_vs_potential)
     def plot_vs_potential(self, *args, **kwargs):
         return plot_vs_potential(self.data, *args, **kwargs)
@@ -251,6 +256,7 @@ class Dataset:
         except AttributeError:
             print('WARNING!!! first argument to dataset.get_flux must be an object of class EC_MS.Molecule.')
             raise TypeError
+
 
     # ... yes, there is! Just equate the function. If the getitem and getattr of
     # Dataset work as well as I hope, the function won't notice it's getting
@@ -305,8 +311,9 @@ class CyclicVoltammagram(Dataset):
 
         if type(dataset) is dict:
             dataset = Dataset(dataset)
-        elif hasattr(dataset, 'type'):
-            if dataset.type == 'Dataset':
+
+        if hasattr(dataset, 'type'):
+            if dataset.type in ['Dataset', 'Cyclic Voltammagram']:
                 if len(args)>0 or len(kwargs)>0:
                     kwargs.update(verbose=False)
                     dataset = dataset.cut(*args, **kwargs)
@@ -444,14 +451,16 @@ class CyclicVoltammagram(Dataset):
             #print(the_masks[sweep_index][i_finish:]) # debugging
             i_start = i_finish + I_out + min_sweep_points
             # can't start a new sweep until you've been out of the current sweep for at least min_sweep_points
-            if i_start >= N:
-                break
 
-            I_in_again = np.argmax(the_masks[sweep_index][i_start:])
-            #print(the_masks[sweep_index][i_start:]) # debugging
-            # ^ check how long until the next sweep of that type starts
-            the_next_starts[sweep_index] = i_start + I_in_again
-            # ^ and add it.
+            try:
+                I_in_again = np.argmax(the_masks[sweep_index][i_start:])
+            except ValueError:
+                the_next_starts[sweep_index] = N
+            else:
+                #print(the_masks[sweep_index][i_start:]) # debugging
+                # ^ check how long until the next sweep of that type starts
+                the_next_starts[sweep_index] = i_start + I_in_again
+                # ^ and add it.
 
             next_sweep_index = np.argmin(the_next_starts)
             i_finish = the_next_starts[next_sweep_index]
@@ -642,6 +651,7 @@ class CyclicVoltammagram(Dataset):
                     diff.append_to_data_col(col, y_diff, col_type='EC')  # make it all bloody EC
 
         diff['tspan'] = [diff[t_str][0], diff[t_str][-1]]
+        diff = CyclicVoltammagram(diff)
 
         print('\nfunction CyclicVoltammagram.subtract finished!\n\n')
         return diff
@@ -690,7 +700,9 @@ class CyclicVoltammagram(Dataset):
         return average_cv
 
 
-
+    def cut(self, *args, **kwargs):
+        dataset = super(CyclicVoltammagram, self).cut(*args, **kwargs)
+        return CyclicVoltammagram(dataset)
 
 
 

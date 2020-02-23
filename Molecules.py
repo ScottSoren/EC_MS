@@ -20,6 +20,7 @@ from functools import wraps
 from . import Chem
 from .Object_Files import structure_to_lines, lines_to_dictionary, write_to_file
 from .Object_Files import lines_to_structure, date_scott, update_lines
+from .Combining import get_cols_for_mass
 from .MS import get_NIST_spectrum
 
 
@@ -71,7 +72,7 @@ class Molecule:
                 raise MoleculeError
             self.reset(verbose=verbose)
             self.file_lines = ['name: ' + self.name] + self.file_lines
-       
+
         os.chdir(cwd)
 
         if self.formula is None:
@@ -291,9 +292,9 @@ class Molecule:
             y += [value]
         y = np.array(y) / max(y) * top
         x = np.array(x)
-        ax.bar(x+offset, y, 
+        ax.bar(x+offset, y,
                width=width,
-               color=color, 
+               color=color,
                label=self.name,
                **spec)
         ax.set_xticks(x)
@@ -531,7 +532,8 @@ class Molecule:
 
         if x is None:
             if density is None:
-                x = MS_data[self.primary + '-x']
+                xcol, ycol = get_cols_for_mass(self.primary, MS_data)
+                x = MS_data[xcol]
                 if not tspan == 'all':
                     mask = np.logical_and(tspan[0]<x, x<tspan[-1])
                     # Don't cut off outer endpoints before evt interpolation (if used by plot_vs_potential)
@@ -545,8 +547,9 @@ class Molecule:
 
         y = 0
         for mass, C in cal_mat.items():
-            x0 = MS_data[mass + '-x']
-            s0 = MS_data[mass + '-y']
+            xcol, ycol = get_cols_for_mass(mass, MS_data)
+            x0 = MS_data[xcol]
+            s0 = MS_data[ycol]
             s = np.interp(x, x0, s0)
             y += s * C # units: [A] * [mol/C] = [mol/s]
 
