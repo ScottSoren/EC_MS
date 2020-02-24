@@ -11,12 +11,14 @@ import numpy as np
 
 float_match = '[-]?\d+[\.]?\d*(e[-]?\d+)?'     #matches floats like '-3.5e4' or '7' or '245.13' or '1e-15'
 #note, no white space included on the ends! Seems to work fine.
-timestamp_match = '([0-9]{2}:){2}[0-9]{2}'     #matches timestamps like '14:23:01'
+timestamp_match = '([0-9]{2}[:_]){2}[0-9]{2}'      #matches timestamps like '14:23:01' or '15_42_15'
+date_match = '([0-9]{2}[/\-\.]){2}[0-9]{4}'     #matches dates like '01/15/2018' or '09-07-2016' or '04.20.2019'
+date_match_2 = '[0-9]{4}([/-][0-9]{2}){2}'      #matches dates like '2018/01/15' or '2018-09-07'
 
 def numerize(data):
     for col in data['data_cols']: #numerize!
         data[col] = np.array(data[col])
-
+ 
 def get_empty_set(cols, **kwargs):
         #get the colheaders and make space for data
         # cols should be a set
@@ -41,8 +43,6 @@ def parse_timezone(tz=None):
         return tz
 
 def parse_date(line):
-    date_match = '([0-9]{2}[/\-\.]){2}[0-9]{4}'
-    # ^ matches dates like '01/15/2018' or '09-07-2016' or '04.20.2019'. Saw that last one in Degenhart's EC-Lab data
     #^  mm/dd/yyyy, as EC lab does
     # older EC-Lab seems to have dashes in date, and newer has slashes.
     # Both seem to save month before day, regardless of where the data was taken or .mpt exported.
@@ -53,7 +53,6 @@ def parse_date(line):
         date = yyyy + '/' + mm + '/' + dd
         return date
 
-    date_match_2 = '[0-9]{4}([/-][0-9]{2}){2}'          #matches dates like '2018/01/15' or '2018-09-07'
     #^  yyyy/mm/dd, as cinfdata does
     d2 = re.search(date_match_2, line)
     if d2:
@@ -62,11 +61,13 @@ def parse_date(line):
         date = yyyy + '/' + mm + '/' + dd
         return date
 
+    # shit, some dates are written in long form. This'll be a tough RE exercise. Here we go!
+    # I want to match dates like 'Apr. 12, 2019' or 'August 1, 2019'
     month_names = {'01':'January', '02':'February', '03':'March', '04':'April',
                    '05':'May', '06':'June', '07':'July', '08':'August',
                    '09':'September', '10':'October', '11':'November', '12':'December'}
     month_match = '(' + ''.join(list([v[:3] + '|' for v in month_names.values()]))[:-1] + ')' + '[a-z]*(\.)?'
-    date_match_3 = month_match + ' [0-9]+, [0-9]{4}'    #matches dates like 'Apr. 12, 2019' or 'August 1, 2019'
+    date_match_3 = month_match + ' [0-9]+, [0-9]{4}'    
     d3 = re.search(date_match_3, line)
     if d3:
         date3 = d3.group()
@@ -111,13 +112,13 @@ def timestring_to_epoch_time(timestring, date=None, tz=None, verbose=True,
 
     elif type(timestring) is not str:
         if verbose:
-            print('timestamp_to_unix_time\' didn\'t receive a string. ' +
-                  'Received:\n' + str(timestring) + ' \nReturning the argument.')
+            print('WARNING: \'timestamp_to_unix_time\' didn\'t receive a string. ' +
+                  'Received: ' + str(timestring) + ' . Returning the argument.')
         return timestring
 
     if len(timestring) > 8:
         try:
-           # print(timestring) # debugging
+            #print(timestring) # debugging
             timestamp = re.search(timestamp_match, timestring).group()
             hh = int(timestamp[0:2])
             if 'PM' in timestring and not hh==12:
@@ -131,6 +132,10 @@ def timestring_to_epoch_time(timestring, date=None, tz=None, verbose=True,
                       'when you say ' + timestamp + '. It didn\'t match \.' +
                       timestamp_match + '\'. Assuming you want 00:00:00')
             timestamp = '00:00:00'
+        if '_' in timestamp:
+            timestamp = timestamp.replace('_', ':') #otherwise time.strptime below crashes.
+        if verbose:
+            print('found timestamp = ' + timestamp)
     else:
         timestamp = timestring
 
@@ -784,8 +789,12 @@ def load_from_file(full_path_name='current', title='file', tstamp=None, timestam
     if tstamp is not None: #then it overrides whatever text_to_data came up with.
         dataset['tstamp'] = tstamp
     elif dataset['tstamp'] is None:
-        print('WARNING: no tstamp found in ' + full_path_name + '. Using file timestamp.')
-        dataset['tstamp'] = get_creation_time(full_path_name, verbose=verbose)
+        print('WARNING: no tstamp found in ' + full_path_name + '. Looking in file name.')
+        tstamp = timestring_to_epoch_time(full_path_name)
+        if tstamp is None: 
+            print('WARNING: no tstamp found in ' + full_path_name + ' file name either. Using file creation time.')
+            tstamp = get_creation_time(full_path_name, verbose=verbose)
+        dataset['tstamp'] = tstamp
     if 'data_cols' not in dataset or len(dataset['data_cols']) == 0:
         print('WARNING! empty dataset')
         dataset['empty'] = True

@@ -283,7 +283,7 @@ def carrier_gas_cal(dataset=None, #if signal not given, reads average from datas
 air_composition = {'N2':0.7808, 'O2':0.2095, 'Ar':0.0093, 'CO2':0.000412}
 
 def chip_calibration(data, mol='O2', F_cal=None, primary=None, tspan=None,
-                     tspan_bg=None, gas='air', composition=None, chip='SI-3iv1'):
+                     tspan_bg=None, t_bg=None, gas='air', composition=None, chip='SI-3iv1'):
     '''
     Returns obect of class EC_MS.Chip, given data for a given gas (typically air) for which
     one component (typically O2 at M32) has a trusted calibration. The chip object
@@ -305,6 +305,8 @@ def chip_calibration(data, mol='O2', F_cal=None, primary=None, tspan=None,
         composition = air_composition[mol]
 
     x, y = m.get_flux(data, tspan=tspan, unit='mol/s')
+    if tspan_bg is None and t_bg is not None:
+        tspan_bg = t_bg
     if tspan_bg is not None:
         x_bg, y_bg = m.get_flux(data, tspan=tspan_bg, unit='mol/s')
         y0 = np.mean(y_bg)
@@ -322,9 +324,10 @@ def chip_calibration(data, mol='O2', F_cal=None, primary=None, tspan=None,
     return chip
 
 
-def point_calibration(data, mol, mass='primary', cal_type='internal',
+def point_calibration(data, mol, mass='primary', cal_type=None,
                       tspan=None, n_el=None, tail=0, t_bg=None, tspan_bg=None,
-                      chip=None, composition=None, carrier=None,
+                      chip=None, composition=None, gas=None, carrier=None,
+                      verbose=True,
                       ):
     '''
     Returns a molecule object calibrated based in one of the following ways.
@@ -334,15 +337,26 @@ def point_calibration(data, mol, mass='primary', cal_type='internal',
     extrapolated point if len(tspan)==1. Same for current for internal cal.
     For external calibration,
     '''
-
+    if verbose:
+        print('\n\nfunction point_calibration at your service!\n')
     m = Molecule(mol)
     if mass == 'primary':
         mass = m.primary
+    if carrier is None and gas is not None:
+        carrier = gas
     if composition is None:
         if carrier==mol or carrier is None:
             composition = 1
         elif carrier == 'air':
             composition = air_composition[mol]
+    
+    if cal_type is None:
+        if n_el is None:
+            print('n_el not given! assuming calibration is external.')
+            cal_type = 'external'
+        else:
+            print('n_el given! assuming calibration is internal.')
+            cal_type = 'internal'
 
     #get average signal
     if tspan is None:
@@ -392,12 +406,16 @@ def point_calibration(data, mol, mass='primary', cal_type='internal',
 
     print('point_calibration() results: S = ' + str(S) + ' , n = ' + str(n) +
           ', F_cal = ' + str(F_cal))
+    
+    if verbose:
+        print('\nfunction point_calibration finished!\n\n')
 
     return m
 
 
 
 def calibration_curve(data, mol, mass='primary', n_el=-2,
+                      name=None,
                       cycles=None, cycle_str='selector',
                       mode='average', t_int=15, t_tail=30, t_pre=15,
                       t_i=None, t_f=None,
@@ -632,6 +650,8 @@ def calibration_curve(data, mol, mass='primary', n_el=-2,
                 J = I * 1e3
             J_bg = np.zeros(J.shape)
             ax1[2].fill_between(t, J, J_bg, color=J_color, alpha=0.5)
+            if name is not None:
+                ax1[0].set_title(name)
 
         ns += [n]
         Ys += [Y]
@@ -678,6 +698,9 @@ def calibration_curve(data, mol, mass='primary', n_el=-2,
         else:
             ax2a.set_ylabel('$\Delta$Q/(' + str(n_el) + '$\mathcal{F}$) / ' + unit + 'mol')
             ax2b.set_ylabel(mass + 'signal / ' + unit + 'C')
+        if name is not None:
+            ax2a.set_title(name)
+            ax2b.set_title(name)
         colorax(ax2b, color)
         colorax(ax2a, J_color)
         #align_zero(ax2a, ax2b)
@@ -700,6 +723,8 @@ def calibration_curve(data, mol, mass='primary', n_el=-2,
         else:
             ax2c.set_xlabel('$\Delta$Q/(' + str(n_el) + '$\mathcal{F}$) / ' + unit + 'mol')
             ax2c.set_ylabel(mass + ' signal / ' + unit + 'C')
+        if name is not None:
+            ax2c.set_title(name)
         ax2 += [ax2c]
 
     # ------- parse 'out' and return -------- #

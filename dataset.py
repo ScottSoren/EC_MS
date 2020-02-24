@@ -18,6 +18,7 @@ from .Combining import synchronize, cut_dataset, sort_time, get_timecol
 from .Plotting import plot_experiment, plot_vs_potential, plot_flux
 from .EC import correct_ohmic_drop, CV_difference
 from .Quantification import get_current, get_signal, get_potential
+from .Calibration import calibration_curve, point_calibration, chip_calibration
 
 
 def get_data_from_file(file_name, data_type=None, verbose=True): # assumes you're already in the folder
@@ -78,12 +79,12 @@ class Dataset:
             # ^ user can intiate the dataset with a list of data files
             datas = []
             for file in file_name:
-                data = get_data_from_file(file, verbose=verbose)
+                data = get_data_from_file(file, verbose=verbose, data_type=data_type)
                 datas += [data]
             self.data = synchronize(datas, verbose=verbose)
         elif file_name is not None:
             # ^ ...or just one data file
-            self.data = get_data_from_file(file_name)
+            self.data = get_data_from_file(file_name, data_type=data_type)
         elif folder is not None:
             # ^ ...or a bunch of files in a folder
             print('Importing from a folder!!!')
@@ -249,6 +250,18 @@ class Dataset:
     @wraps(get_timecol)
     def get_timecol(self, col, **kwargs):
         return get_timecol(col, dataset=self.data, **kwargs)
+    
+    @wraps(calibration_curve)
+    def calibration_curve(self, **kwargs):
+        return calibration_curve(self.data, **kwargs)
+    
+    @wraps(point_calibration)
+    def point_calibration(self, **kwargs):
+        return point_calibration(self.data, **kwargs)
+    
+    @wraps(chip_calibration)
+    def chip_calibration(self, **kwargs):
+        return chip_calibration(self.data, **kwargs)
 
     def get_flux(self, m, *args, **kwargs):
         try:
