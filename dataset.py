@@ -48,6 +48,11 @@ def with_update(method):
     return method_with_update
 
 
+metadata_items = ['data_type',
+                  'mass_bgs',
+                  ]
+
+
 class Dataset:
     '''
     This class implements the dataset. Its design is to be back-compatible
@@ -68,6 +73,7 @@ class Dataset:
         Establishes the dataset by loading self.data
         '''
         self.type = 'Dataset'
+        self.verbose = verbose
         if folder is not None: # then go to the folder and remember how to get back
             back = os.getcwd()
             os.chdir(folder)
@@ -93,7 +99,7 @@ class Dataset:
                 files = [f for f in files if re.search('^' + tag, f)]
             if file_type is not None:
                 files = [f for f in files if re.search(file_type + '$', f)]
-            print(files) # debugging
+            #print(files) # debugging
             datas = []
             for file in files:
                 data = get_data_from_file(file, verbose=verbose)
@@ -106,7 +112,8 @@ class Dataset:
 
         if folder is not None: # time to go home.
             os.chdir(back)
-
+        if data_type is not None:
+            self.data['data_type'] = data_type
         self.update_with_data()
 
     def update_with_data(self):
@@ -133,10 +140,11 @@ class Dataset:
             return self.data[self.V_str]
         elif attr == 'j':
             return self.data[self.J_str]
-        elif attr == 'data':
+        elif attr in ['data', 'verbose']:
+            #print('hm...' + attr) # debugging
             raise AttributeError('Dataset has no attribute ' + attr)
+        #print('getting attribute ' + attr + ' from self.data') # debugging
         try:
-            print('getting attribute ' + attr + ' from self.data') # debugging
             #a = b # debugging
             return self.data[attr]
         except KeyError:
@@ -209,8 +217,8 @@ class Dataset:
     @wraps(sync_metadata)
     @with_update
     def sync_metadata(self, *args, **kwargs):
-        print('args = ' + str(args)) # debugging. proves that args[0] is self.
-        print('kwargs = ' + str(kwargs)) # debugging
+        #print('args = ' + str(args)) # debugging. proves that args[0] is self.
+        #print('kwargs = ' + str(kwargs)) # debugging
         return sync_metadata(self.data, *args, **kwargs)
 
     @wraps(make_selector)
@@ -250,15 +258,15 @@ class Dataset:
     @wraps(get_timecol)
     def get_timecol(self, col, **kwargs):
         return get_timecol(col, dataset=self.data, **kwargs)
-    
+
     @wraps(calibration_curve)
     def calibration_curve(self, **kwargs):
         return calibration_curve(self.data, **kwargs)
-    
+
     @wraps(point_calibration)
     def point_calibration(self, **kwargs):
         return point_calibration(self.data, **kwargs)
-    
+
     @wraps(chip_calibration)
     def chip_calibration(self, **kwargs):
         return chip_calibration(self.data, **kwargs)
@@ -285,7 +293,57 @@ class Dataset:
     def calibrate_EC(self, *args, **kwargs):
         return self.sync_metadata(*args, **kwargs)
 
-    def cut(self, tspan=None, cycles=None, **kwargs):
+
+    def set_background(self, t_bg=None, masses=None, mols=None, cols=None):
+        '''
+        TODO: if given mols, it sets a background in each of of the given molecule
+        objects using mol.get_bg #ToDo, that should be mol.set_bg instead
+
+        if given masses, it calculates the background of each
+        and stores it in a dictionary, and SUBTRACTS IT FROM THE DATA!
+
+        TODO: don't subtract it from the data, but have get_signal read it.
+        '''
+        self.reset() # to avoid losing the ability to restore the original
+            # by subtracting a new background from background-subtracted data
+
+        if masses is None and mols is None and cols is None and t_bg is not None:
+            masses = 'all'
+        if masses == 'all':
+            masses = [col[:-2] for col in self.data_cols if (col[0] == 'M' and col[-2:]=='-y')]
+        print('masses = ' + str(masses)) # debugging
+
+        if hasattr(self, 'mass_bgs'):
+            mass_bgs = self.mass_bgs
+        else:
+            mass_bgs = {}
+
+        if masses is not None:
+            for mass in masses:
+                if t_bg is not None:
+                    x, y = self.get_signal(mass=mass, tspan=t_bg, unit='A')
+                    y_bg = np.mean(y)
+                else:
+                    x, y = self.get_signal(mass=mass, unit='A')
+                    y_bg = min(y)
+                #print('subtracting background for mass ' + mass + '!!!')
+                mass_bgs[mass] = y_bg
+                self.data[mass + '-y'] -= y_bg
+        self.mass_bgs = mass_bgs
+        return mass_bgs
+
+
+    def reset(self):
+        '''
+        so far only implemented for masses.
+        '''
+        if hasattr(self, 'mass_bgs'):
+            for mass, y_bg in self.mass_bgs.items():
+                print('adding background back onto ' + mass) # debugging
+                self.data[mass + '-y'] += y_bg
+
+
+    def cut(self, tspan=None, cycles=None, verbose=True, **kwargs):
         if tspan is not None:
             new_data = cut_dataset(self.data, tspan=tspan, **kwargs)
         else:
@@ -295,9 +353,16 @@ class Dataset:
                 if key in kwargs:
                     cycles = kwargs.pop(key)
                     new_data = select_cycles(self.data, cycles=cycles,
-                                             cycle_str=key, **kwargs)
+                                             cycle_str=key, verbose=verbose,
+                                             **kwargs)
         new_dataset = Dataset(new_data)
+        for attr in metadata_items:
+            if hasattr(self, attr):
+                setattr(new_dataset, attr, getattr(self, attr))
         return new_dataset
+
+
+
 
 
 class CyclicVoltammagram(Dataset):
@@ -311,8 +376,9 @@ class CyclicVoltammagram(Dataset):
     plot_all() which plots cv's with a cmap, average() with averages cycles.
     '''
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, verbose=True, **kwargs):
         self.type = 'Cyclic Voltammagram'
+        self.verbose = verbose
         if 'dataset' in kwargs:
             dataset = kwargs.pop('dataset')
         else:
@@ -331,6 +397,9 @@ class CyclicVoltammagram(Dataset):
                     kwargs.update(verbose=False)
                     dataset = dataset.cut(*args, **kwargs)
                 data = dataset.data
+                for attr in metadata_items:
+                    if hasattr(dataset, attr):
+                        setattr(self, attr, getattr(dataset, attr))
             else:
                 print('WARNING!!! CyclicVoltammagram.__init__ doesn\'t know ' +
                       'what ' + str(dataset) + ' is!')
@@ -356,12 +425,12 @@ class CyclicVoltammagram(Dataset):
             key = list(range(start, stop, step))
         if type(key) in [int, list]:
             return CyclicVoltammagram(self.cut(cycle=key, t_zero='start',
-                                               verbose=False))
+                                               verbose=False), verbose=False)
         try:
             return getattr(self, key)
         except AttributeError:
             raise KeyError('Dataset has no attribute ' + key +
-                           'and Dataset.data has no key ' + key
+                           ' and Dataset.data has no key ' + key
                            )
 
     def __len__(self):
@@ -377,6 +446,7 @@ class CyclicVoltammagram(Dataset):
                 selector = self[self['sel_str']]
             except KeyError:
                 sel_str = self.make_selector()
+                #print(self.data.keys()) # debugging
                 selector = self[sel_str]
             cycle = selector - min(selector)
 
@@ -397,7 +467,7 @@ class CyclicVoltammagram(Dataset):
                     break
                 else:
                     n += np.argmax(mask_behind) + 5 # have to be below V for 5 datapoints
-                print('point number on way up: ' + str(n)) # debugging
+                #print('point number on way up: ' + str(n)) # debugging
 
                 mask_in_front = v[n:]>V
                 if not True in mask_in_front:
@@ -407,7 +477,7 @@ class CyclicVoltammagram(Dataset):
                 c += 1 # and then when it crosses to above V again, we register a cyclce!
                 cycle[n:] = c # and subsequent points increase in cycle number
                 n += + 5 # have to be above V for 5 datapoints
-                print('point number on way down: ' + str(n)) # debugging
+                #print('point number on way down: ' + str(n)) # debugging
 
         self.add_data_col('cycle', cycle, col_type='EC')
         self.data['sel_str'] = 'cycle'
@@ -665,6 +735,10 @@ class CyclicVoltammagram(Dataset):
 
         diff['tspan'] = [diff[t_str][0], diff[t_str][-1]]
         diff = CyclicVoltammagram(diff)
+        try:
+            diff.data['data_type'] = self.data['data_type']
+        except KeyError:
+            print('Warning!!! no self.data[\'data_type\']')
 
         print('\nfunction CyclicVoltammagram.subtract finished!\n\n')
         return diff
@@ -695,10 +769,11 @@ class CyclicVoltammagram(Dataset):
         lists = {}
         for col in self.data_cols:
             lists[col] = []
+        #print('test') # debugging
         for c in range(len(self)):
             cv = self[c]
             for col in self.data_cols:
-                lists[col] += [cv[col]]
+                lists[col] += [cv.data[col]]
         ts = lists['time/s']
         N = min([len(t) for t in ts])
 

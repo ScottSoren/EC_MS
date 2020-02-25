@@ -19,7 +19,7 @@ import numpy as np
 #import os
 
 from .Data_Importing import epoch_time_to_timestamp
-from .Combining import cut_dataset, get_timecol, is_time, get_type
+from .Combining import cut_dataset, is_time, get_type
 
 
 E_string_list = ['Ewe/V', '<Ewe>/V', '|Ewe|/V']
@@ -95,12 +95,12 @@ def select_cycles(EC_data_0, cycles=None, cycle=1, t_zero=None, verbose=True,
     if type(cycles)==int:
         cycles = [cycles]
 
-    print('cycles = ' + str(cycles)) # debugging
+    #print('cycles = ' + str(cycles)) # debugging
     mask = np.any(np.array([cycle_numbers == c for c in cycles]), axis=0)
     #list comprehension is awesome.
     t_cut = EC_data[t_str][mask]
     tspan = np.array([t_cut[0], t_cut[-1]])
-    print('tspan = ' + str(tspan))
+    #print('tspan = ' + str(tspan)) # debugging
 
 
     # ------- cutit! ------------- #
@@ -187,8 +187,8 @@ def remove_delay(CV_data):
 
 def CV_difference(cycles_data=None, cycles=None, cycle_1=None, cycle_2=None,
                   redox=1, Vspan=[0.5, 1.0], unit='C',
-                  ax=None, color='g', alpha=0,
-                  cycle_str='selector', verbose=True):
+                  ax=None, color='g', alpha=1,
+                  sel_str=None, cycle_str=None, verbose=True):
     '''
     This will calculate the difference in area between two cycles in a CV,
     written for CO stripping 16J26. If ax is given, the difference will be
@@ -205,13 +205,10 @@ def CV_difference(cycles_data=None, cycles=None, cycle_1=None, cycle_2=None,
         print('\n\nfunction \'CV_difference\' at your service!\n')
 
     if redox == 'ox':
-        redox = [1]
+        redox = 1
     elif redox == 'red':
-        redox = [0]
-    elif type(redox) is int:
-        redox = [redox]
-    elif redox is None:
-        redox = [0,1]
+        redox = 0
+
 
     Vs = []
     Js = []
@@ -225,32 +222,43 @@ def CV_difference(cycles_data=None, cycles=None, cycle_1=None, cycle_2=None,
     if cycles is not None:
         data = cycles_data
         cycles_data = []
+        if sel_str is None:
+            if cycle_str is not None:
+                sel_str = cycle_str
+            else:
+                try:
+                    sel_str = data['sel_str']
+                except KeyError:
+                    print('Warning!!! can\'t tell what sel_str to use. Trying \'selector\'.')
+                    cycle_str = 'selector'
         for cycle in cycles:
-            cycles_data += [select_cycles(data, cycles=[cycle], cycle_str=cycle_str)]
+            cycles_data += [select_cycles(data, cycles=[cycle], cycle_str=sel_str, verbose=verbose)]
 
     for cycle_data in cycles_data:
         #print(type(cycles_data)) # debugging
         V_str, J_str = sync_metadata(cycle_data, verbose=verbose)
-        print(V_str + ', ' + J_str) # debugging
-        V = cycle_data[V_str]
-        J = cycle_data[J_str]
-        t = cycle_data['time/s']
+        try:
+            t_str = cycle_data['t_str']
+        except KeyError:
+            t_str = 'time/s'
+        #print(V_str + ', ' + J_str) # debugging
 
-        ro = cycle_data['ox/red']
-        q = cycle_data['(Q-Qo)/C']
-        I_keep = [I for (I, (V, ro)) in enumerate(zip(V, ro)) if
-                    Vspan[0] < V < Vspan[1] and ro in redox]
+        subset = get_through_sweep(cycle_data, redox=redox, Vspan=Vspan, verbose=verbose)
 
-        V = V[I_keep]
-        J = J[I_keep]
-        t = t[I_keep]
-        print('V_range starts at t = ' + str(t[0]))
+        t, V, J, = subset[t_str], subset[V_str], subset[J_str]
+
+        try:
+            q = subset['(Q-Qo)/C']
+        except KeyError:
+            q = np.nan
+
+        #print('V_range starts at t = ' + str(t[0])) # debugging
 
         Vs += [V]
         Js += [J]
         ts += [t]
 
-        Q += [q[I_keep[-1]] - q[I_keep[0]]]
+        Q += [q[-1] - q[0]]
         JV += [np.trapz(J, V)]
 
     dQ = Q[0] - Q[1] # in C
@@ -271,7 +279,7 @@ def CV_difference(cycles_data=None, cycles=None, cycle_1=None, cycle_2=None,
     # We're going to return three vectors, for t V, and J, and
     #   all of them will be the same length as the first dataset, i.e. t[0]
     if len(Vs[0]) != len(Vs[1]):  #then we'll have to interpolate
-        if 1 in redox:
+        if redox:
             Js[1] = np.interp(Vs[0], Vs[1], Js[1])
             V = Vs[0]
         else:
@@ -287,15 +295,19 @@ def CV_difference(cycles_data=None, cycles=None, cycle_1=None, cycle_2=None,
             ax = plt.figure().add_subplot(111)
             ax.set_xlabel(V_str)
             ax.set_ylabel(J_str)
-            ax.plot(Vs[0], Js[0], 'k-')
-            ax.plot(Vs[1], Js[1], 'r--')
+            ax.plot(V, Js[0], 'k-')
+            ax.plot(V, Js[1], 'r--')
             ax.set_xlabel(V_str)
             ax.set_ylabel(J_str)
 
+        if redox:
+            hatch_1, hatch_2 = '', '//'
+        else:
+            hatch_1, hatch_2 = '//', ''
         ax.fill_between(V, Js[0], Js[1], where=Js[0]>Js[1],
-                        facecolor=color, interpolate=True, alpha=alpha)
+                        facecolor=color, interpolate=True, hatch=hatch_1, alpha=alpha)
         ax.fill_between(V, Js[0], Js[1], where=Js[0]<Js[1],
-                        facecolor=color, alpha=alpha, hatch='//', interpolate=True)
+                        facecolor=color, alpha=alpha, hatch=hatch_2, interpolate=True)
     if verbose:
         print('\nfunction \'CV_difference\' finished!\n\n')
 
@@ -535,6 +547,8 @@ def make_selector(data, sel_str='selector', cols=[]):
             changes = np.logical_or(changes, n_down<n)
     selector = np.cumsum(changes)
     data[sel_str] = selector
+    print('setting data[\'sel_str\']') # debugging
+    data['sel_str'] = sel_str
     try:
         data['data_cols'].add(sel_str)
     except AttributeError:
@@ -844,7 +858,7 @@ def get_through_sweep(data=None, t_str=None, V_str=None, t=None, V=None, t_i=0,
     elif out == 'tspan':
         return tspan
     elif out == 'dataset':
-        return cut_dataset(data, tspan=tspan)
+        return cut_dataset(data, tspan=tspan, verbose=verbose)
 
 
 def get_shunt_current_line(data, V_DL, t_i=0,
