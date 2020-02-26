@@ -667,6 +667,11 @@ def cut_dataset(dataset_0, tspan=None, tspan_0=None, time_masks=None,
     # ^ use this in loop to avoid a "Set changed size during iteration" RuntimeError
     for col in data_cols:
         timecol = get_timecol(col, dataset)
+        if timecol not in dataset:
+            print('Warning!!! can\'t cut ' + col + ' because dataset doesn\'t have timecol ' + timecol)
+            purge_column(dataset, col, purge=purge, verbose=verbose)
+            continue
+
         #print(col + ', length = ' + str(len(dataset[col]))) # debugging
         #print(timecol + ', length = ' + str(len(dataset[timecol]))) #debugging
 
@@ -674,12 +679,7 @@ def cut_dataset(dataset_0, tspan=None, tspan_0=None, time_masks=None,
             #print('already got indeces, len = ' + str(len(indeces[timecol]))) #debugging
             mask = time_masks[timecol]
         else:
-            try:
-                t = dataset[timecol]
-            except KeyError:
-                print('can\'t cut ' + col + ' because dataset doesn\'t have timecol ' + timecol)
-                purge_column(dataset, col, purge=purge, verbose=verbose)
-                continue
+            t = dataset[timecol]
             mask = np.logical_and(tspan[0]<t, t<tspan[-1])
             # Don't cut off outer endpoints before evt interpolation (if used by plot_vs_potential)
             extra_left = np.append(mask[1:], False)
@@ -757,7 +757,7 @@ def remove_filtered_values(data, filter_fun):
         #print('len(data[' + timecol + ']) = ' + str(len(data[timecol]))) # debugging
         mask = masks[timecol]
         data[col] = data[col][mask]
-        
+
     return data  # not necessary
 
 def rename_SI_cols(data, removenans=True):
@@ -985,10 +985,10 @@ def get_timecol(col=None, dataset=None, data_type=None, verbose=False):
     #print('getting timecol for ' + col + '. datset = ' + (str(dataset)+ 20*' ')[:20]) # debugging
     if dataset is not None and 'timecols' in dataset and col in dataset['timecols']:
         return dataset['timecols'][col]
-    
+
     if data_type is None:
         data_type = get_type(col, dataset)
-    
+
     if data_type == 'EC':
         return 'time/s'
     elif data_type == 'MS':

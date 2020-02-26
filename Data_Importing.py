@@ -18,7 +18,7 @@ date_match_2 = '[0-9]{4}([/-][0-9]{2}){2}'      #matches dates like '2018/01/15'
 def numerize(data):
     for col in data['data_cols']: #numerize!
         data[col] = np.array(data[col])
- 
+
 def get_empty_set(cols, **kwargs):
         #get the colheaders and make space for data
         # cols should be a set
@@ -67,7 +67,7 @@ def parse_date(line):
                    '05':'May', '06':'June', '07':'July', '08':'August',
                    '09':'September', '10':'October', '11':'November', '12':'December'}
     month_match = '(' + ''.join(list([v[:3] + '|' for v in month_names.values()]))[:-1] + ')' + '[a-z]*(\.)?'
-    date_match_3 = month_match + ' [0-9]+, [0-9]{4}'    
+    date_match_3 = month_match + ' [0-9]+, [0-9]{4}'
     d3 = re.search(date_match_3, line)
     if d3:
         date3 = d3.group()
@@ -791,7 +791,7 @@ def load_from_file(full_path_name='current', title='file', tstamp=None, timestam
     elif dataset['tstamp'] is None:
         print('WARNING: no tstamp found in ' + full_path_name + '. Looking in file name.')
         tstamp = timestring_to_epoch_time(full_path_name)
-        if tstamp is None: 
+        if tstamp is None:
             print('WARNING: no tstamp found in ' + full_path_name + ' file name either. Using file creation time.')
             tstamp = get_creation_time(full_path_name, verbose=verbose)
         dataset['tstamp'] = tstamp
@@ -979,7 +979,7 @@ def download_cinfdata_set(setup='sniffer', group_id=None, grouping_column=None, 
                 y = data[:, 1]
                 x_label = label + '-x'
                 y_label = label + '-y'
-                dataset['timecols'][x_label] = y_label
+                dataset['timecols'][y_label] = x_label  # Fixed 20B26!!!
                 dataset[x_label] = x * 1e-3 # cinfdata saves time in ms!!!
                 dataset[y_label] = y
 

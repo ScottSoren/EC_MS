@@ -20,6 +20,7 @@ import numpy as np
 
 from .Data_Importing import epoch_time_to_timestamp
 from .Combining import cut_dataset, is_time, get_type
+from .patches import fix_timecols
 
 
 E_string_list = ['Ewe/V', '<Ewe>/V', '|Ewe|/V']
@@ -39,7 +40,7 @@ EC_cols_0 = ['mode', 'ox/red', 'error', 'control changes', 'time/s', 'control/V'
            'Ewe-Ece/V', '<Ece>/V', '<Ewe>/V', 'Energy charge/W.h', 'Energy discharge/W.h',
            'Efficiency/%', 'Rcmp/Ohm', 'time/s*', 'selector', 'j / [A/mg]',
            V_string_default, J_string_default,
-           'I/ECSA / [mA/m^2]'
+           'I/ECSA / [mA/m^2]',
            ] # exotic J_str's. I need to change how this works!]
 
 
@@ -615,9 +616,9 @@ def sync_metadata(data, RE_vs_RHE=None, A_el=None,
     if not 'data_cols' in data:
         print('WARNING!!! no data_cols in data. sync_metadata will make a sparsely populated one.')
         data['data_cols'] = set()
-    if type(data['data_cols']) is list:
+    if type(data['data_cols']) is list: # implementing a patch here because this is likely to be called
         data['data_cols'] = set(data['data_cols'])
-
+    fix_timecols(data) # another patch
 
     # use these to keep track of whether variables 1 and 2 will be calibrated:
     cal1 = False

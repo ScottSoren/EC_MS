@@ -82,7 +82,7 @@ def plot_vs_potential(CV_and_MS_0,
                       ax1='new', ax2='new', ax=None, #spec='k-',
                       overlay=0, logplot=True, leg=False,
                       verbose=True,
-                      removebackground=False, background=None, t_bg=None, endpoints=3,
+                      removebackground=None, background=None, t_bg=None, endpoints=3,
                       masses='all', masses_left=None, masses_right=None,
                       mols=None, mols_left=None, mols_right=None,
                       unit=None, smooth_points=0,
@@ -103,7 +103,7 @@ def plot_vs_potential(CV_and_MS_0,
     if type(logplot) is not list:
         logplot = [logplot, False]
     if removebackground is None:
-        removebackground = not logplot[0]
+        removebackground = (t_bg is not None)
 
     spec.update(kwargs) # extra arguments are passed to plt.plot
 
