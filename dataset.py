@@ -15,7 +15,7 @@ from matplotlib import cm as colormap
 from .EC import sync_metadata, make_selector, select_cycles
 from .Data_Importing import load_from_file
 from .Combining import synchronize, cut_dataset, sort_time, get_timecol
-from .Plotting import plot_experiment, plot_vs_potential, plot_flux
+from .Plotting import plot_experiment, plot_vs_potential, plot_flux, plot_signal
 from .EC import correct_ohmic_drop, CV_difference
 from .Quantification import get_current, get_signal, get_potential
 from .Calibration import calibration_curve, point_calibration, chip_calibration
@@ -238,6 +238,10 @@ class Dataset:
     @wraps(plot_flux)
     def plot_flux(self, *args, **kwargs):
         return plot_flux(self.data, *args, **kwargs)
+    
+    @wraps(plot_signal)
+    def plot_signal(self, *args, **kwargs):
+        return plot_signal(self.data, *args, **kwargs)
 
     @wraps(plot_vs_potential)
     def plot_vs_potential(self, *args, **kwargs):
