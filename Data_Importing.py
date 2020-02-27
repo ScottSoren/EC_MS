@@ -11,7 +11,7 @@ import numpy as np
 
 float_match = '[-]?\d+[\.]?\d*(e[-]?\d+)?'     #matches floats like '-3.5e4' or '7' or '245.13' or '1e-15'
 #note, no white space included on the ends! Seems to work fine.
-timestamp_match = '([0-9]{2}[:_]){2}[0-9]{2}'      #matches timestamps like '14:23:01' or '15_42_15'
+timestamp_match = '([0-9]{2}[:_.]){2}[0-9]{2}'      #matches timestamps like '14:23:01' or '15_42_15' or '09.56.25'
 date_match = '([0-9]{2}[/\-\.]){2}[0-9]{4}'     #matches dates like '01/15/2018' or '09-07-2016' or '04.20.2019'
 date_match_2 = '[0-9]{4}([/-][0-9]{2}){2}'      #matches dates like '2018/01/15' or '2018-09-07'
 
@@ -132,12 +132,14 @@ def timestring_to_epoch_time(timestring, date=None, tz=None, verbose=True,
                       'when you say ' + timestamp + '. It didn\'t match \.' +
                       timestamp_match + '\'. Assuming you want 00:00:00')
             timestamp = '00:00:00'
-        if '_' in timestamp:
-            timestamp = timestamp.replace('_', ':') #otherwise time.strptime below crashes.
         if verbose:
             print('found timestamp = ' + timestamp)
     else:
         timestamp = timestring
+    if '_' in timestamp:
+        timestamp = timestamp.replace('_', ':') #otherwise time.strptime below crashes.
+    if '.' in timestamp:
+        timestamp = timestamp.replace('.', ':') #otherwise time.strptime below crashes.
 
     if date is None:
         if verbose:
@@ -441,6 +443,10 @@ def import_text(full_path_name='current', verbose=True):
         except UnicodeDecodeError:
             if verbose:
                 print('Shit, some encoding problem in readlines() for ' + encoding_type)
+        except FileNotFoundError:
+            print('File not Found! file_name = ' + file_name + 
+                  '\nDirectory = ' + os.getcwd() + '\nfiles = ' + str(os.listdir(os.getcwd())))
+            raise
     else:
         print('couldn\'t read ' + file_name + '\n ... may by due to an encoding issue')
 

@@ -475,8 +475,11 @@ def synchronize(data_objects, t_zero=None, append=None, file_number_type=None,
             # processing: ensuring unique column names for non-appended data
             else:
                 if col in combined_data:
-                    print('conflicting versions of ' + col + '. adding subscripts.')
-                    col = col + '_' + str(nd)
+                    if len(combined_data[col]) == 0:
+                        print(col + ' in multiple datasets. Overwriting an empty one!')
+                    else:
+                        print('conflicting versions of ' + col + '. adding subscripts.')
+                        col = col + '_' + str(nd)
 
             # ---- put the processed data into combined_data! ----
             combined_data[col] = data
@@ -724,7 +727,7 @@ def offerquit():
         raise SystemExit
 
 def remove_nans(data):
-    filter_fun = np.isnan()
+    filter_fun = np.isnan
     return remove_filtered_values(data, filter_fun)
 
 def remove_negatives(data):
