@@ -7,11 +7,11 @@ For a description of this package, see the included NOTES__EC_MS.text
 @author: Scott
 """
 
+# fmt off
+# ^ I can't have black formatting this because it breaks setup.py
 __version__ = "0.5.0.dev0"
 __title__ = "EC_MS"
-__description__ = (
-    "Analysis tools for electrochemistry and mass spectrometry and a lot in between"
-)
+__description__ = "Analysis tools for electrochemistry and mass spectrometry and a lot in between"
 __url__ = "https://github.com/ScottSoren/EC_MS"
 __author__ = "Soren B. Scott"
 __email__ = "sbs@spectroinlets.com"
