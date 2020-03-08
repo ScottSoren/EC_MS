@@ -1,10 +1,11 @@
-==================
+==============
 ``EC_MS``: Electrochemistry, Mass Spectrometry, and much in-between
-==================
+==============
 
 ``EC_MS`` provides a powerful **object-oriented** interface to electrochemistry data, mass spectrometry data, and especially the combination of these two types of datasets produced by electrochemistry - mass spectrometry techniques such as differential electrochemical mass spectrometry (DEMS) chip-based electrochemistry mass spectrometry (chip EC-MS). 
 
 The primary object-oriented interface for this is the ``Dataset`` class. For example:
+
 .. -code-begin-
 .. code-block:: pycon
 
