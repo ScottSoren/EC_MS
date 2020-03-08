@@ -22,15 +22,9 @@ import numpy as np
 from scipy.optimize import curve_fit
 from scipy.integrate import odeint
 
-if os.path.split(os.getcwd())[1] == "EC_MS":
-    # then we're running from inside the package
-    import Chem
-    from Molecules import Molecule
-    from Plotting import plot_operation
-else:  # then we use relative import
-    from . import Chem
-    from .Molecules import Molecule
-    from .Plotting import plot_operation
+from . import Chem
+from .Molecules import Molecule
+from .Plotting import plot_operation
 
 
 def fit_exponential(t, y):

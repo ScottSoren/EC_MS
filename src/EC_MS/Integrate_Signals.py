@@ -16,17 +16,10 @@ import numpy as np
 from matplotlib import pyplot as plt
 import os
 
-if os.path.split(os.getcwd())[1] == "EC_MS":
-    # then we're running from inside the package
-    from Plotting import plot_experiment
-    from EC import select_cycles
-    from Combining import cut_dataset
-    from Quantification import get_flux, get_potential, get_current
-else:  # then we use relative import
-    from .Plotting import plot_experiment
-    from .EC import select_cycles
-    from .Combining import cut_dataset
-    from .Quantification import get_flux, get_potential, get_current
+from .Plotting import plot_experiment
+from .EC import select_cycles
+from .Combining import cut_dataset
+from .Quantification import get_flux, get_potential, get_current
 
 
 def get_datapoints(

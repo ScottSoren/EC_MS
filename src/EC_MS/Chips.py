@@ -12,17 +12,10 @@ import os
 import numpy as np
 from matplotlib import pyplot as plt
 
-if os.path.split(os.getcwd())[1] == "EC_MS":
-    # then we're running from inside the package
-    import Chem
-    from Molecules import Molecule
-    from Object_Files import structure_to_lines, lines_to_dictionary
-    from Object_Files import lines_to_structure, date_scott, update_lines
-else:
-    from . import Chem
-    from .Molecules import Molecule
-    from .Object_Files import structure_to_lines, lines_to_dictionary
-    from .Object_Files import lines_to_structure, date_scott, update_lines
+from . import Chem
+from .Molecules import Molecule
+from .Object_Files import structure_to_lines, lines_to_dictionary
+from .Object_Files import lines_to_structure, date_scott, update_lines
 
 data_directory = (
     os.path.dirname(os.path.realpath(__file__)) + os.sep + "data" + os.sep + "chips"

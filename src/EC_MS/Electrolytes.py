@@ -15,14 +15,8 @@ from scipy.optimize import brentq
 from scipy.integrate import odeint
 from matplotlib import pyplot as plt
 
-if (
-    os.path.split(os.getcwd())[1] == "EC_MS"
-):  # Then we're running from inside the package
-    from Object_Files import lines_to_dictionary
-    import Chem
-else:
-    from .Object_Files import lines_to_dictionary
-    from . import Chem
+from .Object_Files import lines_to_dictionary
+from . import Chem
 
 data_directory = os.path.dirname(os.path.realpath(__file__)) + os.sep + "data"
 with open(data_directory + os.sep + "Electrolytes.txt") as f:
