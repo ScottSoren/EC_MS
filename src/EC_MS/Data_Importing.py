@@ -6,7 +6,7 @@ Created on Sun Dec 10 03:17:41 2017
 @author: scott
 """
 import os, platform, re, codecs
-import time, datetime, pytz  #all three seem necessary for dealing with timezones.
+import time, datetime
 import numpy as np
 
 float_match = '[-]?\d+[\.]?\d*(e[-]?\d+)?'     #matches floats like '-3.5e4' or '7' or '245.13' or '1e-15'
@@ -35,12 +35,13 @@ def parse_timezone(tz=None):
     useful for Scott. If the input is not a string, it is returned as is.
     '''
     abbreviations = {'CA':'US/Pacific', 'DK':'Europe/Copenhagen',}
+    if tz is not None:
+        import pytz  #all three seem necessary for dealing with timezones.
     if tz in abbreviations:
         return pytz.timezone(abbreviations[tz])
     elif type(tz) is str:
         return pytz.timezone(tz)
-    else:
-        return tz
+    return tz
 
 def parse_date(line):
     #^  mm/dd/yyyy, as EC lab does
@@ -97,6 +98,7 @@ def timestring_to_epoch_time(timestring, date=None, tz=None, verbose=True,
     The epoch time is referred to here and elsewhere as tstamp.
     '''
     if tz is not None:
+        import pytz  #all three seem necessary for dealing with timezones.
         tz = parse_timezone(tz)
         if verbose:
             print('getting epoch time given a timestamp local to ' + str(tz))
