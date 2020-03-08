@@ -10,4 +10,4 @@ __description__ = 'Chemistry sub-package to EC_MS. Can calculate molar masses, s
 __url__ = "https://github.com/ScottSoren/EC_MS"
 __author__ = "Soren B. Scott"
 __email__ = "sbs@spectroinlets.com"
-__license = "MIT"
+__license__ = "MIT"

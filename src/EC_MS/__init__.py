@@ -14,7 +14,7 @@ __url__ = "https://github.com/ScottSoren/EC_MS"
 __author__ = "Soren B. Scott"
 __email__ = "sbs@spectroinlets.com"
 
-__license = "MIT"
+__license__ = "MIT"
 
 print('\n' + '-'*10 + '  Importing: EC_MS ' + __version__ + ' ' + '-'*10)
 print('from ' + __file__ + '\n\n')
