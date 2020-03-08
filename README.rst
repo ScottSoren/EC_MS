@@ -1,6 +1,6 @@
-==============
-``EC_MS``: Electrochemistry, Mass Spectrometry, and much in-between
-==============
+=====================================================================
+``EC_MS``: Electrochemistry and Mass Spectrometry
+=====================================================================
 
 ``EC_MS`` provides a powerful **object-oriented** interface to electrochemistry data, mass spectrometry data, and especially the combination of these two types of datasets produced by electrochemistry - mass spectrometry techniques such as differential electrochemical mass spectrometry (DEMS) chip-based electrochemistry mass spectrometry (chip EC-MS). 
 
@@ -35,4 +35,18 @@ And that's just a small teaser. Additional functionality includes:
 - Mass-transport modelling of products and reactants in the working volume between the electrode and the vacuum inlet
 - ohmic drop correction and automated quantitative comparisons of cyclic voltammagrams
 
-If you'd like to contribute, please log issues here or write to me at scott.soren@gmail.com
+References
+==========
+
+This python package was first described in:
+
+Daniel B. Trimarco and Soren B. Scott, et al. **Enabling real-time detection of electrochemical desorption phenomena with sub-monolayer sensitivity**. `Electrochimica Acta, 2018 <https://doi.org/10.1016/j.electacta.2018.02.060>`_.
+
+The theory behind its quantification tools are described more thoroughly and correctly in:
+
+Soren B. Scott. **Isotope-Labeling Studies in Electrocatalysis for Renewable Energy Conversion and the Net CO2 Impact of this PhD Project.** `PhD Thesis, 2019. <https://orbit.dtu.dk/en/publications/isotope-labeling-studies-in-electrocatalysis-for-renewable-energy>`_.
+
+Project Information
+===================
+
+If you have questions or if you'd like to contribute, please log issues on `github <https://github.com/ScottSoren/EC_MS/>`_ or write to me.

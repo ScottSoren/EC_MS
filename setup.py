@@ -10,9 +10,10 @@ KEYWORDS = [
 ]
 
 CLASSIFIERS = [
-    "Intended Audience :: Scientists",
+    "License :: Free for non-commercial use",
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
     "Natural Language :: English",
-    "License :: MIT License",
 ]
 
 PACKAGES = find_packages(where="src")
@@ -60,6 +61,8 @@ if __name__ == "__main__":
     setup(
         name=NAME,
         description=find_meta("description"),
+        long_description=read("README.rst"),
+        #long_description_content_type="text/x-rst", #gives an error
         license=find_meta("license"),
         version=find_meta("version"),
         url=find_meta("url"),

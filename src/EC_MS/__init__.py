@@ -9,16 +9,16 @@ For a description of this package, see the included NOTES__EC_MS.text
 
 # fmt off
 # ^ I can't have black formatting this because it breaks setup.py
-__version__ = "0.5.0.dev0"
+__version__ = "0.5.0"
 __title__ = "EC_MS"
 __description__ = "Analysis tools for electrochemistry and mass spectrometry and a lot in between"
 __url__ = "https://github.com/ScottSoren/EC_MS"
 __author__ = "Soren B. Scott"
 __email__ = "sbs@spectroinlets.com"
-
+__copyright__ = "Copyright (c) 2018 Soren B. Scott"
 __license__ = "MIT"
 
-print("\n" + "-" * 10 + "  Importing: EC_MS " + __version__ + " " + "-" * 10)
+print("\n" + "-" * 10 + "  Importing EC_MS v" + __version__ + " " + "-" * 10)
 print("from " + __file__ + "\n\n")
 
 
