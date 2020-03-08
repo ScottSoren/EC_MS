@@ -180,7 +180,7 @@ def grouped_lines_to_structure(lines, indent='\t'):
                     value[item[0]] = item[1]
                 except IndexError:
                     print('missing something. line = ' + str(line))
-        if key is '<list>:' or key is '<dictionary>':
+        if key == '<list>:' or key == '<dictionary>':
             structure = value
         else:
             structure = (key, value)
@@ -203,7 +203,7 @@ def lines_to_structure(lines, indent='\t', removecomments=True):
 def lines_to_dictionary(lines, indent='\t', removecomments=True):
     lines = ['<dictionary>\n'] + lines
     structure = lines_to_structure(lines, removecomments=removecomments)
-    dictionary = structure[1] #structure[0] being '<dictionary>'
+    dictionary = structure #'<dictionary>' line is now ignored in grouped_lines_to_structure
         #this is necessary for it to treat the file as a single structure
 #    print('grouped lines:\n ' + str(grouped_lines))
     return dictionary

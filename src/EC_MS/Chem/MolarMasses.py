@@ -53,14 +53,14 @@ def break_down(compound, forgiving=True):
     N = len(compound)
     addit = False
     for i, char in enumerate(compound):
-        if char is '(':
+        if char == '(':
             if nest == 0:
                 addit = True
             else:
                 subcompound += char
             nest+=1
         elif nest > 0:
-            if char is ')':
+            if char == ')':
                 nest -= 1
             if nest == 0:
                 element = subcompound

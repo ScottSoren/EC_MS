@@ -384,7 +384,7 @@ def plot_datalist_fit(datalist, colors, X_str='V', Xrange='all', keys=None,
         y = np.array(data)
         x = np.array(X)
 
-        if xspan is not 'all':
+        if not xspan == 'all':
             try:
                 I_keep = [I for (I, x_I) in enumerate(x) if x_I>xspan[0] and x_I<xspan[1]]
                 x = x[I_keep]

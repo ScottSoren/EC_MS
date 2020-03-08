@@ -300,6 +300,7 @@ class Molecule:
         ax.set_xticks(x)
         ax.set_xticklabels([str(m) for m in x])
         ax.set_title('literature QMS spectrum for ' + self.name)
+        return ax
 
 
     def add_calibration(self, calibration,
@@ -558,7 +559,7 @@ class Molecule:
         if removebackground is None:
             removebackground = (background is not None)
 
-        if (background is None or background is 'preset') and hasattr(self, 'background'):
+        if (background is None or background == 'preset') and hasattr(self, 'background'):
             background = self.background
         elif background == 'preset':
             background = None
