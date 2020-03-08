@@ -1,5 +1,9 @@
-__pycache__/*
+*/__pycache__/*
 *~
 *.pyc
 *.html
 *.png
+src/*egg*
+build/*
+dist/*
+gitcommitmessage*
