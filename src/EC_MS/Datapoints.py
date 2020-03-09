@@ -230,7 +230,9 @@ def plot_errorbar(
     yfactor=1,
     specs={},
     linespecs={},
+    **kwargs,
 ):
+    specs.update(kwargs) # so that kwargs get fed to plot
     if ax == "current":
         ax = plt.gca()
     elif ax == "new":
@@ -277,21 +279,31 @@ def plot_errorbar(
         )
 
 
-def plot_errorbars_y(stats, colors, ax="new", marker=None, factor=1, specs={}):
+def plot_errorbars_y(stats, colors=None, ax="new", marker=None, factor=1, **kwargs):
     if ax == "new":
         fig, ax = plt.subplots()
     for x, stat in stats.items():
-        for key, color in colors.items():
-            ystat = stat[key]
+        if colors is None:
             plot_errorbar(
                 ax=ax,
                 xstat=x,
-                ystat=ystat,
-                color=color,
+                ystat=stat,
                 marker=marker,
                 yfactor=factor,
-                specs=specs,
+                **kwargs,
             )
+        else:
+            for key, color in colors.items():
+                ystat = stat[key]
+                plot_errorbar(
+                    ax=ax,
+                    xstat=x,
+                    ystat=ystat,
+                    color=color,
+                    marker=marker,
+                    yfactor=factor,
+                    **kwargs,
+                )
     return ax
 
 
