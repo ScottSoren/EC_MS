@@ -29,10 +29,10 @@ def get_data_from_file(
     if re.search(".pkl$", file_name):
         with open(file_name, "rb") as f:
             return pickle.load(f)
-    elif re.search(".mpt$", file_name):
-        return load_from_file(file_name, data_type="EC", verbose=verbose)
     elif data_type is not None:
         return load_from_file(file_name, data_type=data_type, verbose=verbose)
+    elif re.search(".mpt$", file_name):
+        return load_from_file(file_name, data_type="EC", verbose=verbose)
     else:
         print(
             "WARNING: loading files of the type "

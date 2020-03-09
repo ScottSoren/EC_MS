@@ -25,8 +25,9 @@ print("from " + __file__ + "\n\n")
 
 import EC_MS.Chem as Chem
 
-from EC_MS.Data_Importing import *
 from EC_MS.dataset import *
+from EC_MS.parsing_tools import *
+from EC_MS.Data_Importing import *
 from EC_MS.Combining import *
 
 from EC_MS.Plotting import *

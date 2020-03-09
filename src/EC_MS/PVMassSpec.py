@@ -8,7 +8,7 @@ Created on Wed Feb 26 11:06:17 2020
 import re
 import numpy as np
 
-from .Data_Importing import timestring_to_epoch_time
+from .parsing_tools import timestring_to_epoch_time
 
 PVMassSpec_time_match = r"[0-9]{2}-[0-9]{2}-[0-9]{4} [0-9]{2}'[0-9]{2}'[0-9]{2}"  # it has a ridiculous format
 
