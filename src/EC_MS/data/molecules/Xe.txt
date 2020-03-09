@@ -1,0 +1,5 @@
+name: Xe
+formula: Xe
+primary: M132
+sigma_100eV	=	5.5	# from https://descanso.jpl.nasa.gov/SciTechBook/series1/Goebel_AppD_IonizationCross.pdf
+sigma_70eV	=	5.1	# from https://descanso.jpl.nasa.gov/SciTechBook/series1/Goebel_AppD_IonizationCross.pdf
