@@ -2,7 +2,9 @@
 ``EC_MS``: Electrochemistry plus Mass Spectrometry
 =====================================================================
 
-``EC_MS`` provides a powerful **object-oriented** interface to electrochemistry data, mass spectrometry data, and especially the combination of these two types of datasets produced by electrochemistry - mass spectrometry techniques such as differential electrochemical mass spectrometry (DEMS) chip-based electrochemistry mass spectrometry (chip EC-MS).
+``EC_MS`` provides a powerful **object-oriented** interface to electrochemistry data, mass spectrometry data,
+and especially the combination of these two types of datasets produced by electrochemistry - mass spectrometry (EC-MS) techniques such as
+differential electrochemical mass spectrometry (DEMS) and chip-based EC-MS.
 
 The primary object-oriented interface for this is the ``Dataset`` class. For example:
 
@@ -12,8 +14,8 @@ The primary object-oriented interface for this is the ``Dataset`` class. For exa
    >>> from EC_MS import Dataset
    >>> MS_dataset = Dataset('MS_data.txt', data_type='MS')
    >>> EC_dataset = Dataset('EC_data.mpt', data_type='EC')
-   >>> dataset = MS_dataset + EC_dataset
-   >>> dataset.plot_experiment()
+   >>> dataset = MS_dataset + EC_dataset # calls the function EC_MS.synchronize()
+   >>> dataset.plot_experiment() # EC data in lower panel, MS data in upper panel
 
 In this example, the MS and EC datasets are combined by lining up all of the time variables based on timestamps read in the headers of the files.
 
@@ -27,7 +29,7 @@ It is easy to manipulate the datasets based on the electrochemistry program
    >>> cv.normalize(RE_vs_RHE=0.715)
    >>> cv.redefine_cycle(V=0.45, redox=1) # defines when the cycle counter increases
    >>> cycle_1 = cv[1]
-   >>> cycle_1.plot(masses=['M2', 'M44'])
+   >>> cycle_1.plot(masses=['M2', 'M44']) # electrochemical potential on the x-axis
 
 And that's just a small teaser. Additional functionality includes:
 
