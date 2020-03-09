@@ -26,3 +26,4 @@ standard colors
 	M29: #001146
 	M70: purple
 	M3: orange
+	M132: purple

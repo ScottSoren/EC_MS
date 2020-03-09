@@ -38,12 +38,13 @@ ourcolors_0 = {
     "M20": "slateblue",
     "M16": "steelblue",
     "M19": "teal",
-    "M17": "chocolate",  # HO2 isotopes
+    "M17": "chocolate",  # H2O isotopes
     "M41": "#FF2E2E",
     "M42": "olive",
     "M29": "#001146",  # propene and propane
     "M70": "purple",
     "M3": "orange",  # exotic stuff
+    "M132": "purple",
 }
 
 
