@@ -6,6 +6,8 @@
 and especially the combination of these two types of datasets produced by electrochemistry - mass spectrometry (EC-MS) techniques such as
 differential electrochemical mass spectrometry (DEMS) and chip-based EC-MS.
 
+``EC_MS`` has grown in concert with the chip EC-MS technology sold by `Spectro Inlets <https://spectroinlets.com>`_, but supports analysis of data from other hardware.
+
 The primary object-oriented interface for this is the ``Dataset`` class. For example:
 
 .. -code-begin-
@@ -33,6 +35,8 @@ It is easy to manipulate the datasets based on the electrochemistry program
 
 And that's just a small teaser. Additional functionality includes:
 
+- object-oriented interface to mass spectra with the Spectrum and Spectra classes
+
 - Calibration functions and classes for quantitative data analysis and plotting
 
 - Thermochemistry and Electrolyte subpackages for calculating standard potentials and chemical equilibrium
@@ -40,6 +44,10 @@ And that's just a small teaser. Additional functionality includes:
 - Mass-transport modelling of products and reactants in the working volume between the electrode and the vacuum inlet
 
 - ohmic drop correction and automated quantitative comparisons of cyclic voltammagrams
+
+
+Full documentation is pending!
+
 
 Installation
 ============
@@ -55,7 +63,34 @@ The in-development version is available on `github <https://github.com/ScottSore
 
 **EC_MS** requires **numpy**, **scipy**, and **matplotlib**. I recommend using *Anaconda* python, and writing and running your scripts with *spyder*. This has proven the easiest to set up on all operating systems I've tried.
 
+
+Supported Data Types
+====================
+
+**Mass Spectrometry**
+
+- .tsv files export by Spectro Inlets' Zilien (data_type="SI")
+
+- .dat files (both Bin.dat and Scan.dat) export by Pfeiffer Vacuum's PVMassSpec (data_type="PVMS")
+
+- .txt files export by `cinfdata <https://github.com/CINF/cinfdata>`_. (data_type="MS")
+
+- .txt files export by Stanford Reasearch Systsms' Residual Gas Analyzer (data_type="RGA")
+
+
+**Electrochemistry**
+
+- .tsv files export by Spectro Inlets' Zilien (data_type="SI")
+
+- .mpt files export by BioLogic's EC-Lab (data_type="EC")
+
+- .txt files export by CH Instruments software (data_type="CHI")
+
 Full documentation is pending!
+
+
+If you would like support for another file type, write to me.
+
 
 References
 ==========
@@ -79,4 +114,6 @@ Other articles with figures and data analysis by **EC_MS** include:
 Project Information
 ===================
 
-If you have questions or if you'd like to contribute, please log issues on `github <https://github.com/ScottSoren/EC_MS/>`_ or write to me.
+This is a pre-alpha version, so it is buggy. Please log issues on `github <https://github.com/ScottSoren/EC_MS/>`_ to help me improve it.
+
+If you have questions or if you'd like to contribute, please write to me.
