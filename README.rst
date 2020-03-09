@@ -16,8 +16,8 @@ The primary object-oriented interface for this is the ``Dataset`` class. For exa
    >>> from EC_MS import Dataset
    >>> MS_dataset = Dataset('MS_data.txt', data_type='MS')
    >>> EC_dataset = Dataset('EC_data.mpt', data_type='EC')
-   >>> dataset = MS_dataset + EC_dataset # calls the function EC_MS.synchronize()
-   >>> dataset.plot_experiment() # EC data in lower panel, MS data in upper panel
+   >>> dataset = MS_dataset + EC_dataset  # calls the function EC_MS.synchronize()
+   >>> dataset.plot_experiment()          # EC data in lower panel, MS data in upper panel
 
 In this example, the MS and EC datasets are combined by lining up all of the time variables based on timestamps read in the headers of the files.
 
@@ -30,7 +30,7 @@ It is easy to manipulate the datasets based on the electrochemistry program
    >>> cv = CyclicVoltammagram(Dataset)
    >>> cv.normalize(RE_vs_RHE=0.715)
    >>> cv.redefine_cycle(V=0.45, redox=1) # defines when the cycle counter increases
-   >>> cycle_1 = cv[1] # selects one cycle
+   >>> cycle_1 = cv[1]                    # selects one cycle
    >>> cycle_1.plot(masses=['M2', 'M44']) # electrochemical potential on the x-axis
 
 And that's just a small teaser. Additional functionality includes:
@@ -116,6 +116,6 @@ Project Information
 
 This is a pre-alpha version, so it is buggy. Please log issues on `github <https://github.com/ScottSoren/EC_MS/>`_ to help me improve it.
 
-``EC_MS`` is fully free and open-source.
+``EC_MS`` is completely free and open-source.
 
 If you have questions or if you'd like to contribute, please write to me.
