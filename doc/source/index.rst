@@ -21,11 +21,15 @@ To get started with your EC-MS data treatment in a hurry, read the
 :ref:`getting started <getting_started>` page, with :ref:`installation
 instructions <installation>` and a small :ref:`tutorial <tutorial>`.
 
+To search the complete code documentation head over to the :ref:`API
+docs <module_reference>`.
+
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
 
    getting_started
+   api/EC_MS.rst
 
 Indices and tables
 ==================
