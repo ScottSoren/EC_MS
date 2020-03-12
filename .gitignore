@@ -6,5 +6,6 @@
 src/*egg*
 build/*
 dist/*
+doc/build
 gitcommitmessage*
 *.vscode*
