@@ -75,7 +75,7 @@ class Dataset:
 
     def __init__(
         self,
-        file_name=None,
+        file_path=None,
         folder=None,
         tag=None,
         data_type=None,
@@ -91,19 +91,21 @@ class Dataset:
             back = os.getcwd()
             os.chdir(folder)
 
-        if type(file_name) is dict and "data_cols" in file_name:
+        if type(file_path) is dict and "data_cols" in file_path:
             # ^ user can intiate the dataset with a data dictionary
-            self.data = file_name
-        elif type(file_name) in (list, tuple):
+            self.data = file_path
+        elif type(file_path) in (list, tuple):
             # ^ user can intiate the dataset with a list of data files
             datas = []
-            for file in file_name:
+            for file in file_path:
                 data = get_data_from_file(file, verbose=verbose, data_type=data_type)
                 datas += [data]
             self.data = synchronize(datas, verbose=verbose)
-        elif file_name is not None:
+        elif file_path is not None:
+            self.folder, self.file = os.path.split(file_path)
+            print(file_path)  # debugging
             # ^ ...or just one data file
-            self.data = get_data_from_file(file_name, data_type=data_type)
+            self.data = get_data_from_file(file_path, data_type=data_type)
         elif folder is not None:
             # ^ ...or a bunch of files in a folder
             print("Importing from a folder!!!")

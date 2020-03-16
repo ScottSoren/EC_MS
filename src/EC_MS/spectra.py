@@ -4,7 +4,7 @@ Created on Mon Mar  2 15:55:31 2020
 
 @author: scott
 """
-import os, re
+import os, re, pickle
 import numpy as np
 from matplotlib import pyplot as plt
 
@@ -106,16 +106,43 @@ class Spectrum:
         return integral
 
 
+def spectrums_from_data(data):
+    x = data["x"]
+    spectra = data["spectra"]
+    spectrums = []
+    for i, y in enumerate(spectra):
+        spectrum = Spectrum(x=x, y=y)
+        spectrums += [spectrum]
+    return spectrums
+
+
+def spectra_from_data(data):  # should be class function of Spectra
+    spectrums = spectrums_from_data(data)
+    print("spectra_from_daa: spectrums = " + str(spectrums))  # debugging
+    return Spectra(spectrums=spectrums)
+
+
 class Spectra:
     def __init__(
-        self, file_path=None, spectrums=None, data=None, tstamp=None, data_type="PVMS"
+        self,
+        file_path=None,
+        folder=None,
+        spectrums=None,
+        data=None,
+        tstamp=None,
+        data_type="PVMS",
     ):
-        if data is None and spectrums is None:
+        print(spectrums)  # debugging
+        if file_path is not None and file_path[-4:] == ".pkl":
+            with open(file_path, "rb") as f:
+                data = pickle.load(f)
+            spectrums = data_to_spectrums(data)
+        elif data is None and spectrums is None:
             if data_type == "PVMS":
                 data = read_PVMS(file_path)
-            spectrums = data_to_spectrums(data)
         self.spectrums = spectrums
         self.data = data
+        self.x = spectrums[0].x
         self.spectra = np.stack([spectrum.y for spectrum in spectrums])
         self.file_path = file_path
         if file_path is not None:
@@ -131,6 +158,11 @@ class Spectra:
         raise KeyError(
             "Spectra has no attribute " + key + ", and spectra.data has no key " + key
         )
+
+    def save(self, file_name):
+        data = {"x": self.x, "spectra": self.spectra}
+        with open(file_name, "wb") as f:
+            pickle.dump(data, f)
 
 
 def data_to_spectrums(data):

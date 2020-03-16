@@ -9,7 +9,7 @@ For a description of this package, see the included NOTES__EC_MS.text
 
 # fmt: off
 # ^ I can't have black formatting this because it breaks setup.py
-__version__ = "0.5.1"
+__version__ = "0.5.2.dev0"
 __title__ = "EC_MS"
 __description__ = "Analysis tools for electrochemistry and mass spectrometry and a lot in between"
 __url__ = "https://github.com/ScottSoren/EC_MS"
@@ -47,7 +47,7 @@ from EC_MS.Potentiostat import *
 from EC_MS.spectra import *
 from EC_MS.PVMassSpec import *
 
-# from EC_MS.Zilien import * # anticipating an upcoming commit
+from EC_MS.Zilien import *
 
 from EC_MS.Electrolytes import *
 from EC_MS.Time_Response import *
