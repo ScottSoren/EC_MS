@@ -30,9 +30,7 @@ with open(preferencedir + os.sep + "standard_colors.txt", "r") as f:
     standard_colors = lines_to_dictionary(lines, removecomments=False)[
         "standard colors"
     ]
-data_directory = (
-    os.path.dirname(os.path.realpath(__file__)) + os.sep + "data" + os.sep + "molecules"
-)
+data_directory = os.path.dirname(os.path.realpath(__file__)) + os.sep + "data"
 cwd = os.getcwd()
 # for python2:
 try:
@@ -51,7 +49,15 @@ class Molecule:
     """
 
     def __init__(
-        self, name, formula=None, writenew=True, verbose=True, primary=None, F_cal=None
+        self,
+        name,
+        formula=None,
+        writenew=True,
+        verbose=True,
+        primary=None,
+        F_cal=None,
+        data_dir=data_directory,
+        molecule_dir=None,
     ):
         self.name = name
         self.real_name = name  # for a trick with Calibration.load_calibration_results()
@@ -62,10 +68,14 @@ class Molecule:
         self.calibrations = []  # will store calibration data
         self.attr_status = {"D": 0, "kH": 0, "n_el": 0}
         self.formula = formula
+        self.data_dir = data_dir
+        if molecule_dir is None:
+            molecule_dir = os.path.join(data_dir, "molecules")
+        self.molecule_dir = molecule_dir
         # 0 for undefined, 1 for loaded from file, 2 for set by function
         file_name = self.name + ".txt"
         cwd = os.getcwd()
-        os.chdir(data_directory)
+        os.chdir(self.molecule_dir)
         try:
             with open(file_name, "r") as f:
                 self.file_lines = f.readlines()
@@ -122,9 +132,11 @@ class Molecule:
         # self.color = self.get_color()
 
     @wraps(write_to_file)
-    def write(self, a=None, attr=None, data_directory=data_directory, *args, **kwargs):
+    def write(self, a=None, attr=None, data_dir=None, *args, **kwargs):
+        if data_dir is None:
+            data_dir = self.molecule_dir
         return write_to_file(
-            self, a=None, attr=None, data_directory=data_directory, *args, **kwargs
+            self, a=None, attr=None, data_directory=data_dir, *args, **kwargs
         )
 
     def rewrite(self, file="default"):
@@ -138,7 +150,7 @@ class Molecule:
         )
 
         if type(file) is str:
-            os.chdir(data_directory)
+            os.chdir(self.molecule_dir)
             with open(file, "w") as f:
                 f.writelines(newlines)
             os.chdir(cwd)
@@ -218,13 +230,16 @@ class Molecule:
         #  else:
         #      f.write(attr + '\t=\t' + str(self.attr) + '\n') #not necessary...
 
-    def get_spectrum(self):
+    def get_spectrum(self, data_dir=None):
+        if data_dir is None:
+            data_dir = self.data_dir
         if hasattr(self, "spectrum"):
             return self.spectrum
         else:  # that must mean there's no spectrum in the molecule's data file :(
             # try and get the spectrum from the data.
             try:
-                spectrum = get_NIST_spectrum(self)
+                print("loading NIST spectrum from .jdx")
+                spectrum = get_NIST_spectrum(self, data_dir=data_dir)
             except:
                 print("WARNING!!! Could not get spectrum for " + self.real_name)
                 raise  # MoleculeError('no spectrum for ' + self.real_name)

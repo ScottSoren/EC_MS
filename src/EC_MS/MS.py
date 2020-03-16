@@ -10,11 +10,11 @@ import os, re
 data_directory = os.path.dirname(os.path.realpath(__file__)) + os.sep + "data"
 
 
-def get_NIST_spectrum(mol):
+def get_NIST_spectrum(mol, data_dir=data_directory):
     """
     a parser for NIST-exported .jdx files
     """
-    data_folder = data_directory + os.sep + "NIST_spectra_data"
+    data_folder = data_dir + os.sep + "NIST_spectra_data"
     if type(mol) is not str:
         try:
             mol = mol.real_name

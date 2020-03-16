@@ -44,6 +44,7 @@ ourcolors_0 = {
     "M29": "#001146",  # propene and propane
     "M70": "purple",
     "M3": "orange",  # exotic stuff
+    "M130": "purple",
     "M132": "purple",
 }
 
