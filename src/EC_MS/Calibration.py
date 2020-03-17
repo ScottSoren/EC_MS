@@ -5,9 +5,6 @@ Most recently edited: 16J27
 
 @author: scott
 
-
-
-
 """
 
 
@@ -42,13 +39,35 @@ def ML_strip_cal(
     verbose=True,
     plot_instantaneous=False,
 ):
-    """
+    """Determine F_cal and return partially populated calibration dictionary
+
     Determines F_cal = Q_QMS / n_electrode by integrating a QMS signal over
     tspan, assuming the starting value is background; and
     integrating over vspan the difference between two CV cycles and converting
     that to a molar amount.
-    Returns a partially populated calibration dictionary.
     The calibration factor is calibration['F_cal']
+
+    FIXME Maybe rewrite the section above to the extent that some
+    information is better served below by documenting the arguments.
+
+    Args:
+        CV_and_MS (dict): CV_and_MS dict
+        cycles (list): List of the two CV cycles to calculate difference between
+        t_int (int): ...TODO...
+        cycle_str (str): ...TODO...
+        mol (str): Molecule name
+        mass (str): "primary" or ...TODO...
+        n_el (int): ...TODO...
+        Vspan (list): List of start and end of Vspan
+        redox (int): ...TODO...
+        ax (str): ...TODO... something axis ...
+        title (str): The plot title
+        verbose (bool): Whether to output verbose procedure information
+        plot_instantaneous (bool): Whether to instantaneously plot the result
+
+    Return:
+        dict: Partially populated calibration dictionary
+
     """
     if verbose:
         print("\n\ncalibration function 'ML_strip_cal' at your service!\n")
