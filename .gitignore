@@ -6,6 +6,7 @@
 src/*egg*
 build/*
 dist/*
+doc/build
 gitcommitmessage*
 *.vscode*
 pip-wheel-metadata/*
