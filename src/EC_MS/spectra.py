@@ -132,14 +132,20 @@ class Spectra:
         tstamp=None,
         data_type="PVMS",
     ):
-        print(spectrums)  # debugging
+        #print(spectrums)  # debugging
         if file_path is not None and file_path[-4:] == ".pkl":
             with open(file_path, "rb") as f:
                 data = pickle.load(f)
-            spectrums = data_to_spectrums(data)
         elif data is None and spectrums is None:
             if data_type == "PVMS":
                 data = read_PVMS(file_path)
+                spectrums = data_to_spectrums(data)
+            else:
+                print(
+                    "Spectra.__init__ does not yet support reading spectrums "
+                    + "from files with data_type = "
+                    + data_type
+                )
         self.spectrums = spectrums
         self.data = data
         self.x = spectrums[0].x
