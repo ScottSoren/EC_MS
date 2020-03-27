@@ -347,15 +347,15 @@ class Molecule:
 
         return self.RSF[mass]
 
-    def plot_spectrum(
-        self, top=100, offset=0, width=0.5, ax="new", color=None, spec={}
-    ):
+    def plot_spectrum(self, top=100, offset=0, width=0.5, ax="new", **kwargs):
         if ax == "new":
             fig1 = plt.figure()
             ax = fig1.add_subplot(111)
         x = []
         y = []
-        if color is None:
+        try:
+            color = kwargs.pop("color")
+        except KeyError:
             color = self.get_color()
         for (mass, value) in self.spectrum.items():
             if mass == "Title":
@@ -364,7 +364,7 @@ class Molecule:
             y += [value]
         y = np.array(y) / max(y) * top
         x = np.array(x)
-        ax.bar(x + offset, y, width=width, color=color, label=self.name, **spec)
+        ax.bar(x + offset, y, width=width, color=color, label=self.name, **kwargs)
         ax.set_xticks(x)
         ax.set_xticklabels([str(m) for m in x])
         ax.set_title("literature QMS spectrum for " + self.name)
