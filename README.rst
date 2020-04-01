@@ -6,7 +6,8 @@
 and especially the combination of these two types of datasets produced by electrochemistry - mass spectrometry (EC-MS) techniques such as
 differential electrochemical mass spectrometry (DEMS) and chip-based EC-MS.
 
-``EC_MS`` has grown in concert with the chip EC-MS technology sold by `Spectro Inlets <https://spectroinlets.com>`_, but supports analysis of data from other hardware.
+``EC_MS`` has grown in concert with the chip EC-MS technology sold by `Spectro Inlets <https://spectroinlets.com>`_, but is especially 
+useful data sets from other hardware and software (see below), as it automates the tedious task of ligning up the datasets in time.
 
 The primary object-oriented interface for this is the ``Dataset`` class. For example:
 
@@ -77,6 +78,8 @@ Supported Data Types
 
 - .txt files from Stanford Reasearch Systsms' Residual Gas Analyzer (data_type="RGA")
 
+- .txt files from MKS's Process Eye Professional software
+
 
 **Electrochemistry**
 
@@ -118,4 +121,4 @@ This is a pre-alpha version, so it is buggy. Please log issues on `github <https
 
 ``EC_MS`` is completely free and open-source.
 
-If you have questions or if you'd like to contribute, please write to me.
+If you have questions or if you'd like to contribute, please contact me.
