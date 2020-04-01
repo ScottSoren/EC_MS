@@ -121,12 +121,15 @@ def synchronize(
             objects_with_data += [dataset]
             datasets += [data]
 
-    if append is None:  # by default, append if all datasets are same type
-        # and share at least some data columns names
-        data_cols_list = [d["data_cols"] for d in datasets]
-        append = (len({d["data_type"] for d in datasets}) == 1) and (
-            len(set.intersection(*data_cols_list)) > 0
-        )
+    if append is None:  # figure out if we're appending by looking at the datasets
+        # simplest is if they have one time column each:
+        if len(set([d["t_str"] for d in datasets if "t_str" in d])) == 1:
+            append = True
+        else:  # Otherwise check if they're the same type and share at least some data columns names
+            data_cols_list = [d["data_cols"] for d in datasets]
+            append = (len({d["data_type"] for d in datasets}) == 1) and (
+                len(set.intersection(*data_cols_list)) > 0
+            )
 
     if t_zero is None:
         if append:
@@ -183,7 +186,15 @@ def synchronize(
         {}
     )  #'combining number' of dataset with False if its empty or True if it has data
 
-    combined_data = {"data_type": "combined", "data_cols": set(), "col_types": {}}
+    combined_data = {
+        "data_cols": set(),
+        "col_types": {},
+        "timecols": {},
+    }
+    if append:
+        combined_data["data_type"] = datasets[0]["data_type"]
+    else:
+        combined_data["data_type"] = "combined"
     # ^ data_cols is a SET, col_types is a DICTIONAIRY
     title_combined = ""
 
@@ -237,11 +248,7 @@ def synchronize(
             try:
                 istime = is_time(col, dataset)
             except TypeError:
-                print(
-                    "WARNING! can't tell if "
-                    + col
-                    + " is time. Removing from data_cols."
-                )
+                print(f"WARNING! can't tell if {col} is time. Removing from data_cols.")
                 dataset["data_cols"].remove(col)
                 continue
             if istime:
@@ -405,9 +412,7 @@ def synchronize(
         if not hasdata[nd]:
             if verbose:
                 print(
-                    "skipping this dataset, because its combining number, "
-                    + str(nd)
-                    + ", is in the empty files list"
+                    "skipping this dataset, because its combining number, {nd}, is in the empty files list"
                 )
             continue
 
@@ -470,9 +475,7 @@ def synchronize(
                     data = data[masks[get_timecol(col, dataset)]]
                 except KeyError:
                     print(
-                        "WARNING: coulsn't cut "
-                        + col
-                        + " because no mask for its timecol"
+                        f"WARNING: coulsn't cut {col} because no mask for its timecol"
                     )
             # processing: offsetting
             if is_time(col, dataset):
@@ -497,14 +500,8 @@ def synchronize(
                 # timecol will have been processed first or not...
                 except KeyError:
                     print(
-                        "WARNING: "
-                        + col
-                        + " should have timecol "
-                        + timecol
-                        + " but this is "
-                        + " not in dataset. Not adding "
-                        + col
-                        + " to the combined dataset."
+                        "WARNING: {col} should have timecol {timecol} but this is "
+                        + +f" not in dataset. Not adding {col} to the combined dataset."
                     )
                     continue
                 if (
@@ -516,16 +513,9 @@ def synchronize(
                         ):  # debugging. This particular problem (0's for Ewe/V in CP datasets)
                             # turns out to be an EC-Lab text export bug, not my bug!
                             print(
-                                "col = "
-                                + col
-                                + ". \ndataset['data_cols'] = "
-                                + str(dataset["data_cols"])
-                                + ".\ncombined_data['data_cols'] = "
-                                + str(combined_data["data_cols"])
-                                + "\nl1 = "
-                                + str(l1)
-                                + "\nl0 = "
-                                + str(l0)
+                                f"col = {col}. \ndataset['data_cols'] = {dataset['data_cols']}."
+                                + f"\ncombined_data['data_cols'] = {combined_data['data_cols']}"
+                                + f"\nl1 = {l1}\nl0 = {l0}"
                             )  # debugging DEBUGGING!
                             from matplotlib import pyplot as plt
 
@@ -584,6 +574,16 @@ def synchronize(
                 combined_data["data_cols"].add(col)
             # And make sure the dataset knows what type it is:
             combined_data["col_types"][col] = get_type(col, dataset)
+            # and what the timecol is:
+            if "timecols" in dataset and col in dataset["timecols"]:
+                if (
+                    col in combined_data["timecols"]
+                    and not combined_data["timecols"] == dataset["timecols"]
+                ):
+                    print(
+                        "WARNING!!! datasets don't agree on timecol for {col}. Using {timecol}."
+                    )
+                combined_data["timecols"][col] = dataset["timecols"][col]
 
         # keep the metadata from the original datasets
         for col, value in dataset.items():
@@ -642,8 +642,9 @@ def synchronize(
         # print('about to cut ' + col + ' according to timecol ' + timecol) # debugging
         try:
             l0 = len(combined_data[timecol])
-        except KeyError:
+        except (KeyError, TypeError):
             print("can't find timecol for {}. skipping.".format(col))
+            continue
         if l0 > l1:
             if (
                 col == "Ewe/V" and "<Ewe>/V" in dataset
@@ -799,10 +800,7 @@ def cut_dataset(
         timecol = get_timecol(col, dataset)
         if timecol not in dataset:
             print(
-                "Warning!!! can't cut "
-                + col
-                + " because dataset doesn't have timecol "
-                + timecol
+                f"Warning!!! can't cut {col} because dataset doesn't have timecol {timecol}"
             )
             purge_column(dataset, col, purge=purge, verbose=verbose)
             continue
@@ -999,6 +997,20 @@ def rename_RGA_cols(data):
             data["data_cols"].add(mass + "-x")
             data["data_cols"].add(mass + "-y")
             print(channel + " copied to " + mass)
+
+
+def rename_MKS_cols(data):
+    for col in data["data_cols"].copy():
+        if col[:4] == "Mass":
+            mass = "M" + str(col[5:])
+            xcol, ycol = mass + "-x", mass + "-y"
+            data[xcol] = data["Time"].copy()
+            data[ycol] = data[col].copy()
+            print("copied " + col + " to " + mass)
+            data["timecols"][ycol] = xcol
+            for col in xcol, ycol:
+                data["col_types"][col] = "MS"
+                data["data_cols"].add(col)
 
 
 def rename_CHI_cols(data):

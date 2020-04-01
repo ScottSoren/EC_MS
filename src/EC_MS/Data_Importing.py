@@ -171,7 +171,10 @@ def text_to_data(
     N_head = N_lines  # this will change when I find the line that tells me how ling the header is
     header_string = ""
 
-    dataset = {}
+    data = {}
+    data["data_type"] = data_type
+    data["timecols"] = {}
+
     commacols = []  # will catch if data is recorded with commas as decimals.
 
     loop = False
@@ -185,7 +188,7 @@ def text_to_data(
     elif data_type == "RGA":
         sep = ","
         N_blank = 2
-        dataset["channels"] = {}
+        data["channels"] = {}
     elif data_type == "CHI":  # CH Instruments potentiostat
         N_blank = 2
         sep = ","
@@ -224,13 +227,13 @@ def text_to_data(
                 elif re.search("Number of loops", line):
                     # Then I want to add a loop number variable to data_cols
                     loop = True
-                    dataset["loop number"] = []
+                    data["loop number"] = []
                 elif re.search("Loop", line):
                     n = int(re.search(r"^Loop \d+", line).group()[5:])
                     start = int(re.search(r"number \d+", line).group()[7:])
                     finish = int(re.search(r"to \d+", line).group()[3:])
                     N = finish - start + 1
-                    dataset["loop number"] += N * [n]
+                    data["loop number"] += N * [n]
 
             elif data_type == "MS":
                 if len(line.strip()) == 0:
@@ -273,7 +276,7 @@ def text_to_data(
                         print("title '" + str(title) + "' found in line " + str(nl))
                 if items[0] == "offset":
                     offset = float(items[-1])
-                    dataset["SI offset"] = offset
+                    data["SI offset"] = offset
                     if verbose:
                         print(
                             "SI offset '" + str(offset) + "' found in line " + str(nl)
@@ -314,7 +317,7 @@ def text_to_data(
                     ]
                     channel = "Channel#" + items[0]
                     mass = "M" + items[1].split(".")[0]
-                    dataset["channels"][channel] = mass
+                    data["channels"][channel] = mass
                 if "Analog Scan" in l:
                     col_headers = ["m/z", "signal/A"]
                     got_col_headers = True
@@ -335,12 +338,12 @@ def text_to_data(
                         l, tz=tz, out="all", verbose=verbose
                     )
                 if "Segment = " in line:
-                    dataset["segments"] = line.split(" = ")[-1].strip()
-                    last_segment_line = "Segment " + dataset["segments"] + ":"
-                if "segments" in dataset and last_segment_line in line:
+                    data["segments"] = line.split(" = ")[-1].strip()
+                    last_segment_line = "Segment " + data["segments"] + ":"
+                if "segments" in data and last_segment_line in line:
                     N_blank = 1
                 if "Scan Rate (V/s)" in line:
-                    dataset["scan rate"] = (
+                    data["scan rate"] = (
                         eval(line.split(" = ")[-1].strip()) * 1e3
                     )  # in mV/s
                 if "Time/s" in line:  # then it's actually the column header line.
@@ -374,18 +377,18 @@ def text_to_data(
 
             # print(col_headers) # debugging
 
-            dataset["N_col"] = len(col_headers)
-            dataset["data_cols"] = set(
+            data["N_col"] = len(col_headers)
+            data["data_cols"] = set(
                 col_headers.copy()
             )  # will store names of columns containing data
-            if not len(col_headers) == len(dataset["data_cols"]):
+            if not len(col_headers) == len(data["data_cols"]):
                 print("WARNING: repeated column headers!!!")
                 print("col_headers = " + str(col_headers))
 
-            dataset["col_types"] = dict([(col, data_type) for col in col_headers])
+            data["col_types"] = dict([(col, data_type) for col in col_headers])
 
             for col in col_headers:
-                dataset[col] = []  # data will go here
+                data[col] = []  # data will go here
             header_string = header_string + line  # include this line in the header
             if verbose:
                 print("Data starting on line " + str(N_head) + "\n")
@@ -403,14 +406,14 @@ def text_to_data(
                     continue
                 yyyy, dd, mm = timestring[6:10], timestring[0:2], timestring[3:5]
                 timestring = yyyy + "/" + mm + "/" + dd + timestring[-9:]
-                t = timestring_to_epoch_time(timestring)
+                t = timestring_to_epoch_time(timestring, verbose=False)
                 line_data[0] = str(t)
 
             if not len(line_data) == len(col_headers):
                 # print('Mismatch between col_headers and data on line ' + str(nl) + ' of ' + title) #debugging
                 pass
             for col, x in zip(col_headers, line_data):
-                if not col in dataset["data_cols"]:
+                if not col in data["data_cols"]:
                     # don't try adding data to a column that has already been determined not to have data!
                     continue
                 try:
@@ -419,6 +422,11 @@ def text_to_data(
                     if x == "":
                         continue  # added 17C22 to deal with data acquisition crashes.
                     try:
+                        if verbose and not col in commacols:
+                            print(
+                                f"ValueError on value {x} in column {col} line {nl}\n"
+                                + "Checking if yo're using commas as decimals in that column..."
+                            )
                         x = x.replace(".", "")
                         # ^ in case there's also '.' as thousands separator, just get rid of it.
                         x = x.replace(",", ".")  # put '.' as decimals
@@ -427,68 +435,65 @@ def text_to_data(
                         if verbose:
                             print(list(zip(col_headers, line_data)))
                             print(
-                                title
-                                + " in text_to_data: \nRemoved '"
-                                + str(col)
-                                + "' from data columns because of value '"
-                                + str(x)
-                                + "' at line "
-                                + str(nl)
-                                + "\n"
+                                f"{title} in text_to_data: \nRemoved {col} from data columns"
+                                + f" because ofvalue '{x}' at line {nl}\n"
                             )
-                        dataset["data_cols"].remove(col)
+                        data["data_cols"].remove(col)
                     else:
-                        if verbose and not col in commacols:
-                            print(
-                                "ValueError on value "
-                                + str(x)
-                                + " in column "
-                                + col
-                                + " line "
-                                + str(nl)
-                                + "\n Checking if you"
-                                "re using commas as decimals in that column... "
-                            )
                         if not col in commacols:
                             if verbose:
                                 print("... and you were, dumbass. I" "ll fix it.")
                             commacols += [col]
-                dataset[col].append(x)
+                data[col].append(x)
 
-    if data_type == "MKS":
-        tstamp = dataset["Time"][0]
-        dataset["Time"] -= np.array(dataset["Time"]) - tstamp
-        tstamp = epoch_time_to_timestamp(tstamp)
-        date = None
     if loop:
-        dataset["data_cols"].add("loop number")
-    dataset["title"] = title
-    dataset["header"] = header_string
-    dataset["timestamp"] = timestamp
-    dataset["date"] = date
+        data["data_cols"].add("loop number")
+    data["title"] = title
+    data["header"] = header_string
+    data["timestamp"] = timestamp
+    data["date"] = date
     if tstamp is None:
         tstamp = timestring_to_epoch_time(
             timestamp, date, tz=tz, verbose=verbose, out="tstamp"
         )
-    dataset["timezone"] = tz
-    dataset["tstamp"] = tstamp
-    # UNIX epoch time, for proper synchronization!
-    dataset["data_type"] = data_type
 
-    if (
-        data_type == "EC"
-    ):  # so that synchronize can combine current data from different EC-lab techniques
-        if "<I>/mA" in dataset["data_cols"] and "I/mA" not in dataset["data_cols"]:
+    if data_type == "EC":
+        # rename potential and current variables,
+        # so that synchronize can combine current data from different EC-lab techniques:
+        if "<I>/mA" in data["data_cols"] and "I/mA" not in data["data_cols"]:
             # so that synchronize can combine current data from different EC-lab techniques
-            dataset["data_cols"].add("I/mA")
-            dataset["I/mA"] = dataset["<I>/mA"].copy()
-        if "<Ewe>/V" in dataset["data_cols"] and "Ewe/V" not in dataset["data_cols"]:
-            dataset["data_cols"].add("Ewe/V")
-            dataset["Ewe/V"] = dataset["<Ewe>/V"].copy()
+            data["data_cols"].add("I/mA")
+            data["I/mA"] = data["<I>/mA"].copy()
+        if "<Ewe>/V" in data["data_cols"] and "Ewe/V" not in data["data_cols"]:
+            data["data_cols"].add("Ewe/V")
+            data["Ewe/V"] = data["<Ewe>/V"].copy()
+        # and populate timecols
+        for col in data["data_cols"]:
+            data["timecols"][col] = "time/s"
+        data["t_str"] = "time/s"
+    elif data_type == "MS":
+        data["t_str"] = "<mass>-x"
+    elif data_type == "RGA":
+        for col in data["data_cols"]:
+            data["timecols"][col] = "Time (s)"
+        data["t_str"] = "Time (s)"
+    elif data_type == "MKS":
+        print(data.keys())  # debugging
+        tstamp = data["Time"][0]
+        data["Time"] = np.array(data["Time"]) - tstamp
+        timestamp = epoch_time_to_timestamp(tstamp)
+        date = None
+        for col in data["data_cols"]:
+            data["timecols"][col] = "Time"
+        data["t_str"] = "Time"
+    # I kind of think timecols should be defined for everything here, but it might not be
+
+    data["timezone"] = tz
+    data["tstamp"] = tstamp  # UNIX epoch time, for proper synchronization! :D
 
     if verbose:
         print("\nfunction 'text_to_data' finished!\n\n")
-    return dataset
+    return data
 
 
 def import_data(*args, **kwargs):
@@ -590,6 +595,10 @@ def load_from_file(
         from .PVMassSpec import rename_PVMS_cols
 
         rename_PVMS_cols(data)
+    elif data_type == "MKS":
+        from .Combining import rename_MKS_cols
+
+        rename_MKS_cols(data)
 
     if verbose:
         print("\nfunction 'load_from_file' finished!\n\n")
@@ -902,7 +911,7 @@ def save_as_text(
     header=None,
     N_chars=None,
     timecols={},
-    **kwargs
+    **kwargs,
 ):
     """
     kwargs is fed directly to Molecule.get_flux()

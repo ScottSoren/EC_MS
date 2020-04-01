@@ -160,23 +160,21 @@ def timestring_to_epoch_time(
         try:
             # print(timestring) # debugging
             timestamp = re.search(timestamp_match, timestring).group()
+        except AttributeError:
+            if verbose:
+                print(
+                    f"WARNING: I got no clue what you're talking 'bout when you say {timestamp}."
+                    + f"It didn't match {timestamp_match}. Assuming you want 00:00:00"
+                )
+            timestamp = "00:00:00"
+        else:
             hh = int(timestamp[0:2])
             if "PM" in timestring and not hh == 12:
                 # Holy fuck the whole AM/PM thing is stupid
                 timestamp = str(hh + 12) + timestamp[2:]
             elif "AM" in timestring and hh == 12:
                 timestamp = "00" + timestamp[2:]
-        except AttributeError:
-            if verbose:
-                print(
-                    "WARNING: I got no clue what you're talking 'bout "
-                    + "when you say "
-                    + timestamp
-                    + ". It didn't match \."
-                    + timestamp_match
-                    + "'. Assuming you want 00:00:00"
-                )
-            timestamp = "00:00:00"
+
         if verbose:
             print("found timestamp = " + timestamp)
     else:
