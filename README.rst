@@ -78,7 +78,7 @@ Supported Data Types
 
 - .txt files from Stanford Reasearch Systsms' Residual Gas Analyzer (data_type="RGA")
 
-- .txt files from MKS's Process Eye Professional software
+- .txt files from MKS's Process Eye Professional software (data_type="MKS")
 
 
 **Electrochemistry**
