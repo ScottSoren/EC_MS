@@ -87,6 +87,7 @@ class Dataset:
         """
         self.type = "Dataset"
         self.verbose = verbose
+        self.empty = True  # will be set to false below if necessary
         if folder is not None:  # then go to the folder and remember how to get back
             back = os.getcwd()
             os.chdir(folder)
@@ -126,6 +127,7 @@ class Dataset:
                 "Warning!!! Please specify file_name and/or folder."
                 + " Returning an empty dataset"
             )
+            self.empty = True
 
         if folder is not None:  # time to go home.
             os.chdir(back)
@@ -187,7 +189,15 @@ class Dataset:
         self.data[key] = value
 
     def __add__(self, dataset_2):
-        new_data = synchronize([self.data, dataset_2.data])
+        if dataset_2.empty:
+            print(
+                "WARNING!!!! Can't add an empty Dataset: Just returning the original Dataset"
+            )
+            return self
+        elif self.empty:
+            print("adding to an empty Dataset: Just returning the second Dataset")
+            return dataset_2
+        new_data = synchronize([self.data, dataset_2.data], override=True)
         new_dataset = Dataset(new_data)
         return new_dataset
 
