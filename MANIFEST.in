@@ -1,0 +1,7 @@
+include *.rst
+
+# standard colors and evt. other preferences:
+recursive-include src/EC_MS/preferences *.txt *py
+
+# Molecule and Chip data in the JSON-like format read by Object_Files.py, and NIST spectra files:
+recursive-include src/EC_MS/data *.txt *.jdx 

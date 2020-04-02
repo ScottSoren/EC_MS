@@ -1,5 +1,12 @@
-__pycache__/*
+*/__pycache__/*
 *~
 *.pyc
 *.html
 *.png
+src/*egg*
+build/*
+dist/*
+doc/build
+gitcommitmessage*
+*.vscode*
+pip-wheel-metadata/*

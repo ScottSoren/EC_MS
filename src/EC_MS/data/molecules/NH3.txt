@@ -1,0 +1,13 @@
+name: NH3
+formula: NH3
+
+sigma_100eV	=	3.012
+sigma_70eV	=	3.036
+spectrum
+	Title: NIST_20B12
+	M14	=	220
+	M15	=	751
+	M16	=	8007
+	M17	=	9999
+	M18	=	40
+primary: M16
