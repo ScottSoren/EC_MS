@@ -11,7 +11,7 @@ utilize text files in EC_MS/data/
 """
 
 from __future__ import print_function, division
-import os
+import os, re
 import numpy as np
 from matplotlib import pyplot as plt
 from numbers import Number
@@ -21,7 +21,6 @@ from . import Chem
 from .Object_Files import structure_to_lines, lines_to_dictionary, write_to_file
 from .Object_Files import lines_to_structure, date_scott, update_lines
 from .Combining import get_cols_for_mass
-from .MS import get_NIST_spectrum
 
 
 preferencedir = os.path.dirname(os.path.realpath(__file__)) + os.sep + "preferences"
@@ -87,7 +86,7 @@ class Molecule:
             self.has_file = True
             if len(self.file_lines) == 0:
                 print("The file for " + name + " is empty!")
-                raise MoleculeError
+                #raise MoleculeError
             self.reset(verbose=verbose)
             self.file_lines = ["name: " + self.name] + self.file_lines
 
@@ -870,3 +869,48 @@ def add_script_to_datafiles(path, file_name, attrs="all", mdict={}, mols="all"):
 
         d = getattr(module, var)
         mdict = add_to_datafiles(newvar, d, mdict, mols=mols)
+
+
+
+def get_NIST_spectrum(mol, data_dir=data_directory):
+    """
+    a parser for NIST-exported .jdx files
+    """
+    data_folder = data_dir + os.sep + "NIST_spectra_data"
+    if type(mol) is not str:
+        try:
+            mol = mol.real_name
+        except AttributeError:
+            mol = mol.name
+
+    file_list = os.listdir(data_folder)
+
+    try:
+        file = next(f for f in file_list if re.search("^" + mol, f))
+    except StopIteration:
+        print("WARNING!!! No Spectrum available for " + mol)
+        raise FileNotFoundError
+    # ^ file-extension-ambiguous because I might forget and save them as .txt at some point
+
+    with open(data_folder + os.sep + file) as f:
+        lines = f.readlines()
+
+    in_data = False
+    spectrum = {}
+    for line in lines:
+        if "END" in line:
+            break
+        if in_data:
+            # print(line) # debugging
+            mass_values = line.strip().split(" ")
+            for mass_value in mass_values:
+                mass, value = mass_value.split(",")
+                mass = "M" + mass
+                value = eval(value)
+                spectrum[mass] = value
+        elif "PEAK TABLE" in line:
+            in_data = True
+
+    return spectrum
+
+
