@@ -20,7 +20,7 @@ from functools import wraps
 from . import Chem
 from .Object_Files import structure_to_lines, lines_to_dictionary, write_to_file
 from .Object_Files import lines_to_structure, date_scott, update_lines
-from .Combining import get_cols_for_mass
+from .parsing_tools import get_cols_for_mass
 
 
 preferencedir = os.path.dirname(os.path.realpath(__file__)) + os.sep + "preferences"
@@ -86,7 +86,7 @@ class Molecule:
             self.has_file = True
             if len(self.file_lines) == 0:
                 print("The file for " + name + " is empty!")
-                #raise MoleculeError
+                # raise MoleculeError
             self.reset(verbose=verbose)
             self.file_lines = ["name: " + self.name] + self.file_lines
 
@@ -871,7 +871,6 @@ def add_script_to_datafiles(path, file_name, attrs="all", mdict={}, mols="all"):
         mdict = add_to_datafiles(newvar, d, mdict, mols=mols)
 
 
-
 def get_NIST_spectrum(mol, data_dir=data_directory):
     """
     a parser for NIST-exported .jdx files
@@ -884,7 +883,8 @@ def get_NIST_spectrum(mol, data_dir=data_directory):
             mol = mol.name
 
     file_list = os.listdir(data_folder)
-
+    print(data_folder)  # debugging
+    print(file_list)  # debugging
     try:
         file = next(f for f in file_list if re.search("^" + mol, f))
     except StopIteration:
@@ -912,5 +912,3 @@ def get_NIST_spectrum(mol, data_dir=data_directory):
             in_data = True
 
     return spectrum
-
-

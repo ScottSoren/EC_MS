@@ -13,7 +13,8 @@ from scipy.optimize import curve_fit
 
 
 from .Molecules import Molecule
-from .Combining import cut, get_cols_for_mass
+from .Combining import cut
+from .parsing_tools import get_cols_for_mass
 from .Object_Files import lines_to_dictionary, date_scott
 from .EC import sync_metadata
 from . import Chem
