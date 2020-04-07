@@ -43,9 +43,12 @@ ourcolors_0 = {
     "M29": "#001146",
     "M70": "purple",
     "M3": "orange",
+    "M73": "crimson",
     "M74": "r",
     "M60": "g",
     "M58": "darkcyan",
+    "M88": "darkred",
+    "M89": "darkmagenta",
     "M130": "purple",
     "M132": "purple",
 }
