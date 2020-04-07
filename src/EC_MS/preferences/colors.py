@@ -22,28 +22,30 @@ ourcolors_0 = {
     "M28": "0.5",
     "M32": "k",
     "M40": "c",
-    "M44": "brown",  # H2, He, and air
+    "M44": "brown",
     "M15": "r",
     "M26": "g",
     "M27": "limegreen",
     "M30": "darkorange",
     "M31": "yellowgreen",
-    "M43": "tan",  # hydrocarbons
-    #'M34':'indigo', 'M36':'darkslategray', #O2 isotopes
+    "M43": "tan",
     "M45": "darkgreen",
     "M34": "r",
-    "M36": "g",  # if there's no risk of M15 or M26, whatever.
+    "M36": "g",
     "M46": "purple",
-    "M48": "darkslategray",  # CO2 isotopes
+    "M48": "darkslategray",
     "M20": "slateblue",
     "M16": "steelblue",
     "M19": "teal",
-    "M17": "chocolate",  # H2O isotopes
+    "M17": "chocolate",
     "M41": "#FF2E2E",
     "M42": "olive",
-    "M29": "#001146",  # propene and propane
+    "M29": "#001146",
     "M70": "purple",
-    "M3": "orange",  # exotic stuff
+    "M3": "orange",
+    "M74": "r",
+    "M60": "g",
+    "M58": "darkcyan",
     "M130": "purple",
     "M132": "purple",
 }
