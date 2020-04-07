@@ -2,16 +2,17 @@
 """
 Created on Fri Feb 14 10:28:25 2020
 
+Peak class copied from EC_Xray commit 13b3dbf
+
 @author: scott
 """
 
 import os, re
 import numpy as np
 from matplotlib import pyplot as plt
+from scipy.optimize import curve_fit
 
 data_directory = os.path.dirname(os.path.realpath(__file__)) + os.sep + "data"
-
-
 
 
 def gauss(x, center, sigma, height):
@@ -34,21 +35,50 @@ class Peak:
             x, y = x[mask], y[mask]
         self.x = x
         self.y = y
-        self.background = np.zeros(x.shape)
+        self.y_bg = np.zeros(x.shape)
         self.bg = False
 
-    def set_background(self, background):
-        if not len(background) == len(self.x):
-            print("background wrong length.")
-            raise ValueError
-        self.background = background
-        self.bg = True
-
-    def get_background(self, *args, **kwargs):
+    def get_background(self, y_bg=None, bg_mode="linear", endpoints=2):
+        """
+        This can be much simpler than the ridiculous background subtraction
+        stuff I had going in EC_Xray because mass spec peaks always come
+        at integer m/z and so it's easy to surround the peak
+        """
         x, y = self.x, self.y
-        self.background = get_peak_background(x, y, **kwargs)
+        if bg_mode == "linear":
+            # draw a background line through the endpoints
+            x_start, x_finish = np.mean(x[:endpoints]), np.mean(x[-endpoints:])
+            y_start, y_finish = np.mean(y[:endpoints]), np.mean(y[-endpoints:])
+
+            y_bg = y_start + (x - x_start) / (x_finish - x_start) * (y_finish - y_start)
+
+        return y_bg
+
+    def set_background(self, bg=True, y_bg=None, bg_mode="linear", endpoints=2):
+        self.reset()
+        if bg:
+            y_bg = self.get_background(y_bg=y_bg, bg_mode=bg_mode, endpoints=endpoints)
+            self.y_bg = y_bg
+        else:
+            self.y_bg = np.zeros(self.x.shape)
+
+    def subtract_background(self, y_bg=None, bg_mode="linear", endpoints=2):
+        self.reset()  # to avoid losing the ability to restore the original
+        # by subtracting a new background from background-subtracted data
+        y_bg = self.get_bacground(y_bg=y_bg, bg_mode=bg_mode, endpoints=endpoints)
+
+        self.y_bg = y_bg
         self.bg = True
-        return self.background
+        self.y = self.y - y_bg
+
+    def reset(self):
+        """
+        so far only implemented for masses.
+        """
+        if self.bg:
+            y_bg = self.y_bg
+            self.y = self.y + y_bg
+            self.bg = False
 
     def get_integral(self, *args, **kwargs):
         if "mode" in kwargs and kwargs["mode"] in ["gauss", "fit"]:
@@ -68,9 +98,14 @@ class Peak:
                 ax.fill_between(x, background, y, where=y > background, color="g")
         return integral
 
-    def fit_gauss(self, center=None, sigma=None, ax=None):
-        x, y, background = self.x, self.y, self.background
-        y = y - background
+    def fit_gauss(
+        self, center=None, sigma=None, ax=None, y_bg=None, bg_mode=None, endpoints=2
+    ):
+        if y_bg or bg_mode:
+            self.set_background(y_bg=y_bg, bg_mode=bg_mode, endpoints=endpoints)
+
+        x, y, y_bg = self.x, self.y, self.y_bg
+        y = y - y_bg
 
         guess_c = (x[-1] + x[0]) / 2
         guess_s = (x[-1] - x[0]) / 2
@@ -121,9 +156,9 @@ class Peak:
         if ax is not None:
             if ax == "new":
                 fig, ax = plt.subplots()
-            ax.plot(x, background, "b--")
-            ax.plot(x, y + background, "k.")
-            ax.plot(x, fit + background, "r--")
+            ax.plot(x, y_bg, "b--")
+            ax.plot(x, y + y_bg, "k.")
+            ax.plot(x, fit + y_bg, "r--")
 
         return center, sigma, height
 

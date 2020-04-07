@@ -78,6 +78,7 @@ class Dataset:
         file_path=None,
         folder=None,
         tag=None,
+        data={},  # will get replaced if it's not initialized empty.
         data_type=None,
         file_type=None,
         verbose=True,
@@ -131,6 +132,8 @@ class Dataset:
 
         if folder is not None:  # time to go home.
             os.chdir(back)
+        if not hasattr(self, "data"):
+            self.data = data
         if data_type is not None:
             self.data["data_type"] = data_type
         self.update_with_data()
@@ -138,6 +141,7 @@ class Dataset:
     def update_with_data(self):
         if not hasattr(self, "data") or "data_cols" not in self.data:
             print("Warning!!! Empty dataset.")
+            self.data = {"data_cols": set([]), "timecols": {}}
             return
         for key, value in self.data.items():
             if key not in self.data["data_cols"]:
@@ -176,12 +180,10 @@ class Dataset:
         """
         try:
             return getattr(self, key)
-        except AttributeError:
+        except (AttributeError, TypeError):
             raise KeyError(
-                "Dataset has no attribute "
-                + key
-                + " and Dataset.data has no key "
-                + key
+                f"Dataset has no attribute {key}"
+                + f" and Dataset.data has no key {key}"
             )
 
     def __setitem__(self, key, value):
@@ -203,6 +205,8 @@ class Dataset:
 
     def add_data_col(self, col, value, col_type=None):
         self.data[col] = value
+        if not "data_cols" in self.data:
+            self.data["data_cols"] = set([])
         self.data["data_cols"].add(col)
         if col_type is not None:
             if "col_types" not in self.data:
@@ -397,7 +401,7 @@ class Dataset:
                         cycles=cycles,
                         cycle_str=key,
                         verbose=verbose,
-                        **kwargs
+                        **kwargs,
                     )
         new_dataset = Dataset(new_data)
         for attr in metadata_items:

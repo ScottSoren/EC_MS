@@ -9,6 +9,8 @@ import numpy as np
 from matplotlib import pyplot as plt
 
 from .PVMassSpec import read_PVMS
+from .MS import Peak
+from .dataset import Dataset
 
 float_match = "[-]?\d+[\.]?\d*(e[-+]?\d+)?"  # matches floats like '-3.5e4' or '7' or '245.13' or '1e-15'
 
@@ -48,12 +50,12 @@ class Spectrum:
         index=0,
         data_type="PVMS",
     ):
-        print("Initiating Spectrum!")  # debugging
+        # print("Initiating Spectrum!")  # debugging
         if x is None and y is None:
             spectra = Spectra(file_path, data_type=data_type)
             spectrum = spectra[index]
             x, y, t, tstamp = spectrum.x, spectrum.y, spectrum.t, spectrum.tstamp
-        print(file_path)  # debugging
+        # print(file_path)  # debugging
         self.x = x
         self.y = y
         self.t = t
@@ -129,6 +131,21 @@ class Spectrum:
             ax.fill_between(x, y, bg * np.ones(x.shape), **kwargs)
         return integral
 
+    def get_peak(self, Mspan=None, mass=None, width=None):
+        if Mspan is None:
+            M = float(mass[1:])
+            Mspan = [M - width / 2, M + width / 2]
+        x, y = self.get_signal(Mspan=Mspan)
+        peak = Peak(x, y)
+        return peak
+
+    def __sub__(self, spectrum_2):
+        y_diff = self.y - spectrum_2.y
+        x = self.x
+        t = self.t
+        tstamp = self.tstamp
+        return Spectrum(x=x, y=y_diff, t=t, tstamp=tstamp)
+
 
 def spectrums_from_data(data):
     x = data["x"]
@@ -155,6 +172,7 @@ class Spectra:
         data=None,
         tstamp=None,
         data_type="PVMS",
+        name="spectra",
     ):
         # print(spectrums)  # debugging
         if file_path is not None and file_path[-4:] == ".pkl":
@@ -164,7 +182,13 @@ class Spectra:
             data = spectra_data["data"]
             self.x = spectra_data["x"]
             self.spectra = spectra_data["spectra"]
+            if "name" in spectra_data:
+                self.name = spectra_data["name"]
             self.data = data
+            try:  # okay, doing this twice, but whatever.
+                self.t = data[data["t_str"]]
+            except KeyError:
+                print("Warning!!! can't find t in self.data")
             spectrums = self.spectrums_from_spectra()
         elif data is None and spectrums is None:
             if data_type == "PVMS":
@@ -180,6 +204,7 @@ class Spectra:
         self.file_path = file_path
         if file_path is not None:
             self.folder, self.file = os.path.split(file_path)
+            name = "spectra from " + self.file
         self.spectrums = spectrums
         self.data = data
         try:
@@ -192,6 +217,8 @@ class Spectra:
             self, "spectra"
         ):  # it'll already have this if loaded from pickle
             self.spectra = np.stack([spectrum.y for spectrum in spectrums])
+        if not hasattr(self, name):
+            self.name = name
 
     def __getitem__(self, key):
         if type(key) is int:
@@ -216,8 +243,11 @@ class Spectra:
         for i, y in enumerate(spectra):
             if "t" in self.data:
                 t_i = self.data["t"][i]
+            elif hasattr(self, "t"):
+                t_i = self.t[i]
             else:
                 t_i = None
+            # print(f"{t_i} should be {self.t[i]}") # debugging
             spectrum = Spectrum(x=x, y=y, t=t_i)
             spectrums += [spectrum]
         self.spectrums = spectrums
@@ -235,6 +265,7 @@ class Spectra:
             "data": self.data,
             "tstamp": self.tstamp,
             "file_path": self.file_path,
+            "name": self.name,
         }
         with open(file_name, "wb") as f:
             pickle.dump(spectra_data, f)
@@ -306,3 +337,35 @@ class Spectra:
             kwargs.update(cmap="inferno")
 
         ax.imshow(spectra, **kwargs)
+
+    def get_dataset(
+        self,
+        masses,
+        mode="gauss_height",
+        fit_width=1,
+        y_bg=None,
+        bg_mode=None,
+        endpoints=2,
+    ):
+        dataset = Dataset(data_type=mode)
+        dataset.data = {"timecols": {}}
+        for mass in masses:
+            xcol, ycol = mass + "-x", mass + "-y"
+            x = np.array([])
+            y = np.array([])
+            M = float(mass[1:])
+            Mspan = [M - fit_width / 2, M + fit_width / 2]
+            for spectrum in self.spectrums:
+                x = np.append(x, spectrum.t)
+                peak = spectrum.get_peak(Mspan=Mspan)
+                peak.fit_gauss(y_bg=y_bg, bg_mode=bg_mode, endpoints=endpoints)
+                y = np.append(y, peak.height)
+            dataset.add_data_col(xcol, x, col_type=mode)
+            dataset.add_data_col(ycol, y, col_type=mode)
+            dataset.timecols[ycol] = xcol
+        dataset.data["tstamp"] = self.data["tstamp"]
+        dataset.data["data_type"] = "spectra"
+        dataset["title"] = self.name
+        dataset.empty = False
+
+        return dataset
