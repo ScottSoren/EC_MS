@@ -185,6 +185,8 @@ class Spectra:
             if "name" in spectra_data:
                 self.name = spectra_data["name"]
             self.data = data
+            if tstamp is None and "tstamp" in data:
+                tstamp = data["tstamp"]
             try:  # okay, doing this twice, but whatever.
                 self.t = data[data["t_str"]]
             except KeyError:
@@ -194,6 +196,8 @@ class Spectra:
             if data_type == "PVMS":
                 data = read_PVMS(file_path)
                 spectrums = data_to_spectrums(data)
+                if tstamp is None and "tstamp" in data:
+                    tstamp = data["tstamp"]
             else:
                 print(
                     "Spectra.__init__ does not yet support reading spectrums "
@@ -274,10 +278,10 @@ class Spectra:
         self,
         ax="new",
         vs="number",
-        logscale=False,
-        orientation="xy",
+        logscale=True,
+        orientation="yx",
         zrange=None,
-        **kwargs
+        **kwargs,
     ):
         """
         kwargs are passed on to imshow.
@@ -294,6 +298,10 @@ class Spectra:
             t = self.t
             t_label = "time / [s]"
         M = self.x
+
+        # this makes the extent one increment off.
+        t = np.append(t, 2 * t[-1] - t[-2])
+        M = np.append(M, 2 * M[-1] - M[-2])
 
         if orientation == "xy":
             spectra = np.swapaxes(spectra, 0, 1)
@@ -356,13 +364,25 @@ class Spectra:
             M = float(mass[1:])
             Mspan = [M - fit_width / 2, M + fit_width / 2]
             for spectrum in self.spectrums:
-                x = np.append(x, spectrum.t)
                 peak = spectrum.get_peak(Mspan=Mspan)
-                peak.fit_gauss(y_bg=y_bg, bg_mode=bg_mode, endpoints=endpoints)
-                y = np.append(y, peak.height)
+                try:
+                    peak.fit_gauss(y_bg=y_bg, bg_mode=bg_mode, endpoints=endpoints)
+                    height = peak.height
+
+                except (IndexError, AttributeError):
+                    print(
+                        f"Warning!!! can't fit data in the range for {mass} at t~{spectrum.t}. putting nan."
+                    )
+                    y = np.nan
+                x = np.append(x, spectrum.t)
+                y = np.append(y, height)
             dataset.add_data_col(xcol, x, col_type=mode)
             dataset.add_data_col(ycol, y, col_type=mode)
             dataset.timecols[ycol] = xcol
+            if not "spectrum number" in dataset.data:
+                # ^ this should get called for the first mass column
+                n_vec = np.arange(len(x))
+                dataset.add_data_col(col="spectrum number", value=n_vec, timecol="M4-x")
         dataset.data["tstamp"] = self.data["tstamp"]
         dataset.data["data_type"] = "spectra"
         dataset["title"] = self.name

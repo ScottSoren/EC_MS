@@ -88,7 +88,7 @@ class Dataset:
         """
         self.type = "Dataset"
         self.verbose = verbose
-        self.empty = True  # will be set to false below if necessary
+        self.empty = False  # will be set to True below if necessary
         if folder is not None:  # then go to the folder and remember how to get back
             back = os.getcwd()
             os.chdir(folder)
@@ -123,12 +123,6 @@ class Dataset:
                 datas += [data]
             self.data = synchronize(datas, verbose=verbose)
             sort_time(self.data)
-        else:
-            print(
-                "Warning!!! Please specify file_name and/or folder."
-                + " Returning an empty dataset"
-            )
-            self.empty = True
 
         if folder is not None:  # time to go home.
             os.chdir(back)
@@ -136,6 +130,12 @@ class Dataset:
             self.data = data
         if data_type is not None:
             self.data["data_type"] = data_type
+        if not "data_cols" in self.data:
+            print(
+                "Warning!!! Please specify file_name and/or folder."
+                + " Returning an empty dataset"
+            )
+            self.empty = True
         self.update_with_data()
 
     def update_with_data(self):
@@ -203,11 +203,15 @@ class Dataset:
         new_dataset = Dataset(new_data)
         return new_dataset
 
-    def add_data_col(self, col, value, col_type=None):
+    def add_data_col(self, col, value, timecol=None, col_type=None):
         self.data[col] = value
         if not "data_cols" in self.data:
             self.data["data_cols"] = set([])
         self.data["data_cols"].add(col)
+        if timecol is not None:
+            if "timecols" not in self.data:
+                self.data["timecols"] = {}
+            self.data["timecols"][col] = timecol
         if col_type is not None:
             if "col_types" not in self.data:
                 self.data["col_types"] = {}

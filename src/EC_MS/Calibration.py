@@ -413,6 +413,10 @@ def point_calibration(
     """
     if verbose:
         print("\n\nfunction point_calibration at your service!\n")
+    if "semi" in cal_type:
+        # to avoid confusion with siQuant,
+        # which calls calibrations of gases throught the chip "semi-internal"
+        cal_type = "external"
     m = Molecule(mol)
     if mass == "primary":
         mass = m.primary
@@ -426,7 +430,7 @@ def point_calibration(
 
     if cal_type is None:
         if n_el is None:
-            print("n_el not given! assuming calibration is external.")
+            print("n_el not given! assuming calibration is semi or external.")
             cal_type = "external"
         else:
             print("n_el given! assuming calibration is internal.")

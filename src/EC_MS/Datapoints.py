@@ -188,7 +188,7 @@ def get_mlu(stat, logmean=False):  # mlu stands for for: mean, [lower, upper]
         if len(stat) < 2:
             return stat, None
     except TypeError:
-        print("function 'get_mlu' sayd: stat must be iterable.")
+        # print("function 'get_mlu' says: stat must be iterable.") # too verbose
         return stat, None
 
     if stat[1] == 0:
@@ -239,7 +239,7 @@ def plot_errorbar(
         ax = plt.figure().add_subplot(111)
     x, x_lu = get_mlu(xstat, logmean)
     y, y_lu = get_mlu(ystat, logmean)
-    print("x_lu={}, y_lu={}".format(x_lu, y_lu))  # debugging
+    # print("x_lu={}, y_lu={}".format(x_lu, y_lu))  # debugging
     if marker is None and "marker" in specs:
         marker = specs.pop("marker")
     elif x_lu is None and y_lu is None:

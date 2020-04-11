@@ -75,7 +75,8 @@ S0 = {  # standard entropy / [J/(mol*K)]
 dfG0 = {  # standard free energies of formation / [kJ/mol]
     # I need to find a way to querry a reliable database, i.e., NIST.
     # Most of these standard energies are from
-    """ Commented out because the source is no longer accessible.
+    """
+        Commented out because the source is no longer accessible.
         # bilbo.chm.uri.edu/CHM112/tables/thermtable.htm
         'H2O':-237.1,
         'H2(g)':0,'O2(g)':0, 'Cu':0, 'C(s)':0,
@@ -87,7 +88,7 @@ dfG0 = {  # standard free energies of formation / [kJ/mol]
         'HCOOH(aq)':-356,
         'CH3COOH(aq)':-396.6,
         'C2H2O4(aq)':-697.0, 'CH3OH(l)':-166.4, 'CH3CH2OH(l)':-174.9,
-        """
+    """
     # http://www2.ucdsb.on.ca/tiss/stretton/database/organic_thermo.htm:
     "C3H6": 62.0,  # 74.7 , ... can't find a reliable one.
     "C3H8": -23.4,
