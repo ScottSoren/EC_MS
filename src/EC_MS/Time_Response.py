@@ -26,6 +26,9 @@ from . import Chem
 from .Molecules import Molecule
 from .Plotting import plot_operation
 
+from scipy import signal
+from scipy.interpolate import interp1d
+
 class mass_transport_stagnant:
     """
     Class description.
