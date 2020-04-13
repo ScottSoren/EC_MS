@@ -26,6 +26,97 @@ from . import Chem
 from .Molecules import Molecule
 from .Plotting import plot_operation
 
+class mass_transport_stagnant:
+    """
+    Class description.
+    """
+    def __init__ (
+        self,
+        area=0.196e-4, #electrode area
+        length=100e-6, #distance between electrode and membrane
+        capillary_flow=2.6e-9, #Capillary flow
+        molecule=None, #Molecule class
+        kH=None, #non-dim Henry constant
+        D=None, #Diffusion constant
+        n_el=None #electrons per mole
+    ):
+        """
+        All parameters in SI units.
+        """
+        self.area = area
+        self.length = length
+        self.capillary_flow=capillary_flow
+        self.molecule = molecule
+        self.kH = kH
+        self.D = D
+        self.n_el = n_el
+
+    @property
+    def h(self):
+        return self.kH * 8.314 * 298 * self.capillary_flow / (1e5 * self.area) #mass transport coefficient at membrane
+
+    @property
+    def tau(self):
+        return (self.length/self.h+self.length**2/(2*self.D)) #time constant
+
+    def MS_to_EC(self, time, MS_signal):
+        t_max = time[-1]
+        t_min = time[0]
+        t_length = len(time)
+
+        #if t_length%2==1:
+            #t_length+=1
+
+        #t_length_out = (t_length+1)/2
+
+        time_lin1= np.linspace(0,t_max-t_min, t_length) #converts the input time to a linear array to ensure evenly spaced time values
+        time_lin2 = time_lin1[0:int((t_length+1)/4)]
+
+        def trans(t): # Transfer function as derived in xxxx.
+            return 2/(2+self.length*self.h/self.D)*np.exp(-t/self.tau)
+
+        MS_signal=MS_signal * sum(trans(time_lin2)) / self.length * self.D * self.capillary_flow / self.h
+
+        MS_signal=signal.wiener(MS_signal)
+        MS_signal=signal.savgol_filter(MS_signal,1,0)
+        sig=interp1d(time-t_min, MS_signal)
+
+
+        current, _ = signal.deconvolve(sig(time_lin1), trans(time_lin2))
+
+
+        #current = current-current[0]
+        #zero_fill = np.zeros(2*t_length-1-len(current))
+        #current = np.concatenate((current, zero_fill))
+        current = current*self.n_el*96485
+        current=signal.savgol_filter(current,5,1)
+        current=signal.wiener(current)
+        #return current
+        return time_lin1[:len(current)]+t_min, current
+
+
+    def EC_to_MS(self, time, EC_current):
+
+        t_length = len(time)
+        t_max = time[-1]
+        t_min = time[0]
+
+
+        time_lin, step = np.linspace(0,t_max-t_min, t_length, retstep=True) #converts the input time to a linear array to ensure evenly spaced time values
+
+        def trans(t): # Transfer function as derived in xxxx.
+            return 2/(2+self.length*self.h/self.D)*np.exp(-t/self.tau)
+
+        curr=interp1d(time-t_min, abs(EC_current/(self.n_el*96485)))
+
+        conc_interphase=signal.convolve(curr(time_lin), trans(time_lin), mode='full') / sum(trans(time_lin)) * self.length/self.D
+
+        flux_MS = conc_interphase*self.h
+        p_i = flux_MS/self.capillary_flow
+        p_i = interp1d(np.linspace(0,2*(t_max-t_min)-step, 2*t_length-1), p_i)
+
+        return p_i(time-t_min)
+
 
 def fit_exponential(t, y):
     """
@@ -233,7 +324,7 @@ def stagnant_operator(
     if verbose:
         print("\n\nfunction 'stagnant_operator' at your service!\n")
     if type(mol) is str:
-        mol = Molecule(mol)
+        mol = Molecule(mol, verbose=verbose)
     if Temp is not None:
         mol.set_temperature(Temp)
     else:
@@ -313,6 +404,7 @@ def stagnant_operator(
         startstate=startstate,
         flux=False,
         N=N,
+        verbose=verbose
     )
     cc = CC * c0
     t = T * t0

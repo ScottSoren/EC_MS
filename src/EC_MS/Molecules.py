@@ -116,9 +116,10 @@ class Molecule:
                 + ": Returning a Molecule object with only the spectrum --- \n"
             )
 
-        print(
-            "name = " + str(self.name) + " , formula = " + str(self.formula)
-        )  # debugging
+        if verbose:
+            print(
+                "name = " + str(self.name) + " , formula = " + str(self.formula)
+                )  # debugging
         self.M = Chem.get_mass(self.formula)
         if self.M == 0:
             print("WARNING: could not get molecular mass for " + self.name + " !!!")
