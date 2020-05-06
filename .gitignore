@@ -10,3 +10,5 @@ doc/build
 gitcommitmessage*
 *.vscode*
 pip-wheel-metadata/*
+.idea/*
+.spyproject/*
