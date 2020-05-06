@@ -69,9 +69,9 @@ def is_Xray_data(col):
 
 def get_type(col, dataset=None):
     if dataset is not None:
-        if "col_types" in dataset and col in dataset["col_types"]:
+        if hasattr(dataset, "col_types") and col in dataset["col_types"]:
             return dataset["col_types"][col]
-        elif "data_type" in dataset and dataset["data_type"] in [
+        elif hasattr(dataset, "data_type") and dataset["data_type"] in [
             "EC",
             "MS",
             "SI",
@@ -111,7 +111,12 @@ def get_cols_for_mass(mass, dataset=None):
 
 def get_timecol(col=None, dataset=None, data_type=None, verbose=False):
     # print('getting timecol for ' + col + '. datset = ' + (str(dataset)+ 20*' ')[:20]) # debugging
-    if dataset is not None and "timecols" in dataset and col in dataset["timecols"]:
+    if (
+        dataset is not None
+        and hasattr(dataset, "timecols")
+        and col in dataset["timecols"]
+    ):
+        # funky: experession ("timecols" in dataset) looks for key 0
         return dataset["timecols"][col]
 
     if data_type is None:

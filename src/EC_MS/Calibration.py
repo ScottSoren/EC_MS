@@ -413,7 +413,7 @@ def point_calibration(
     """
     if verbose:
         print("\n\nfunction point_calibration at your service!\n")
-    if "semi" in cal_type:
+    if type(cal_type) is str and "semi" in cal_type:
         # to avoid confusion with siQuant,
         # which calls calibrations of gases throught the chip "semi-internal"
         cal_type = "external"

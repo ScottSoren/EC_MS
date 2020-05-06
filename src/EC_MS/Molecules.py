@@ -166,6 +166,26 @@ class Molecule:
             self.T = T
         return Chem.p_vap(self.name, T)
 
+    def as_dict(self):
+        self_as_dict = {}
+
+        # fmt: off
+        attr_list = [
+            "name", "real_name", "formula", "M",
+            "molecule_diameter", "dynamic_viscosity",
+            "density_RTP", "D_gas_RTP", "D",
+            "H_0", "T_C", "kH", "thermo",
+            "sigma", "sigma_100eV", "sigma_70eV" "spectrum",
+            "primary", "F_cal", "F_mat"
+            ]
+        # fmt: on
+
+        for attr in attr_list:
+            if hasattr(self, attr):
+                self_as_dict[attr] = getattr(self, attr)
+
+        return self_as_dict
+
     def reset(self, verbose=True):
         """
         Retrives data for new object from lines read from file or resets

@@ -68,7 +68,7 @@ def plot_EC_vs_t(
     J_color="r",
     ax="new",
     verbose=True,
-    **kwargs
+    **kwargs,
 ):
     if J_str is None or V_str is None:
         V_str_0, J_str_0 = sync_metadata(data)
@@ -126,7 +126,7 @@ def plot_vs_potential(
     fig=None,
     spec={},
     t_str=None,
-    **kwargs
+    **kwargs,
 ):
     """
     This will plot current and select MS signals vs E_we, as is the
@@ -206,6 +206,9 @@ def plot_vs_potential(
                 ax1 = plt.subplot(gs[0:4, 0])
                 ax2 = plt.subplot(gs[4:8, 0])
             gs.update(hspace=hspace, left=left_space, right=right_space)
+        ax = [ax1, ax2]
+
+    print(f"ax = {ax}")  # debugging
 
     if type(logplot) is int:
         logplot = [logplot, logplot]
@@ -597,7 +600,6 @@ def smooth_data(data, points=3, cols=None, verbose=True):
 
 def plot_signal(
     MS_data,
-    spec={},
     masses="all",
     tspan=None,
     ax="new",
@@ -609,6 +611,7 @@ def plot_signal(
     saveit=False,
     leg=False,
     name=None,
+    spec=None,
     override=False,
     verbose=True,
 ):
@@ -623,6 +626,8 @@ def plot_signal(
                 name = MS_data["title"]
             except KeyError:
                 name = ""
+    if spec is None:
+        spec = {}
     if verbose:
         print("\n\nfunction 'plot_signal' at your service! \n Plotting from: " + name)
 
@@ -676,6 +681,7 @@ def plot_signal(
                 + ". plot_signal is skipping that mass."
             )
             continue
+        print(spec)  # debugging
         lines[mass] = ax.plot(x, y, color, label=mass, **spec)
         # as it is, lines is not actually used for anything
     if leg:

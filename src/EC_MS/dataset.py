@@ -225,7 +225,7 @@ class Dataset:
         if col in self.data_cols:
             self.data[col] = np.append(self.data[col], value)
         else:
-            self.add_data_col(col, value, col_type)
+            self.add_data_col(col, value, col_type=col_type)
 
     def save(self, file_name, data_type=None):
         if data_type is None:
@@ -476,6 +476,10 @@ class CyclicVoltammagram(Dataset):
                 step = 1
             key = list(range(start, stop, step))
         if type(key) in [int, list]:
+            if type(key) is list and not all([type(i) is int for i in key]):
+                print("can't get an item of type list unless all elements are int")
+                print(f"you tried to get key = {key}.")
+                raise AttributeError
             return CyclicVoltammagram(
                 self.cut(cycle=key, t_zero="start", verbose=False), verbose=False
             )
@@ -800,7 +804,8 @@ class CyclicVoltammagram(Dataset):
 
                     diff.append_to_data_col(
                         col, y_diff, col_type="EC"
-                    )  # make it all bloody EC
+                    )  # if we say the col_type is EC,
+                    # then it should recognize "time/s" as the timecol.
 
         diff["tspan"] = [diff[t_str][0], diff[t_str][-1]]
         diff = CyclicVoltammagram(diff)
