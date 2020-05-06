@@ -4,7 +4,7 @@ formula: C2H6O
 M	=	46.069
 D	=	1.2e-09
 kH	=	0.000192
-sigma_100eV	=	7.8
+sigma_100eV	=	7.8 # Rejoub2003 http://dx.doi.org/10.1063/1.1531631
 spectrum
 	Title: NIST_16L14
 	M12	=	0.200020002
