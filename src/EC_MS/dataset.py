@@ -11,6 +11,8 @@ from types import FunctionType
 from functools import wraps
 from matplotlib import pyplot as plt
 from matplotlib import cm as colormap
+import plotly
+import plotly.graph_objects as go
 
 from .EC import sync_metadata, make_selector, select_cycles
 from .Data_Importing import load_from_file
@@ -404,6 +406,64 @@ class Dataset:
             if hasattr(self, attr):
                 setattr(new_dataset, attr, getattr(self, attr))
         return new_dataset
+
+    def export_html(self, name):
+
+        masses = [
+            key[:-2] for key in self.data.keys() if key[0] == "M" and key[-2:] == "-y"
+            ]
+
+
+        fig = plotly.subplots.make_subplots(rows=2, cols=1,
+                        shared_xaxes=True,
+                        vertical_spacing=0.02,
+                        specs=[[{"secondary_y": False}],
+                               [{"secondary_y": True}]])
+        for mass in masses:
+            x, y = self.get_signal(mass)
+            fig.add_trace(go.Scatter(x=x, y=y, name=mass),
+                             row = 1, col = 1,
+                            )
+
+        x_curr, y_curr = self.get_current()
+        x_pot, y_pot = self.get_potential()
+
+        fig.add_trace(go.Scatter(x=x_curr, y=y_curr, name='current'),
+                         row = 2, col = 1, secondary_y=False,
+                        )
+        fig.add_trace(go.Scatter(x=x_pot, y=y_pot, name='voltage'),
+                         row = 2, col = 1, secondary_y=True,
+                        )
+
+
+        updatemenus = list([
+            dict(active=1,
+                buttons=list([
+                    dict(label='Log Scale',
+                        method='update',
+                        args=[{'visible': [True, True]},
+                            {'title': 'Log scale',
+                                'yaxis': {'type': 'log', 'anchor': 'x', 'domain': [0.6000000000000001, 1.0]}}]),
+                    dict(label='Linear Scale',
+                        method='update',
+                        args=[{'visible': [True, True]},
+                           {'title': 'Linear scale',
+                            'yaxis': {'type': 'linear', 'anchor': 'x', 'domain': [0.6000000000000001, 1.0]}}])
+                ]),
+            )
+        ])
+
+
+        layout = dict(updatemenus=updatemenus, title='All')
+
+
+
+        fig['layout'].update(layout)
+
+        #fig = go.Figure(data=MS, layout=layout)
+
+        #fig.update_yaxes(rangeslider_visible=True)
+        fig.write_html(name + '.html')
 
 
 class CyclicVoltammagram(Dataset):
