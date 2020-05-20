@@ -14,7 +14,7 @@ from matplotlib import cm as colormap
 
 from .EC import sync_metadata, make_selector, select_cycles
 from .Data_Importing import load_from_file
-from .Combining import synchronize, cut_dataset, sort_time, get_timecol
+from .Combining import synchronize, cut_dataset, sort_time, get_timecol, timeshift
 from .Plotting import plot_experiment, plot_vs_potential, plot_flux, plot_signal
 from .EC import correct_ohmic_drop, CV_difference
 from .Quantification import get_current, get_signal, get_potential
@@ -78,7 +78,7 @@ class Dataset:
         file_path=None,
         folder=None,
         tag=None,
-        data={},  # will get replaced if it's not initialized empty.
+        data=None,  # will get replaced if it's not initialized empty.
         data_type=None,
         file_type=None,
         verbose=True,
@@ -123,6 +123,10 @@ class Dataset:
                 datas += [data]
             self.data = synchronize(datas, verbose=verbose)
             sort_time(self.data)
+        else:
+            if data is None:
+                data = {}
+            self.data = data
 
         if folder is not None:  # time to go home.
             os.chdir(back)
@@ -130,6 +134,7 @@ class Dataset:
             self.data = data
         if data_type is not None:
             self.data["data_type"] = data_type
+
         if not "data_cols" in self.data:
             print(
                 "Warning!!! Please specify file_name and/or folder."
@@ -147,7 +152,7 @@ class Dataset:
             if key not in self.data["data_cols"]:
                 try:
                     setattr(self, key, value)
-                except:
+                except Exception:
                     # not sure what the error is yet.
                     raise
 
@@ -254,6 +259,8 @@ class Dataset:
     def sync_metadata(self, *args, **kwargs):
         # print('args = ' + str(args)) # debugging. proves that args[0] is self.
         # print('kwargs = ' + str(kwargs)) # debugging
+        for key, value in kwargs.items():
+            setattr(self, key, value)  # such that i writes to e.g. self.RE_vs_RHE
         return sync_metadata(self.data, *args, **kwargs)
 
     @wraps(make_selector)
@@ -265,6 +272,14 @@ class Dataset:
     @with_update
     def correct_ohmic_drop(self, *args, **kwargs):
         return correct_ohmic_drop(self.data, *args, **kwargs)
+
+    @wraps(sort_time)
+    def sort_time(self, *args, **kwargs):
+        return sort_time(self.data, *args, **kwargs)
+
+    @wraps(timeshift)
+    def timeshift(self, *args, **kwargs):
+        return timeshift(self.data, *args, **kwargs)
 
     @wraps(plot_experiment)
     def plot_experiment(self, *args, **kwargs):
