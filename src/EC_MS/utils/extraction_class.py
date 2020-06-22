@@ -6,15 +6,15 @@ Created on Sun May  3 15:22:35 2020
 """
 import os, json
 import numpy as np
-from matplotlib import pyplot as plt
 
-data_dir = "../pickles/"
-extraction_dir = "../extractions/"
+# from matplotlib import pyplot as plt
+
+STANDARD_DATA_DIR = "../pickles/"
+STANDARD_EXTRACTION_DIR = "../extractions/"
 
 from siCalibration import Calibration
 from EC_MS import Dataset
 
-# show up in git!
 
 class Extraction(Dataset):
     """
@@ -28,9 +28,12 @@ class Extraction(Dataset):
         dataset=None,
         data_file=None,
         data_files=None,
+        data_dir=STANDARD_DATA_DIR,
         tspan_experiment=None,
         tspan_exchange=None,
         tspan_extraction=None,
+        RE_vs_RHE=None,
+        A_el=None,
         t_bg=None,
         calibration=None,
         calibration_file="20A25_sniffer.json",
@@ -39,28 +42,38 @@ class Extraction(Dataset):
         element="Pt",
         tspan_ratio=None,
         alpha=None,
+        n_ex=None,
     ):
 
         if name is None:
             name = f"extraction {element}{film} in {electrolyte}"
+        self.name = name
         if calibration is None and calibration_file is not None:
             calibration = Calibration.load(calibration_file)
+        self.calibration_file = calibration_file
         self.calibration = calibration
         self.mdict = get_EC_MS_mdict(calibration)
         # Later we will just directly use the siQuant mdict!
+        self.data_file = data_file
+        self.data_files = data_files
+        self.data_dir = data_dir
         if dataset is None:
             if data_file is not None:  # <-- load one data file
                 if os.sep not in data_file:
-                    data_file = os.path.join(data_dir, data_file)
-                dataset = Dataset(data_file)
+                    path_to_data = os.path.join(data_dir, data_file)
+                dataset = Dataset(path_to_data)
             elif data_files is not None:  # <-- synchronize multiple datasets!
                 dataset = Dataset()
                 for data_file in data_files:
                     if os.sep not in data_file:
-                        data_file = os.path.join(data_dir, data_file)
-                    dataset = dataset + Dataset(data_file)
+                        path_to_data = os.path.join(data_dir, data_file)
+                    dataset = dataset + Dataset(path_to_data)
         self.dataset = dataset
         self.data = dataset.data
+        self.RE_vs_RHE = RE_vs_RHE
+        self.A_el = A_el
+        if RE_vs_RHE is not None or A_el is not None:
+            self.normalize(RE_vs_RHE=RE_vs_RHE, A_el=A_el)
         self.tspan_experiment = tspan_experiment
         self.tspan_exchange = tspan_exchange
         self.tspan_extraction = tspan_extraction
@@ -75,13 +88,18 @@ class Extraction(Dataset):
         self.alpha = alpha
         if alpha is None and tspan_ratio is not None:
             self.get_alpha(tspan=tspan_ratio, ax=None)
-        self.n_ex = {}  # will store extraction results
+        if n_ex is None:
+            n_ex = {}
+        self.n_ex = n_ex  # will store extraction results
 
     def as_dict(self):
         self_as_dict = {}
         # fmt: off
         self_as_dict.update(
-            data_file=self.data_file, calibration_file=self.calibration_file,
+            name=self.name,
+            data_dir=self.data_dir, data_file=self.data_file,
+            data_files=self.data_files, calibration_file=self.calibration_file,
+            RE_vs_RHE=self.RE_vs_RHE, A_el=self.A_el,
             tspan_experiment=self.tspan_experiment, tspan_exchange=self.tspan_exchange,
             tspan_extraction=self.tspan_extraction, tspan_ratio=self.tspan_ratio,
             alpha=self.alpha, n_ex=self.n_ex, t_bg=self.t_bg,
@@ -96,16 +114,17 @@ class Extraction(Dataset):
         if os.sep in extraction_file:
             path_to_file = extraction_file
         else:
-            path_to_file = os.path.join(extraction_dir, extraction_file)
+            path_to_file = os.path.join(STANDARD_EXTRACTION_DIR, extraction_file)
         self_as_dict = self.as_dict()
         with open(path_to_file, "w") as f:
             json.dump(self_as_dict, f, indent=4)
 
     @classmethod
-    def load(cls, extraction_file):
-        path_to_file = os.path.join(extraction_dir, extraction_file)
+    def load(cls, extraction_file, **kwargs):
+        path_to_file = os.path.join(STANDARD_EXTRACTION_DIR, extraction_file)
         with open(path_to_file, "r") as f:
             self_as_dict = json.load(f)
+        self_as_dict.update(kwargs)
         return cls(**self_as_dict)
 
     def plot_experiment(self, *args, **kwargs):
@@ -207,6 +226,13 @@ class Extraction(Dataset):
     def get_majors_and_minors(
         self, mol="O2",
     ):
+        """
+        Get the majority and minority isotopes of mol produced in the electrolyte
+
+        majors are ^{16}O2 and C^{16}O2 in 16O electrolyte,
+        ^{18}O2 and (C^{16}O^{18}O and C^{18}O2) in 18O electrolyte,
+        minors are the other isotopes.
+        """
         if self.electrolyte == "18O":
             if mol == "O2":
                 majors = [self.mdict["O2_M36"]]
@@ -228,10 +254,12 @@ class Extraction(Dataset):
         if self.electrolyte == "18O":
             ratio = 2 * alpha / (1 - alpha)
         elif self.electrolyte == "16O":
-            ratio = 2 * (1 - alpha) / (alpha)
+            ratio = 2 * (1 - alpha) / alpha
         return ratio
 
-    def plot_exchange(self, mol="O2", tspan=None, t_bg=None, axes="new", unit="pmol/s"):
+    def plot_exchange(
+        self, mol="O2", tspan=None, t_bg=None, axes="new", unit="pmol/s", **kwargs
+    ):
         if tspan is None or tspan == "experiment":
             tspan = self.tspan_experiment
         elif tspan == "exchange":
@@ -249,6 +277,7 @@ class Extraction(Dataset):
                 logplot=False,
                 ax=axes,
                 unit=unit,
+                **kwargs,
             )
         else:
             for molecule in minors:
@@ -288,9 +317,9 @@ class Extraction(Dataset):
         return axes
 
     def plot_extraction_vs_potential(
-        self, mol="O2", tspan=None, unit="pmol/s", ax="new", reverse=True
+        self, mol="CO2", tspan=None, unit="pmol/s", ax="new", reverse=True
     ):
-        if tspan == None:
+        if tspan is None:
             tspan = self.tspan_extraction
         ratio = self.get_ratio()
         majors, minors = self.get_majors_and_minors(mol=mol)
@@ -300,31 +329,69 @@ class Extraction(Dataset):
         )
         ax[-1].set_ylim([l / ratio for l in ax[0].get_ylim()])
         if reverse:
-            for ax_i in ax:
-                ax_i.invert_xaxis()
+            ax[0].invert_xaxis()
+            ax[1].invert_xaxis()
         return ax
 
-    def quantify_extraction(self, mol="O2", tspan=None, unit="pmol/s"):
-        if tspan == None:
-            tspan = self.tspan_extraction
-        ratio = self.get_ratio()
+    def create_excess_mol(self, mol="CO2", ratio=None, ratio_type=None, name=None):
+        """Return EC_MS.Molecule object who's get_flux calculates lattice oxygen ex."""
+        if name is None:
+            name = "excess_" + mol
         majors, minors = self.get_majors_and_minors(mol=mol)
-        Y = 0
-        for molecule in minors:
-            x, y = self.get_flux(molecule, tspan=tspan, unit=unit)
-            Y += np.trapz(y, x)
-        for molecule in majors:
-            x, y = self.get_flux(molecule, tspan=tspan, unit=unit)
-            Y -= np.trapz(y, x) * ratio
+        if ratio is None:
+            if ratio_type is None:
+                if mol == "CO2" and self.electrolyte == "18O":
+                    ratio_type = "single"
+                else:
+                    ratio_type = "ratio"
+            if ratio_type == "single":  # expect only one O atom from electrolyte
+                ratio = self.alpha / (1 - self.alpha)
+            elif ratio_type == "alpha":  # expect only one O atom from electrolyte
+                ratio = self.alpha
+            else:
+                ratio = self.get_ratio()
+        print(f"ratio = {ratio}")  # debugging
+        excess_molecule = minors[0]
+        excess_molecule.name = name
+        excess_molecule.cal_mat = {
+            minors[0].primary: 1 / minors[0].F_cal,
+            majors[0].primary: -1 / majors[0].F_cal * ratio,
+        }
+        self.mdict[name] = excess_molecule
+        return excess_molecule
+
+    def get_excess(self, mol="O2", x=None, tspan=None, unit="pmol/s"):
+        majors, minors = self.get_majors_and_minors(mol=mol)
+        x1, y1 = self.get_flux(minors[0], tspan=tspan, unit=unit)
+        x0, y0 = self.get_flux(majors[-1], tspan=tspan, unit=unit)
+        ratio = self.get_ratio()
+        if x is None:
+            if tspan is None:
+                tspan = self.tspan_exchange
+            x = np.linspace(tspan[0], tspan[-1], 100)
+        y = np.interp(x, x1, y1) - np.interp(x, x0, y0) * ratio
+        return x, y
+
+    def quantify_extraction(self, mol="O2", tspan=None, unit="pmol/s"):
+        x, y = self.get_excess(mol=mol, tspan=tspan, unit=unit)
+        Y = np.trapz(y, x)
         self.n_ex[mol] = Y
         return Y
 
 
-def get_EC_MS_mdict(calibration):
+def get_EC_MS_mdict(calibration, mols=None, get_cal_mat=True):
     from EC_MS import Molecule
 
     mdict = {}
-    for mol, molecule in calibration.mdict.items():
+    if mols is None:
+        mols = set([])
+        if hasattr(calibration, "mol_list"):
+            mols = mols.union(calibration.mol_list)
+        if hasattr(calibration, "mdict"):
+            mols = mols.union(calibration.mdict)  # adds mdict's keys to the set mols
+    for mol in mols:
+        print(f"geting EC_MS molecule {mol} from calibration")
+        molecule = calibration.get_molecule(mol, withQ=get_cal_mat)
         if mol in calibration.real_names:
             mol_name = calibration.real_names[mol]
         else:
@@ -333,6 +400,11 @@ def get_EC_MS_mdict(calibration):
         mdict[mol].name = mol
         F = molecule.F
         mdict[mol].F = F
+        if get_cal_mat:
+            try:
+                mdict[mol].cal_mat = molecule.Q
+            except AttributeError:
+                print(f"Warning!!! couldn't get Q for molecule {mol}.")
         key_max = None
         F_max = 0
         for key, val in F.items():
