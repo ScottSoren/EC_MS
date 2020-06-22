@@ -23,7 +23,10 @@ for that specific file type or data producing equipment.
 """
 
 
-import os, re, codecs
+import os
+from pathlib import Path
+import re
+import codecs
 import numpy as np
 
 from .parsing_tools import (
@@ -373,9 +376,13 @@ def text_to_data(
 
             if data_type == "SI":
                 for i, col in enumerate(col_headers):
-                    col_headers[i] = col_preheaders[i] + " - " + col
+                    try:
+                        col_headers[i] = col_preheaders[i] + " - " + col
+                    except IndexError:
+                        print("WARNING!!! Spectro Inlets pre-column header too short")
+                        break
 
-            # print(col_headers) # debugging
+            print(f"col_headers = {col_headers}")  # debugging
 
             data["N_col"] = len(col_headers)
             data["data_cols"] = set(
@@ -548,9 +555,7 @@ def load_from_file(
     if tstamp is not None:  # then it overrides whatever text_to_data came up with.
         data["tstamp"] = tstamp
     elif data["tstamp"] is None:
-        print(
-            "WARNING: no tstamp found in " + full_path_name + ". Looking in file name."
-        )
+        print(f"WARNING: no tstamp found in {full_path_name}. Looking in file name.")
         tstamp = timestring_to_epoch_time(full_path_name)
         if tstamp is None:
             print(
@@ -575,6 +580,7 @@ def load_from_file(
     elif data_type == "SI":
         from .Combining import rename_SI_cols
 
+        print("RENAMING SI COLS!")  # debugging
         rename_SI_cols(data)
     elif data_type == "RGA":
         from .Combining import rename_RGA_cols
@@ -646,18 +652,21 @@ def load_EC_set(
     lslist = os.listdir(directory)
 
     if EC_files is None:
-        EC_files = [f for f in lslist if f[: len(tag)] == tag and f[-4:] == suffix]
+        EC_files = [f for f in lslist if f.startswith(tag) and f.endswith(suffix)]
         if type(exclude) is str:
             exclude = [exclude]
         for excl in exclude:
             EC_files = [f for f in EC_files if not excl in f]
     elif type(EC_files) is str:
         EC_files = [EC_files]
+
+    print(f"lslist = {lslist}\nEC_files = {EC_files}")  # debugging
+
     EC_datas = []
     for f in EC_files:
         try:
             data = load_from_file(
-                directory + os.sep + f, data_type=data_type, tz=tz, verbose=verbose
+                Path(directory) / f, data_type=data_type, tz=tz, verbose=verbose
             )
         except OSError:
             print("WARNING: problem importing " + f + ". Continuing.")
@@ -673,6 +682,7 @@ def load_EC_set(
                     + " either Ece/V or Ewe-Ece/V"
                 )
         EC_datas += [data]
+
     EC_data = synchronize(EC_datas, verbose=verbose, append=True, t_zero="first", tz=tz)
     if "loop number" in EC_data["data_cols"]:
         sort_time(EC_data, verbose=verbose)  # note, sort_time no longer returns!

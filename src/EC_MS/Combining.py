@@ -900,16 +900,20 @@ def remove_filtered_values(data, filter_fun):
     return data  # not necessary
 
 
-def rename_SI_cols(data, removenans=True):
+def rename_SI_cols(dataset, removenans=True):
     """
     names columns of Spectro Inlets data like EC-Lab and PyExpLabSys+cinfdata name them.
     """
-    data_cols = data[
-        "data_cols"
-    ].copy()  # to avoid changing the size of a set during iteration
+    if isinstance(dataset, dict):
+        print("WARNGING!!! The use of dataset dictionaries is no longer suported!!!")
+        data = dataset
+    else:
+        data = dataset.data
+    data_cols = data["data_cols"].copy()
+    # ^ to avoid changing the size of a set during iteration
     for col_0 in data_cols:
         col = "test"
-        if not get_type(col_0, data) == "SI":
+        if not get_type(col_0, dataset=dataset) == "SI":
             continue
         if re.search("^C[0-9]+", col_0):
             try:

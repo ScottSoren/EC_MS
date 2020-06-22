@@ -206,7 +206,8 @@ def plot_vs_potential(
                 ax1 = plt.subplot(gs[0:4, 0])
                 ax2 = plt.subplot(gs[4:8, 0])
             gs.update(hspace=hspace, left=left_space, right=right_space)
-        ax = [ax1, ax2]
+        if ax is None or len(ax) < 2:
+            ax = [ax1, ax2]
 
     print(f"ax = {ax}")  # debugging
 
@@ -416,7 +417,7 @@ def plot_vs_potential(
                 ax1.legend()
 
     # if colors_right is not None:
-    #    ax[0].set_xlim(ax[1].get_xlim())
+    #    align_zero(axes[0], axes[-1])
 
     if verbose:
         print("\nfunction 'plot_vs_potential' finished!\n\n")
@@ -993,25 +994,27 @@ def plot_experiment(
         )
 
     if "data_type" in EC_and_MS and EC_and_MS["data_type"][0:2] == "EC":
-        ax = plot_experiment_EC(
-            EC_and_MS,
-            tspan=tspan,
-            verbose=verbose,
-            RE_vs_RHE=RE_vs_RHE,
-            A_el=A_el,
-            ax=ax,
-            # mols will overide masses will overide colors
-            V_color=V_color,
-            J_color=J_color,
-            V_label=V_label,
-            J_label=J_label,
-            t_str=t_str,
-            J_str=J_str,
-            V_str=V_str,
-            fig=None,
-            spec={},
-        )
-        return ax
+        print(set(EC_and_MS["col_types"].values()))
+        if "col_types" in EC_and_MS and set(EC_and_MS["col_types"].values()) == {"EC"}:
+            ax = plot_experiment_EC(
+                EC_and_MS,
+                tspan=tspan,
+                verbose=verbose,
+                RE_vs_RHE=RE_vs_RHE,
+                A_el=A_el,
+                ax=ax,
+                # mols will overide masses will overide colors
+                V_color=V_color,
+                J_color=J_color,
+                V_label=V_label,
+                J_label=J_label,
+                t_str=t_str,
+                J_str=J_str,
+                V_str=V_str,
+                fig=None,
+                spec={},
+            )
+            return ax
 
     # ----------- prepare the axes on which to plot ------------ #
     if ax == "new":

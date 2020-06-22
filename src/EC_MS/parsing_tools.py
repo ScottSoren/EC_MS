@@ -68,6 +68,12 @@ def is_Xray_data(col):
 
 
 def get_type(col, dataset=None):
+    if isinstance(dataset, dict):
+        print("WARNING!!! Dataset dictionaries are no longer supported!!")
+        # raise RuntimeError  # hard to remove use via rename_SI_cols in load_from_file
+        from .dataset import Dataset
+
+        dataset = Dataset(dataset)
     if dataset is not None:
         if hasattr(dataset, "col_types") and col in dataset["col_types"]:
             return dataset["col_types"][col]
@@ -92,6 +98,7 @@ def get_type(col, dataset=None):
         + " is not recognized. Assuming type 'EC'.\n "
         + " Consider adding to EC_cols_0 in EC.py if so."
     )
+    print(f"dataset.data_type = {dataset.data_type}")
     return "EC"  #'Xray' # to be refined later...
 
 
@@ -281,6 +288,8 @@ def timestring_to_epoch_time(
 
     The epoch time is referred to here and elsewhere as tstamp.
     """
+    if timestring and not isinstance(timestring, str):
+        timestring = str(timestring)
     if tz is not None:
         import pytz  # all three seem necessary for dealing with timezones.
 
