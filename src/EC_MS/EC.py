@@ -1426,12 +1426,15 @@ def capacitance_curve(
 
 
 def correct_ohmic_drop(data, R_ohm=0):
-    V_str, J_str = sync_metadata(data)
+    V_str_0, J_str = sync_metadata(data)
     I_str = data["I_str"]
-    V, I = data[V_str].copy(), data[I_str].copy()
+    V, I = data[V_str_0].copy(), data[I_str].copy()
     V -= R_ohm * I * 1e-3
-    if not V_str[-1] == "*":
-        V_str = V_str + "*"
+    if not V_str_0.endswith("*"):
+        V_str = V_str_0 + "*"
+    data["data_cols"].add(V_str)
+    if "timecols" in data and V_str_0 in data["timecols"]:
+        data["timecols"][V_str] = data["timecols"][V_str_0]
     data[V_str] = V
     data["V_str"] = V_str
     return V_str
