@@ -542,15 +542,23 @@ def load_from_file(
     else:
         file_lines = import_text(full_path_name, verbose)
 
-        data = text_to_data(  # I want to split up the text_to_data function
-            file_lines=file_lines,
-            title=title,
-            data_type=data_type,
-            timestamp=timestamp,
-            tz=tz,
-            tstamp=tstamp,
-            verbose=verbose,
-        )
+        try:
+            data = text_to_data(  # I want to split up the text_to_data function
+                file_lines=file_lines,
+                title=title,
+                data_type=data_type,
+                timestamp=timestamp,
+                tz=tz,
+                tstamp=tstamp,
+                verbose=verbose,
+            )
+        except Exception as e:
+            print(
+                f"COULD NOT PARSE {full_path_name}!!! Got error = {e}. "
+                "Returning an empty dictionary."
+            )
+            data = {"data_type": data_type, "title": "empty"}
+            return data
 
     if tstamp is not None:  # then it overrides whatever text_to_data came up with.
         data["tstamp"] = tstamp

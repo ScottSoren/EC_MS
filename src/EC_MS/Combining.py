@@ -492,7 +492,8 @@ def synchronize(
                 # proccessing: ensure elignment with timecol for appended data
                 l1 = len(data) + len(olddata)
                 timecol = get_timecol(col, dataset)
-                coltype, istime = get_type(col, dataset), col == timecol
+                coltype = get_type(col, dataset)
+                istime = col == timecol
                 # print('col = ' + col + ', timecol = ' + str(timecol)) #debugging
                 # print('coltype = ' + coltype + ', istime = ' + str(istime)) # debugging
                 try:
@@ -582,7 +583,7 @@ def synchronize(
                     and not combined_data["timecols"] == dataset["timecols"]
                 ):
                     print(
-                        "WARNING!!! datasets don't agree on timecol for {col}. Using {timecol}."
+                        f"WARNING!!! datasets don't agree on timecol for {col}. Using {timecol}."
                     )
                 combined_data["timecols"][col] = dataset["timecols"][col]
 
@@ -1124,7 +1125,7 @@ def sort_time(dataset, verbose=True, vverbose=False):
         timecol = get_timecol(col, dataset, verbose=vverbose)
         if timecol in sort_indeces.keys():
             indeces = sort_indeces[timecol]
-        else:
+        elif timecol:
             indeces = np.argsort(dataset[timecol])
             # print('found the sort_indeces for ' + timecol + '!') # debugging
             # print('indeces = ' + str(indeces)) # debugging

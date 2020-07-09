@@ -40,7 +40,7 @@ class Zilien_Dataset(Dataset):
                 )
                 spectra_path = os.path.join(self.folder, spectra_folder)
                 self.spectra_folder, self.spectra_path = spectra_folder, spectra_path
-                self.spectra = read_zilien_spectra(spectra_path)
+                self.spectra = read_zilien_spectra(spectra_path, data=self.data)
             except FileNotFoundError:
                 print("Warning!!! No spectra found! consider using normal Dataset")
             # self.spectrums = self.spectra.spectrums
@@ -139,9 +139,9 @@ def read_zilien_spectrums(folder, delim="\t"):
     return spectrums
 
 
-def read_zilien_spectra(folder, delim="\t"):
+def read_zilien_spectra(folder, delim="\t", data=None):
     """
     """
     spectrums = read_zilien_spectrums(folder, delim="\t")
     # return spectrums # debugging
-    return Spectra(folder=folder, spectrums=spectrums)
+    return Spectra(folder=folder, spectrums=spectrums, data=data)

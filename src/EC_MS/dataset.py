@@ -82,8 +82,10 @@ class Dataset:
         folder=None,
         tag=None,
         data=None,  # will get replaced if it's not initialized empty.
+        tstamp=None,
         data_type=None,
         file_type=None,
+        title=None,
         verbose=True,
     ):
         """
@@ -128,16 +130,16 @@ class Dataset:
             sort_time(self.data)
         else:
             if data is None:
-                data = {}
+                data = {"tstamp": tstamp, "data_type": data_type}
             self.data = data
 
         if folder is not None:  # time to go home.
             os.chdir(back)
         if not hasattr(self, "data"):
             self.data = data
-        if data_type is not None:
-            self.data["data_type"] = data_type
-
+        if not tstamp and data and "tstamp" in data:
+            tstamp = data["tstamp"]
+        self.tstamp = tstamp
         if not "data_cols" in self.data:
             print(
                 "Warning!!! Please specify file_name and/or folder."
@@ -145,12 +147,19 @@ class Dataset:
             )
             self.empty = True
         self.update_with_data()
+        if data_type:
+            self.data["data_type"] = data_type
+        if title:
+            self.data["title"] = data_type
 
     def update_with_data(self):
-        if not hasattr(self, "data") or "data_cols" not in self.data:
-            print("Warning!!! Empty dataset.")
+        if not hasattr(self, "data"):
             self.data = {"data_cols": set([]), "timecols": {}}
             return
+        if "data_cols" not in self.data:
+            self.data["data_cols"] = set([])
+        if "timecols" not in self.data:
+            self.data["timecols"] = {}
         for key, value in self.data.items():
             if key not in self.data["data_cols"]:
                 try:
@@ -224,6 +233,7 @@ class Dataset:
             if "col_types" not in self.data:
                 self.data["col_types"] = {}
             self.data["col_types"][col] = col_type
+        self.empty = False
 
     def append_to_data_col(self, col, value, col_type=None):
         """
