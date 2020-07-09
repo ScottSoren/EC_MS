@@ -12,7 +12,6 @@ import numpy as np
 STANDARD_DATA_DIR = "../pickles/"
 STANDARD_EXTRACTION_DIR = "../extractions/"
 
-from siCalibration import Calibration
 from EC_MS import Dataset
 
 
@@ -48,8 +47,6 @@ class Extraction(Dataset):
         if name is None:
             name = f"extraction {element}{film} in {electrolyte}"
         self.name = name
-        if calibration is None and calibration_file is not None:
-            calibration = Calibration.load(calibration_file)
         self.calibration_file = calibration_file
         self.calibration = calibration
         self.mdict = get_EC_MS_mdict(calibration)
