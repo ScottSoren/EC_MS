@@ -40,7 +40,7 @@ def is_time(col, data=None, verbose=False):
             print(f"data.timecols = {data.timecols}")
         elif "timecols" in data:
             print(f"data['timecols'] = {data['timecols']}")
-        raise KeyboardInterrupt
+        raise
 
 
 def is_MS_data(col):
