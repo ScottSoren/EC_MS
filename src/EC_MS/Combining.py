@@ -492,7 +492,8 @@ def synchronize(
                 # proccessing: ensure elignment with timecol for appended data
                 l1 = len(data) + len(olddata)
                 timecol = get_timecol(col, dataset)
-                coltype, istime = get_type(col, dataset), col == timecol
+                coltype = get_type(col, dataset)
+                istime = col == timecol
                 # print('col = ' + col + ', timecol = ' + str(timecol)) #debugging
                 # print('coltype = ' + coltype + ', istime = ' + str(istime)) # debugging
                 try:
@@ -582,7 +583,7 @@ def synchronize(
                     and not combined_data["timecols"] == dataset["timecols"]
                 ):
                     print(
-                        "WARNING!!! datasets don't agree on timecol for {col}. Using {timecol}."
+                        f"WARNING!!! datasets don't agree on timecol for {col}. Using {timecol}."
                     )
                 combined_data["timecols"][col] = dataset["timecols"][col]
 
@@ -900,16 +901,20 @@ def remove_filtered_values(data, filter_fun):
     return data  # not necessary
 
 
-def rename_SI_cols(data, removenans=True):
+def rename_SI_cols(dataset, removenans=True):
     """
     names columns of Spectro Inlets data like EC-Lab and PyExpLabSys+cinfdata name them.
     """
-    data_cols = data[
-        "data_cols"
-    ].copy()  # to avoid changing the size of a set during iteration
+    if isinstance(dataset, dict):
+        print("WARNGING!!! The use of dataset dictionaries is no longer suported!!!")
+        data = dataset
+    else:
+        data = dataset.data
+    data_cols = data["data_cols"].copy()
+    # ^ to avoid changing the size of a set during iteration
     for col_0 in data_cols:
         col = "test"
-        if not get_type(col_0, data) == "SI":
+        if not get_type(col_0, dataset=dataset) == "SI":
             continue
         if re.search("^C[0-9]+", col_0):
             try:
@@ -1120,7 +1125,7 @@ def sort_time(dataset, verbose=True, vverbose=False):
         timecol = get_timecol(col, dataset, verbose=vverbose)
         if timecol in sort_indeces.keys():
             indeces = sort_indeces[timecol]
-        else:
+        elif timecol:
             indeces = np.argsort(dataset[timecol])
             # print('found the sort_indeces for ' + timecol + '!') # debugging
             # print('indeces = ' + str(indeces)) # debugging

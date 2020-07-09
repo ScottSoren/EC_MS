@@ -26,11 +26,14 @@ standard colors
 	M29: #001146
 	M70: purple
 	M3: orange
+<<<<<<< Updated upstream
 	M73: crimson
 	M74: r
 	M60: g
 	M58: darkcyan
 	M88: darkred
 	M89: darkmagenta
+=======
+>>>>>>> Stashed changes
 	M130: purple
 	M132: purple

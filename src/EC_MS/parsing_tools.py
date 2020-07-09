@@ -31,7 +31,16 @@ def is_time(col, data=None, verbose=False):
     if verbose:
         print("\nfunction 'is_time' checking '" + col + "'!")
     timecol = get_timecol(col, data, verbose=verbose)
-    return timecol == col[: len(timecol)]  # so that a * at the end doesn't mess it up
+    try:
+        return col.startswith(timecol)  # so that a * at the end doesn't mess it up
+    except TypeError as e:
+        print(e)
+        print(f"\twith col = {col}, timecol = {timecol}")
+        if hasattr(data, "timecols"):
+            print(f"data.timecols = {data.timecols}")
+        elif "timecols" in data:
+            print(f"data['timecols'] = {data['timecols']}")
+        raise KeyboardInterrupt
 
 
 def is_MS_data(col):
@@ -68,7 +77,17 @@ def is_Xray_data(col):
 
 
 def get_type(col, dataset=None):
-    if dataset is not None:
+    if isinstance(dataset, dict):
+        print("WARNING!!! Dataset dictionaries are no longer supported!!")
+        if "col_types" in dataset and col in dataset["col_types"]:
+            return dataset["col_types"][col]
+        elif "data_type" in dataset and dataset["data_type"] in [
+            "EC",
+            "MS",
+            "SI",
+        ]:
+            return dataset["data_type"]
+    elif dataset is not None:
         if hasattr(dataset, "col_types") and col in dataset["col_types"]:
             return dataset["col_types"][col]
         elif hasattr(dataset, "data_type") and dataset["data_type"] in [
@@ -89,10 +108,9 @@ def get_type(col, dataset=None):
     print(
         "WARNING: "
         + col
-        + " is not recognized. Assuming type 'EC'.\n "
-        + " Consider adding to EC_cols_0 in EC.py if so."
+        + " is not recognized. Returning 'unknown'.\n "
     )
-    return "EC"  #'Xray' # to be refined later...
+    return "unknown"
 
 
 def get_cols_for_mass(mass, dataset=None):
@@ -113,7 +131,10 @@ def get_timecol(col=None, dataset=None, data_type=None, verbose=False):
     # print('getting timecol for ' + col + '. datset = ' + (str(dataset)+ 20*' ')[:20]) # debugging
     if (
         dataset is not None
-        and hasattr(dataset, "timecols")
+        and (
+            hasattr(dataset, "timecols")
+            or (isinstance(dataset, dict) and "timecols" in dataset)
+        )
         and col in dataset["timecols"]
     ):
         # funky: experession ("timecols" in dataset) looks for key 0
@@ -281,6 +302,8 @@ def timestring_to_epoch_time(
 
     The epoch time is referred to here and elsewhere as tstamp.
     """
+    if timestring and not isinstance(timestring, str):
+        timestring = str(timestring)
     if tz is not None:
         import pytz  # all three seem necessary for dealing with timezones.
 
