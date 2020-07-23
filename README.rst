@@ -1,6 +1,6 @@
-=====================================================================
+==================================================
 ``EC_MS``: Electrochemistry plus Mass Spectrometry
-=====================================================================
+==================================================
 
 ``EC_MS`` provides a powerful **object-oriented** interface to electrochemistry data, mass spectrometry data,
 and especially the combination of these two types of datasets produced by electrochemistry - mass spectrometry (EC-MS) techniques such as
@@ -9,7 +9,10 @@ differential electrochemical mass spectrometry (DEMS) and chip-based EC-MS.
 ``EC_MS`` has grown in concert with the chip EC-MS technology sold by `Spectro Inlets <https://spectroinlets.com>`_, but is especially 
 useful data sets from other hardware and software (see below), as it automates the tedious task of ligning up the datasets in time.
 
-The primary object-oriented interface for this is the ``Dataset`` class. For example:
+``EC_MS`` will soon be replaced by the *in-situ experimental data tool* ``ixdat``, which will inherit the interface and EC-MS functionality of ``EC_MS``, but with full documentation, better design, plugability for data from any in-situ technique, and a database interface.
+
+
+The primary object-oriented interface is the ``Dataset`` class. For example:
 
 .. -code-begin-
 .. code-block:: pycon
@@ -47,7 +50,7 @@ And that's just a small teaser. Additional functionality includes:
 - ohmic drop correction and automated quantitative comparisons of cyclic voltammagrams
 
 
-Full documentation is pending!
+Full documentation will be included from the beginning when ``EC_MS`` is replaced by ``ixdat``.
 
 
 Installation
@@ -117,7 +120,11 @@ Other articles with figures and data analysis by **EC_MS** include:
 Project Information
 ===================
 
-This is a pre-alpha version, so it is buggy. Please log issues on `github <https://github.com/ScottSoren/EC_MS/>`_ to help me improve it.
+``EC_MS`` is poorly documented and, despite my best efforts, can still be a bit buggy.
+
+Please log issues and suggest features on `github <https://github.com/ScottSoren/EC_MS/>`_ to help me improve it.
+
+Major imporovements will most likely not come in ``EC_MS``, but instead in its successor ``ixdat``. Feedback is still highly appreciated, so we can get things right from the start in ``ixdat``.
 
 ``EC_MS`` is completely free and open-source.
 
