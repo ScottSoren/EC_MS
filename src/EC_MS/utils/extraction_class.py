@@ -35,6 +35,7 @@ class Extraction(Dataset):
         A_el=None,
         t_bg=None,
         calibration=None,
+        mdict=None,
         calibration_file="20A25_sniffer.json",
         electrolyte="16O",
         film="18O",
@@ -48,16 +49,27 @@ class Extraction(Dataset):
             name = f"extraction {element}{film} in {electrolyte}"
         self.name = name
         self.calibration_file = calibration_file
+        if not calibration and calibration_file and not mdict:
+            raise NotImplementedError(
+                "proper calibration is not implemented in EC_MS. "
+                "You have to import the calibration externally. "
+                "An EC_MS mdict should also work.\n"
+                "...The functionality should come soon to ixdat."
+            )
         self.calibration = calibration
-        self.mdict = get_EC_MS_mdict(calibration)
+        if calibration and not mdict:
+            mdict = get_EC_MS_mdict(calibration)
+        self.mdict = mdict
         # Later we will just directly use the siQuant mdict!
         self.data_file = data_file
         self.data_files = data_files
         self.data_dir = data_dir
         if dataset is None:
             if data_file is not None:  # <-- load one data file
-                if os.sep not in data_file:
+                if os.sep not in str(data_file):
                     path_to_data = os.path.join(data_dir, data_file)
+                else:
+                    path_to_data = data_file
                 dataset = Dataset(path_to_data)
             elif data_files is not None:  # <-- synchronize multiple datasets!
                 dataset = Dataset()
@@ -388,7 +400,7 @@ def get_EC_MS_mdict(calibration, mols=None, get_cal_mat=True):
             mols = mols.union(calibration.mdict)  # adds mdict's keys to the set mols
     for mol in mols:
         print(f"geting EC_MS molecule {mol} from calibration")
-        molecule = calibration.get_molecule(mol, withQ=get_cal_mat)
+        molecule = calibration.molecule(mol, with_Q=get_cal_mat)
         if mol in calibration.real_names:
             mol_name = calibration.real_names[mol]
         else:
