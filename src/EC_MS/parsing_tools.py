@@ -78,7 +78,8 @@ def is_Xray_data(col):
 
 def get_type(col, dataset=None):
     if isinstance(dataset, dict):
-        print("WARNING!!! Dataset dictionaries are no longer supported!!")
+        # print("WARNING!!! Dataset dictionaries are no longer supported!!")
+        #   ^ way too verbose, not a useful message for user.
         if "col_types" in dataset and col in dataset["col_types"]:
             return dataset["col_types"][col]
         elif "data_type" in dataset and dataset["data_type"] in [
@@ -105,11 +106,7 @@ def get_type(col, dataset=None):
         return "cinfdata"  # it's cinfdata but not from a mass channel
     if col is None:
         return None
-    print(
-        "WARNING: "
-        + col
-        + " is not recognized. Returning 'unknown'.\n "
-    )
+    print("WARNING: " + col + " is not recognized. Returning 'unknown'.\n ")
     return "unknown"
 
 

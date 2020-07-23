@@ -541,7 +541,7 @@ def get_signal(
         except KeyError:
             print("WARNING: no tspan available to get_signal()! using tspan='all'")
             tspan = "all"
-    if not tspan == "all":
+    if not (isinstance(tspan, str) and tspan == "all"):
         try:
             x, y = cut(x, y, tspan, override=override)
         except TypeError:

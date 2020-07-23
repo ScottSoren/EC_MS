@@ -8,10 +8,17 @@ Created on Wed Feb 26 23:10:02 2020
 
 
 def fix_timecols(data):
+    """Update and fix old errors in the timecols item of old data dictionaries"""
+
     if "timecols" not in data:
         return
 
     new_timecols = {}
+
+    # some old pickles have timecols as tuples:
+    if not isinstance(data["timecols"], dict):
+        data["timecols"] = dict(data["timecols"])
+
     for col, tcol in data["timecols"].items():
         if col[-2:] == "-x" and tcol[-2:] == "-y":
             new_timecols[tcol] = col

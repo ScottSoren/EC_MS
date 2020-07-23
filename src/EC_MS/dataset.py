@@ -764,16 +764,32 @@ class CyclicVoltammagram(Dataset):
         except AttributeError:
             t_str = "time/s"
         try:
+            E_str = self.E_str
+        except AttributeError:
+            E_str = "Ewe/V"
+        try:
+            I_str = self.I_str
+        except AttributeError:
+            I_str = "I/mA"
+        try:
             V_str = self.V_str
         except AttributeError:
-            V_str = "Ewe/V"
+            V_str = E_str
         try:
             J_str = self.J_str
         except AttributeError:
-            J_str = "I/mA"
+            J_str = I_str
 
         diff = Dataset(
-            {"data_cols": set(), "V_str": V_str, "t_str": t_str, "J_str": J_str,}
+            {
+                "data_cols": set(),
+                "timecols": {},
+                "t_str": t_str,
+                "V_str": V_str,
+                "J_str": J_str,
+                "E_str": E_str,
+                "I_str": I_str,
+            }
         )
         debugging = False
         if debugging:
@@ -819,8 +835,12 @@ class CyclicVoltammagram(Dataset):
                     x1, y1_i = data1[tcol], data1[col]
                     x2, y2_i = data2[tcol], data2[col]
 
-                    y1 = np.interp(t1, x1, y1_i)
-                    y2 = np.interp(t2, x2, y2_i)
+                    try:
+                        y1 = np.interp(t1, x1, y1_i)
+                        y2 = np.interp(t2, x2, y2_i)
+                    except ValueError as e:
+                        print(f"skipping column {col} due to ValueError {e}")
+                        continue
 
                     y_diff = y1 - y2
 

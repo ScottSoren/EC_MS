@@ -472,7 +472,7 @@ def plot_vs_potential_EC(
 
     # plot EC-lab data
     ec_spec = spec.copy()
-    print(ec_spec)  # debugging
+    # print(ec_spec)  # debugging
     if "color" not in ec_spec.keys():
         ec_spec["color"] = "k"
 
@@ -655,8 +655,6 @@ def plot_signal(
             masses[m] = color
 
     for mass, color in masses.items():
-        if verbose:
-            print("plotting: " + mass)
         try:
             x, y = get_signal(
                 MS_data,
@@ -682,7 +680,9 @@ def plot_signal(
                 + ". plot_signal is skipping that mass."
             )
             continue
-        print(spec)  # debugging
+        if verbose:
+            print("plotting: " + mass)
+        # print(spec)  # debugging
         lines[mass] = ax.plot(x, y, color, label=mass, **spec)
         # as it is, lines is not actually used for anything
     if leg:
@@ -946,6 +946,8 @@ def plot_experiment(
     name=None,
     leg=False,
     unit=None,
+    unit_left=None,
+    unit_right=None,
     masses="all",
     masses_left=None,
     masses_right=None,
@@ -1149,8 +1151,11 @@ def plot_experiment(
 
     # ----------- Plot the MS signals! ------------- #
     if quantified:
-        if unit is None:
-            unit = "pmol/s"
+        if unit_left is None:
+            if unit is not None:
+                unit_left = unit
+            else:
+                unit_left = "pmol/s"
         print("removebackground = " + str(removebackground))  # debugging
         plot_flux(
             EC_and_MS,
@@ -1161,7 +1166,7 @@ def plot_experiment(
             ax=ax[0],
             leg=leg,
             logplot=logplot[0],
-            unit=unit,
+            unit=unit_left,
             removebackground=removebackground_left,
             background=background,
             endpoints=endpoints,
@@ -1171,6 +1176,11 @@ def plot_experiment(
             verbose=verbose,
         )
         if mols_right is not None:
+            if unit_right is None:
+                if unit is not None:
+                    unit_right = unit
+                else:
+                    unit_right = "pmol/s"
             ax += [ax[0].twinx()]
             plot_flux(
                 EC_and_MS,
@@ -1181,7 +1191,7 @@ def plot_experiment(
                 ax=ax[-1],
                 leg=leg,
                 logplot=logplot[0],
-                unit=unit,
+                unit=unit_right,
                 removebackground=removebackground_right,
                 background=background,
                 endpoints=endpoints,

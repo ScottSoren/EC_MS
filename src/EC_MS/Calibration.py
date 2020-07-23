@@ -464,9 +464,9 @@ def point_calibration(
         n = I / (n_el * Chem.Far)
 
     elif cal_type == "external":
-        if chip is None:
-            chip = "SI-3iv1"
-        if type(chip) is str:
+        if not chip:
+            chip = Chip()
+        elif type(chip) is str:
             chip = Chip(chip)
         if carrier == None:
             carrier = mol
@@ -802,7 +802,8 @@ def calibration_curve(
     # ----- plot the results -------- #
     if color is None:
         color = m.get_color()
-    ax2 = []
+    if ax is not None:
+        ax2 = []
     if unit == "p":
         ns_plot, Ys_plot = ns * 1e12, Ys * 1e12
     elif unit == "n":

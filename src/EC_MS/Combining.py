@@ -503,7 +503,7 @@ def synchronize(
                 except KeyError:
                     print(
                         "WARNING: {col} should have timecol {timecol} but this is "
-                        + +f" not in dataset. Not adding {col} to the combined dataset."
+                        + f" not in dataset. Not adding {col} to the combined dataset."
                     )
                     continue
                 if (
