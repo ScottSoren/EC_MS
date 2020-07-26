@@ -16,6 +16,7 @@ import re
 # import os #, sys
 import numpy as np
 from .parsing_tools import get_timecol, is_time, get_type, timestamp_to_seconds
+from .patches import fix_timecols
 
 # import warnings # actually not that useful, as you loose information about
 # when in the running of the code the problem appeared.
@@ -205,6 +206,7 @@ def synchronize(
 
     for nd, dataset in enumerate(datasets):
         dataset["combining_number"] = nd
+        fix_timecols(dataset)  # patch
         if "data_cols" not in dataset or len(dataset["data_cols"]) == 0:
             print(dataset["title"] + " is empty")
             hasdata[nd] = False
@@ -502,8 +504,8 @@ def synchronize(
                 # timecol will have been processed first or not...
                 except KeyError:
                     print(
-                        "WARNING: {col} should have timecol {timecol} but this is "
-                        + f" not in dataset. Not adding {col} to the combined dataset."
+                        f"WARNING: {col} should have timecol {timecol} but this is "
+                        + f"not in dataset. Not adding {col} to the combined dataset."
                     )
                     continue
                 if (
@@ -519,7 +521,7 @@ def synchronize(
                                 + f"\ncombined_data['data_cols'] = {combined_data['data_cols']}"
                                 + f"\nl1 = {l1}\nl0 = {l0}"
                             )  # debugging DEBUGGING!
-                            from matplotlib import pyplot as plt
+                            from matplotlibc import pyplot as plt
 
                             fig, ax = plt.subplots()
                             ax.plot(dataset[timecol], dataset[col], "k")

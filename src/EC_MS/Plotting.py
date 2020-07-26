@@ -766,8 +766,8 @@ def plot_flux(
             )
             if smooth_points:
                 y = smooth(y, smooth_points)
-        except KeyError:
-            print("Can't get signal for " + str(mol))
+        except KeyError as e:
+            print("Can't get signal for " + str(mol) + f".\nError: {e}")
             continue
         if type(mol) is str:
             l = mol

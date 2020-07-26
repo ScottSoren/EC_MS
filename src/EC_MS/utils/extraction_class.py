@@ -139,33 +139,61 @@ class Extraction(Dataset):
     def plot_experiment(self, *args, **kwargs):
         """
         Just adds to the plot_experiment of the Dataset class that it uses
-        the calibration and tspan_experiment by default
+        the calibration and tspan_experiment by default.
+        Molecules can be given as str and the Extraction tries to look them
+        up in its calibration.
         """
-        to_plot = []
-        to_plot_0 = None
+        to_plot = []  # this will be either mols or masses to plot
+        to_plot_0 = None  # first we see if the function caller told us what to plot
         if len(args) > 0:
-            to_plot_0 = args[0]
-        elif "mols" in kwargs:
+            to_plot_0 = args[0]  # first positional argument should be mols or masses!
+        elif "mols" in kwargs:  # ... but mols can also be given as a kwarg
             to_plot_0 = kwargs["mols"]
-        if to_plot_0 is not None:
+        elif "masses" in kwargs:  # ... and so can masses
+            pass  # but then we don't actually need to do anything to it
+
+        if to_plot_0:
+            # now we go through and put the requested calibrated objects in to_plot
             for i, thing in enumerate(to_plot_0):
-                if type(thing) is str and thing in self.mdict:
+                print(f"thing to plot = {thing}")  # debugging
+                if isinstance(thing, str) and thing in self.mdict:
+                    # excellent! then we've got the name of a calibrated molecule.
                     to_plot += [self.mdict[thing]]
+                elif isinstance(thing, list) or isinstance(thing, tuple):
+                    # ^ this will be the case if they ask for mols left and mols right
+                    to_plot += [[]]  # we need to mirror the list in to_plot
+                    for subthing in thing:
+                        print(f"subthing to plot = {subthing}")  # debugging
+                        if isinstance(subthing, str) and subthing in self.mdict:
+                            # excellent! then we've got the name of a calibrated molecule.
+                            to_plot[-1] += [self.mdict[subthing]]
+                        else:
+                            # then we assume they know what they're doing.
+                            to_plot[-1] += [subthing]
                 else:
+                    # then we assume they know what they're doing.
                     to_plot += [thing]
         elif "masses" not in kwargs:
+            # okay, so this is actually the case if they don't ask for anything to plot
+            #   and then by default we try to plot everything in the calibration
             to_plot = self.mdict
 
         # print(f"to_plot_0 = {to_plot_0}") # debugging
         # print(f"to_plot = {to_plot}") # debugging
 
         if len(args) > 0:
+            # then we overwrite to_plot_0, which is args[0], with to_plot:
             args[0] = to_plot
         elif "mols" in kwargs or "masses" not in kwargs:
+            # this is the case if they asked for mols or didn't ask for anything.
+            #   and then we've generated the calibrated plotted list:
             kwargs["mols"] = to_plot
 
         if len(args) < 2 and "tspan" not in kwargs:
+            # ah, yes, we use the Experiment tspan by default instead of the Dataset tspan:
             kwargs.update(tspan=self.tspan_experiment)
+
+        # and now we're ready to call plot_experiment via Dataset.plot_experiment!
 
         return super(Extraction, self).plot_experiment(*args, **kwargs)
 

@@ -708,8 +708,18 @@ class Molecule:
         y = 0
         for mass, C in cal_mat.items():
             xcol, ycol = get_cols_for_mass(mass, MS_data)
-            x0 = MS_data[xcol]
-            s0 = MS_data[ycol]
+            try:
+                x0 = MS_data[xcol]
+                s0 = MS_data[ycol]
+            except KeyError:
+                if self.primary and mass == self.primary:
+                    raise
+                else:
+                    print(
+                        f"Skipping {mass} in matrix calibration of {self.name}"
+                        " as it's missing from the data cols."
+                    )
+                    continue
             s = np.interp(x, x0, s0)
             y += s * C  # units: [A] * [mol/C] = [mol/s]
 

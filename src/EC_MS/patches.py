@@ -20,7 +20,7 @@ def fix_timecols(data):
         data["timecols"] = dict(data["timecols"])
 
     for col, tcol in data["timecols"].items():
-        if col[-2:] == "-x" and tcol[-2:] == "-y":
+        if col.endswith("-x") and tcol.endswith("-y"):
             new_timecols[tcol] = col
         else:
             new_timecols[col] = tcol
