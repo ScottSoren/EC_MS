@@ -9,7 +9,7 @@ differential electrochemical mass spectrometry (DEMS) and chip-based EC-MS.
 ``EC_MS`` has grown in concert with the chip EC-MS technology sold by `Spectro Inlets <https://spectroinlets.com>`_, but is especially 
 useful data sets from other hardware and software (see below), as it automates the tedious task of ligning up the datasets in time.
 
-``EC_MS`` will soon be replaced by the *in-situ experimental data tool* ``ixdat``, which will inherit the interface and EC-MS functionality of ``EC_MS``, but with full documentation, better design, plugability for data from any in-situ technique, and a database interface.
+``EC_MS`` will soon be replaced by the *in-situ experimental data tool* `ixdat <https://github.com/ixdat/ixdat>`_, which will inherit the interface and EC-MS functionality of ``EC_MS``, but with full documentation, better design, plugability for data from any in-situ technique, and a database interface.
 
 
 The primary object-oriented interface is the ``Dataset`` class. For example:
