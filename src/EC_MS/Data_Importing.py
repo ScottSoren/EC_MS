@@ -202,6 +202,7 @@ def text_to_data(
 
     n_blank = 0
     got_col_headers = False
+    no_offset = True
     for nl, line in enumerate(file_lines):
         l = line.strip()
         if nl < N_head - 1:  # we're in the header
@@ -276,7 +277,11 @@ def text_to_data(
                         print("title '" + str(title) + "' found in line " + str(nl))
                 if items[0] == "offset":
                     offset = float(items[-1])
-                    data["SI offset"] = offset
+                    if no_offset:
+                        data["SI offset"]=[offset]
+                        no_offset = False
+                    else:
+                        data["SI offset"].append(offset)
                     if verbose:
                         print(
                             "SI offset '" + str(offset) + "' found in line " + str(nl)

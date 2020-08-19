@@ -648,6 +648,7 @@ class Molecule:
         the MS_data for its primary mass and the value of F_cal read from the
         molecule's text file.
         """
+        #KK_Note: gives wrong values if dataset is not time sorted, maybe better using mask instead of interp
         if verbose:
             print("calculating flux of " + self.name)
 

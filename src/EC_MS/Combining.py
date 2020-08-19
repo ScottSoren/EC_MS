@@ -1254,6 +1254,7 @@ def sort_time(dataset, verbose=True, vverbose=False):
     data_cols = dataset["data_cols"].copy()
     dataset["data_cols"] = set()
     for col in data_cols:
+        if 'file numb' in col: continue
         if vverbose:
             print("working on " + col)
         x = dataset[col]  # do I need the copy?

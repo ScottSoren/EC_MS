@@ -30,7 +30,8 @@ def get_data_from_file(
         return file_name  # so that the dataset can be initiated with data already in a dictionary
     if re.search(".pkl$", file_name):
         with open(file_name, "rb") as f:
-            return pickle.load(f)
+            test = pickle.load(f)
+            return test
     elif data_type is not None:
         return load_from_file(file_name, data_type=data_type, verbose=verbose)
     elif re.search(".mpt$", file_name):
@@ -199,7 +200,7 @@ class Dataset:
         elif self.empty:
             print("adding to an empty Dataset: Just returning the second Dataset")
             return dataset_2
-        new_data = synchronize([self.data, dataset_2.data], override=True)
+        new_data = synchronize([self.data, dataset_2.data], override=True, t_zero="first")
         new_dataset = Dataset(new_data)
         return new_dataset
 
@@ -420,7 +421,7 @@ class Dataset:
                         specs=[[{"secondary_y": False}],
                                [{"secondary_y": True}]])
         for mass in masses:
-            x, y = self.get_signal(mass)
+            x, y = self.get_signal(mass, tspan="all")
             fig.add_trace(go.Scatter(x=x, y=y, name=mass),
                              row = 1, col = 1,
                             )

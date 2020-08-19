@@ -346,6 +346,7 @@ def chip_calibration(
     gas="air",
     composition=None,
     chip="SI-3iv1",
+    T = 298
 ):
     """
     Returns obect of class EC_MS.Chip, given data for a given gas (typically air) for which
@@ -379,7 +380,7 @@ def chip_calibration(
 
     if type(chip) is str:
         chip = Chip(chip)
-    n_dot_0 = chip.capillary_flow(gas=gas) / Chem.NA * composition
+    n_dot_0 = chip.capillary_flow(gas=gas, T=T) / Chem.NA * composition
 
     l_eff = chip.l_cap * n_dot_0 / n_dot
     chip.l_cap = l_eff
