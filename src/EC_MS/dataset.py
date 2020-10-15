@@ -413,28 +413,44 @@ class Dataset:
                 print("adding background back onto " + mass)  # debugging
                 self.data[mass + "-y"] += y_bg
 
-    def cut(self, tspan=None, cycles=None, verbose=True, **kwargs):
-        if tspan is not None:
-            new_data = cut_dataset(self.data, tspan=tspan, **kwargs)
+    def cut(self, tspan=None, t_edge=None, verbose=True, **kwargs):
+        """Return a dataset containing part of the this dataset.
+
+        This can be done either with a tspan (uses EC_MS.cut_dataset) or
+        cycles (uses EC_MS.select_cycles).
+        The default behavior (no arguments) is that of cut_dataset. I.e.,
+        cut the according to self.data["tspan"] buffered with t_edge=120
+
+        Args:
+            tspan: [t_start, t_finish] defining the part of the dataset to keep
+            t_edge: a buffer time to include before and after tspan
+            verbose: whether to print a lot of output to the terminal
+            **kwargs: If a key in ["cycle_number", "selector", "loop_number",
+                "file_number", "cycle", "sweep"] is given, call select_cycles
+                with that key as cycle_str. tspan and t_edge are ignored.
+                Additional key-word arguments passed on either to
+                cut_dataset or select_cycles
+
+        Returns a new dataset, cut in time as requested.
+        """
+        for key in [
+            "cycle_number",
+            "selector",
+            "loop_number",
+            "file_number",
+            "cycle",
+            "sweep",
+        ]:
+            # should add self.sel_str, but that would require major changes
+            if key in kwargs:
+                cycles = kwargs.pop(key)
+                new_data = select_cycles(
+                    self.data, cycles=cycles, cycle_str=key, verbose=verbose, **kwargs,
+                )
+                break
         else:
-            for key in [
-                "cycle number",
-                "selector",
-                "loop number",
-                "file number",
-                "cycle",
-                "sweep",
-            ]:
-                # should add self.sel_str, but that would require major changes
-                if key in kwargs:
-                    cycles = kwargs.pop(key)
-                    new_data = select_cycles(
-                        self.data,
-                        cycles=cycles,
-                        cycle_str=key,
-                        verbose=verbose,
-                        **kwargs,
-                    )
+            new_data = cut_dataset(self.data, tspan=tspan, t_edge=t_edge, **kwargs)
+
         new_dataset = Dataset(new_data)
         for attr in metadata_items:
             if hasattr(self, attr):

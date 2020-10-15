@@ -27,11 +27,16 @@ from .Molecules import Molecule
 from .Plotting import plot_operation
 
 
-def fit_exponential(t, y):
+def fit_exponential(t, y, zero_time_axis=False):
+    """Return (tao, y0, y1) for best fit of y = y0 + (y1-y0) * exp(-t/tao)
+
+    Args:
+        t (vector): time
+        y (vector): values
+        zero_time_axix (boolean): whether to subtract t[0] from t. False by default
     """
-    A previous attempt at this had used scipy.optimize.minimize.
-    """
-    t = t - t[0]  # zero time axis
+    if zero_time_axis:
+        t = t - t[0]  # zero time axis
     tau_i = t[-1] / 10  # guess at time constant
     # tau_i = t[-1]      #often can't solve with this guess. A smaller tau helps.
     y0_i = y[-1]  # guess at approach value

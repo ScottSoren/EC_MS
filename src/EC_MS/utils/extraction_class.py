@@ -36,7 +36,7 @@ class Extraction(Dataset):
         t_bg=None,
         calibration=None,
         mdict=None,
-        calibration_file="20A25_sniffer.json",
+        calibration_file=None,  # "20A25_sniffer.json",
         electrolyte="16O",
         film="18O",
         element="Pt",
@@ -49,7 +49,8 @@ class Extraction(Dataset):
             name = f"extraction {element}{film} in {electrolyte}"
         self.name = name
         self.calibration_file = calibration_file
-        if not calibration and calibration_file and not mdict:
+        if (not calibration) and calibration_file and not mdict:
+            print(f"requested calibration_file = {calibration_file}")
             raise NotImplementedError(
                 "proper calibration is not implemented in EC_MS. "
                 "You have to import the calibration externally. "
@@ -295,7 +296,7 @@ class Extraction(Dataset):
         return ratio
 
     def plot_exchange(
-        self, mol="O2", tspan=None, t_bg=None, axes="new", unit="pmol/s", **kwargs
+        self, mol="O2", tspan=None, t_bg=None, axes="new", unit=None, **kwargs
     ):
         if tspan is None or tspan == "experiment":
             tspan = self.tspan_experiment
@@ -305,6 +306,9 @@ class Extraction(Dataset):
             tspan = self.tspan_extraction
         ratio = self.get_ratio()
         majors, minors = self.get_majors_and_minors(mol=mol)
+
+        unit_right = kwargs.get("unit_right", unit)
+        unit_left = kwargs.get("unit_left", unit)
 
         if axes == "new":
             axes = self.plot_experiment(
@@ -319,22 +323,31 @@ class Extraction(Dataset):
         else:
             for molecule in minors:
                 self.plot_flux(
-                    molecule, ax=axes[0], tspan=tspan, unit=unit, logplot=False
+                    molecule, ax=axes[0], tspan=tspan, unit=unit_left, logplot=False
                 )
             for molecule in majors:
                 self.plot_flux(
-                    molecule, ax=axes[-1], tspan=tspan, unit=unit, logplot=False
+                    molecule, ax=axes[-1], tspan=tspan, unit=unit_right, logplot=False
                 )
 
+        unit_ratio = 1
+        if (
+            unit_left
+            and unit_right
+            and unit_left.startswith("p")
+            and unit_right.startswith("n")
+        ):
+            unit_ratio *= 1e3
+        axes_ratio = ratio * unit_ratio
         if True:  # highlight the labeled lattice oxygen evolution
-            x1, y1 = self.get_flux(majors[0], t_bg=t_bg, unit="pmol/s", tspan=tspan)
-            x2, y2 = self.get_flux(minors[0], t_bg=t_bg, unit="pmol/s", tspan=tspan)
+            x1, y1 = self.get_flux(majors[0], t_bg=t_bg, unit=unit_right, tspan=tspan)
+            x2, y2 = self.get_flux(minors[0], t_bg=t_bg, unit=unit_left, tspan=tspan)
             y2_interp = np.interp(x1, x2, y2)
             color_1 = minors[0].get_color()
             color_2 = majors[0].get_color()
             axes[0].fill_between(
                 x1,
-                y1 * ratio,
+                y1 * axes_ratio,
                 y2_interp,
                 color=color_1,
                 where=y2_interp > y1 * ratio,
@@ -342,19 +355,19 @@ class Extraction(Dataset):
             )
             axes[0].fill_between(
                 x1,
-                y1 * ratio,
+                y1 * axes_ratio,
                 y2_interp,
                 color=color_2,
                 where=y2_interp < y1 * ratio,
                 alpha=0.2,
                 hatch="//",
             )
-        axes[-1].set_ylim([l / ratio for l in axes[0].get_ylim()])
+        axes[-1].set_ylim([l / axes_ratio for l in axes[0].get_ylim()])
 
         return axes
 
     def plot_extraction_vs_potential(
-        self, mol="CO2", tspan=None, unit="pmol/s", ax="new", reverse=True
+        self, mol="CO2", tspan=None, unit=None, ax="new", reverse=True
     ):
         if tspan is None:
             tspan = self.tspan_extraction
@@ -454,9 +467,9 @@ def get_EC_MS_mdict(calibration, mols=None, get_cal_mat=True):
 
 
 def parse_isotope(isotope):
-    if isotope in ["18O", "O18"]:
+    if isotope in ["18O", "O18", "18", 18]:
         return "18O"
-    elif isotope in ["16O", "O16"]:
+    elif isotope in ["16O", "O16", "16", 16]:
         return "16O"
     else:
         return isotope

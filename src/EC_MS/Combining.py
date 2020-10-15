@@ -768,6 +768,7 @@ def purge_column(dataset, col, purge=True, verbose=True):
 def cut_dataset(
     dataset_0,
     tspan=None,
+    t_edge=None,
     tspan_0=None,
     time_masks=None,
     # if I directly write time_masks = {} here, it saves old values...
@@ -787,7 +788,9 @@ def cut_dataset(
     dataset = dataset_0.copy()
     dataset["data_cols"] = dataset["data_cols"].copy()
     if tspan is None and tspan_0 is None:
-        return dataset
+        tspan = dataset["tspan"]
+        if t_edge is None:
+            t_edge = 120
     if time_masks is None:
         time_masks = {}
     # print('time_masks = ' + str(time_masks)) # debugging
@@ -795,6 +798,9 @@ def cut_dataset(
     if tspan is None and tspan_0 is not None:
         t0 = dataset["tstamp"]
         tspan = [tspan_0[0] - t0, tspan_0[-1] - t0]
+
+    if t_edge is not None:
+        tspan = [tspan[0] - t_edge, tspan[-1] + t_edge]
 
     if verbose:
         print("cutting according to tspan = " + str(tspan))

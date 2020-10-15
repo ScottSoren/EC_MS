@@ -714,7 +714,7 @@ def plot_flux(
     endpoints=5,
     t_bg=None,
     A_el=None,
-    unit="nmol/s",
+    unit=None,
     smooth_points=0,
     logplot=True,
     leg=False,
@@ -738,6 +738,8 @@ def plot_flux(
         # then it's probably just one molecule object.
         mols = [mols]
 
+    unit = unit if unit else "nmol/s"
+
     if type(mols) is list:
         c = mols
         mols = {}
@@ -746,7 +748,8 @@ def plot_flux(
                 mol = Molecule(m, verbose=False)
             else:
                 mol = m  # this function should accept a list of Molecule instances!
-            color = standard_colors[mol.primary]
+            # color = standard_colors[mol.primary]
+            color = m.get_color()
             mols[mol] = color
             print("mol={}, primary={}, color={}".format(mol.name, mol.primary, color))
 

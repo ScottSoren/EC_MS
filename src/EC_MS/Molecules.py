@@ -651,7 +651,7 @@ class Molecule:
         MS_data,
         tspan="tspan",
         density=None,
-        unit="pmol/s",
+        unit=None,
         verbose=True,
         override=False,
         x=None,
@@ -687,6 +687,8 @@ class Molecule:
                 tspan = MS_data[tspan]
             except KeyError:
                 tspan = "all"
+
+        unit = unit if unit else "nmol/s"
 
         if x is None:
             if density is None:

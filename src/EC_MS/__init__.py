@@ -53,3 +53,5 @@ from EC_MS.Electrolytes import *
 from EC_MS.Time_Response import *
 
 from EC_MS.patches import *
+
+from EC_MS.utils import *

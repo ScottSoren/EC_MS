@@ -529,6 +529,7 @@ def calibration_curve(
     ax="new",
     J_color="0.5",
     unit=None,
+    plot_unit="nA",
     out="Molecule",
     verbose=True,
 ):
@@ -633,7 +634,7 @@ def calibration_curve(
             tspan=tspan_plot,
             emphasis=None,
             removebackground=False,
-            unit="pA",
+            unit=plot_unit,
         )
         fig1 = ax1[0].get_figure()
     elif ax1 is not None:
@@ -646,7 +647,7 @@ def calibration_curve(
             masses=[mass],
             tspan=tspan_plot,
             removebackground=False,
-            unit="pA",
+            unit=plot_unit,
             ax=ax1a,
         )
     if ax2 == "new":
@@ -768,8 +769,13 @@ def calibration_curve(
                 y_bg = bg * np.ones(y.shape)
             else:
                 y_bg = bg
+            unit_factor = {"u": 1e6, "n": 1e9, "p": 1e12}.get(plot_unit[0], 1)
             ax1[0].fill_between(
-                x, y * 1e12, y_bg * 1e12, color=color, alpha=0.5  # where=y>y_bg,
+                x,
+                y * unit_factor,
+                y_bg * unit_factor,
+                color=color,
+                alpha=0.5,  # where=y>y_bg,
             )
             try:
                 J = I * 1e3 / data["A_el"]
@@ -866,9 +872,9 @@ def calibration_curve(
         ax2 += [ax2c]
 
     # ------- parse 'out' and return -------- #
-    if fig1 is None and ax1 is not None:
+    if fig1 and not ax1:
         fig1 = ax1[0].get_figure()
-    if fig2 is None and ax2 is not None:
+    if fig2 and not ax2:
         fig2 = ax2[0].get_figure()
     possible_outs = {
         "ax": [ax1, ax2],
