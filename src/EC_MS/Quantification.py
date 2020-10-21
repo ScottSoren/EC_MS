@@ -502,7 +502,7 @@ def get_signal(
     endpoints=5,
     fillcolor=None,
     unit="A",
-    verbose=True,
+    verbose=False,
     override=False,
     plotit=False,
     ax="new",
@@ -515,7 +515,7 @@ def get_signal(
     """
 
     if verbose:
-        print("geting signal for " + mass)
+        print("getting signal for " + mass)
 
     xcol, ycol = get_cols_for_mass(mass, MS_data)
     x = MS_data[xcol]

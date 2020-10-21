@@ -703,7 +703,7 @@ def sync_metadata(
     J_str=None,
     E_str=None,
     I_str=None,
-    verbose=True,
+    verbose=False,
 ):
     """
     A nice one-serve-all function for calibrating data, updating calibration, checking

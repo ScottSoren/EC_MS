@@ -52,7 +52,7 @@ class Molecule:
         name,
         formula=None,
         writenew=True,
-        verbose=True,
+        verbose=False,
         primary=None,
         F_cal=None,
         data_dir=data_directory,
@@ -114,10 +114,10 @@ class Molecule:
                 + self.name
                 + ": Returning a Molecule object with only the spectrum --- \n"
             )
-
-        print(
-            "name = " + str(self.name) + " , formula = " + str(self.formula)
-        )  # debugging
+        if verbose:
+            print(
+                "name = " + str(self.name) + " , formula = " + str(self.formula)
+            )  # debugging
         self.M = Chem.get_mass(self.formula)
         if self.M == 0:
             print("WARNING: could not get molecular mass for " + self.name + " !!!")
@@ -186,7 +186,7 @@ class Molecule:
 
         return self_as_dict
 
-    def reset(self, verbose=True):
+    def reset(self, verbose=False):
         """
         Retrives data for new object from lines read from file or resets
         attribute values to those originally in the file
@@ -652,7 +652,7 @@ class Molecule:
         tspan="tspan",
         density=None,
         unit=None,
-        verbose=True,
+        verbose=False,
         override=False,
         x=None,
         removebackground=None,
@@ -672,7 +672,8 @@ class Molecule:
         if hasattr(self, "cal_mat"):
             cal_mat = self.cal_mat
         else:
-            print("no cal_mat! using self.primary and self.F_cal instead.")
+            if verbose:
+                print("no cal_mat! using self.primary and self.F_cal instead.")
             F_cal = self.F_cal
             mass = self.primary
             cal_mat = {mass: 1 / F_cal}
@@ -694,7 +695,7 @@ class Molecule:
             if density is None:
                 xcol, ycol = get_cols_for_mass(self.primary, MS_data)
                 x = MS_data[xcol]
-                if not tspan == "all":
+                if not (isinstance(tspan, str) and tspan == "all"):
                     mask = np.logical_and(tspan[0] < x, x < tspan[-1])
                     # Don't cut off outer endpoints before evt interpolation (if used by plot_vs_potential)
                     extra_left = np.append(mask[1:], False)

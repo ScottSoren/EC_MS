@@ -110,7 +110,8 @@ class Dataset:
             self.data = synchronize(datas, verbose=verbose)
         elif file_path is not None:
             self.folder, self.file = os.path.split(file_path)
-            print(file_path)  # debugging
+            if self.verbose:
+                print(f"loading from {file_path}")  # debugging
             # ^ ...or just one data file
             self.data = get_data_from_file(file_path, data_type=data_type)
         elif folder is not None:
@@ -383,7 +384,8 @@ class Dataset:
                 for col in self.data_cols
                 if (col[0] == "M" and col[-2:] == "-y")
             ]
-        print("masses = " + str(masses))  # debugging
+        if self.verbose:
+            print("masses = " + str(masses))  # debugging
 
         if hasattr(self, "mass_bgs"):
             mass_bgs = self.mass_bgs
