@@ -28,6 +28,8 @@ from .Plotting import plot_operation
 
 from scipy import signal
 from scipy.interpolate import interp1d
+from scipy.ndimage import gaussian_filter1d
+from mpmath import invertlaplace, sinh, cosh, sqrt
 
 class mass_transport_stagnant:
     """
@@ -73,27 +75,32 @@ class mass_transport_stagnant:
         #t_length_out = (t_length+1)/2
 
         time_lin1= np.linspace(0,t_max-t_min, t_length) #converts the input time to a linear array to ensure evenly spaced time values
-        time_lin2 = time_lin1[0:int((t_length+1)/4)]
+        time_lin2 = time_lin1
+        time_lin2[0]=1e-100
 
-        def trans(t): # Transfer function as derived in xxxx.
-            return 2/(2+self.length*self.h/self.D)*np.exp(-t/self.tau)
+        impulse=self.trans_num(time_lin2)
+        impulse = impulse[impulse >= 0.05]
 
-        MS_signal=MS_signal * sum(trans(time_lin2)) / self.length * self.D * self.capillary_flow / self.h
+        MS_signal=MS_signal * sum(impulse) / self.length * self.D * self.capillary_flow / self.h
 
-        MS_signal=signal.wiener(MS_signal)
-        MS_signal=signal.savgol_filter(MS_signal,1,0)
+        #MS_signal=gaussian_filter1d(MS_signal, 2)
+        MS_signal=signal.wiener(MS_signal,3)
+        #MS_signal=gaussian_filter1d(MS_signal, 0.5)
+        #MS_signal=signal.savgol_filter(MS_signal,3,1)
         sig=interp1d(time-t_min, MS_signal)
 
 
-        current, _ = signal.deconvolve(sig(time_lin1), trans(time_lin2))
+
+        current, _ = signal.deconvolve(sig(time_lin1), impulse)
 
 
         #current = current-current[0]
         #zero_fill = np.zeros(2*t_length-1-len(current))
         #current = np.concatenate((current, zero_fill))
         current = current*self.n_el*96485
-        current=signal.savgol_filter(current,5,1)
-        current=signal.wiener(current)
+        #current=gaussian_filter1d(current, 1)
+        #current=signal.savgol_filter(current,1,0)
+        current=signal.wiener(current,mysize=2)
         #return current
         return time_lin1[:len(current)]+t_min, current
 
@@ -107,18 +114,41 @@ class mass_transport_stagnant:
 
         time_lin, step = np.linspace(0,t_max-t_min, t_length, retstep=True) #converts the input time to a linear array to ensure evenly spaced time values
 
-        def trans(t): # Transfer function as derived in xxxx.
-            return 2/(2+self.length*self.h/self.D)*np.exp(-t/self.tau)
 
         curr=interp1d(time-t_min, abs(EC_current/(self.n_el*96485)))
-
-        conc_interphase=signal.convolve(curr(time_lin), trans(time_lin), mode='full') / sum(trans(time_lin)) * self.length/self.D
+        impulse=self.trans_num(time_lin)
+        conc_interphase=signal.convolve(curr(time_lin), impulse, mode='full') / sum(trans_num(time_lin)) * self.length/self.D
 
         flux_MS = conc_interphase*self.h
         p_i = flux_MS/self.capillary_flow
         p_i = interp1d(np.linspace(0,2*(t_max-t_min)-step, 2*t_length-1), p_i)
 
         return p_i(time-t_min)
+
+    def trans_num(self, t):
+        a=self.length*self.h/self.D
+        t_diff=t*self.D/self.length**2
+        fs = lambda s: 1/(sqrt(s)*sinh(sqrt(s))+a*cosh(sqrt(s)))*1/(11+s)
+        trans=np.zeros(len(t))
+
+        for i in range(len(t)):
+            trans[i]=invertlaplace(fs,t_diff[i],method='talbot')
+
+
+        return trans
+
+    def trans(self, t): # Transfer function as derived in xxxx with second order taylor terms of sinh and cosh.
+        a=self.length*self.h/self.D
+        t_diff=t*self.D/self.length**2
+        b1=2*np.sqrt(3)*np.sqrt(a**2+4*a+12)/(a+4)
+        b2=(6*a+12)/(a+4)
+
+        trans=-2*np.sqrt(3)/np.sqrt(a**2+4*a+12)*(np.exp((-b1-b2)*t_diff)-np.exp((b1-b2)*t_diff))
+
+        return trans
+        #return 2/(2+self.length*self.h/self.D)*np.exp(-t/self.tau) #1st order Taylor-terms
+
+
 
 
 def fit_exponential(t, y):

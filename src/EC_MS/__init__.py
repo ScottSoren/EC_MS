@@ -51,5 +51,6 @@ from EC_MS.Zilien import *
 
 from EC_MS.Electrolytes import *
 from EC_MS.Time_Response import *
+from EC_MS.Deconvolution import *
 
 from EC_MS.patches import *
