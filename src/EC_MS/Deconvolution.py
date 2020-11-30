@@ -610,7 +610,7 @@ class Kernel:
         if matrix:
             kernel = np.tile(kernel, (len(kernel), 1))
             i = 1
-            while i < len(x):
+            while i < len(time):
                 kernel[i] = np.concatenate((kernel[0][i:], kernel[0][:i]))
                 i=i+1
 
