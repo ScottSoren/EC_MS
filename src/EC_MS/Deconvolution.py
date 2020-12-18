@@ -15,7 +15,7 @@ of this module. The most reliable results are obtained when "calibrating" the
 mass transport by fitting of impulse responses of the MS-signal implemented in
 fit_impulse.
 The term kernel is used interchangebly with the term impulse response.
-"""
+test"""
 import numpy as np
 from scipy.optimize import curve_fit
 from scipy.interpolate import interp1d
