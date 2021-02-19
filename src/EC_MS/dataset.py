@@ -16,7 +16,7 @@ from .EC import sync_metadata, make_selector, select_cycles
 from .Data_Importing import load_from_file
 from .Combining import synchronize, cut_dataset, sort_time, get_timecol, timeshift
 from .Plotting import plot_experiment, plot_vs_potential, plot_flux, plot_signal
-from .EC import correct_ohmic_drop, CV_difference
+from .EC import correct_ohmic_drop, CV_difference, get_capacitance
 from .Quantification import get_current, get_signal, get_potential
 from .Calibration import calibration_curve, point_calibration, chip_calibration
 
@@ -459,6 +459,9 @@ class Dataset:
                 setattr(new_dataset, attr, getattr(self, attr))
         return new_dataset
 
+    def as_cv(self):
+        return CyclicVoltammagram(self)
+
 
 class CyclicVoltammagram(Dataset):
     """
@@ -696,6 +699,12 @@ class CyclicVoltammagram(Dataset):
             mask = np.logical_and(tspan[0] < t, t < tspan[-1])
             return np.mean(scan_rate[mask])
         return self.scan_rate
+
+    def get_capacitance(self, V_DL=None, V_str=None, J_str=None, t_i=None, out=None):
+        """Return capacitance in F/cm^2 (geometric)"""
+        return get_capacitance(
+            self.data, V_DL=V_DL, V_str=V_str, J_str=J_str, t_i=t_i, out=out
+        )
 
     def make_scan_rate(self, min_sweep_points=10):
         """

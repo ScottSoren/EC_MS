@@ -80,6 +80,9 @@ class Extraction(Dataset):
                     dataset = dataset + Dataset(path_to_data)
         self.dataset = dataset
         self.data = dataset.data
+        self.verbose = self.dataset.verbose
+        print(f"Extraction.__init__: type(dataset) = f{type(dataset)}")
+        self.data = dataset.data
         self.RE_vs_RHE = RE_vs_RHE
         self.A_el = A_el
         if RE_vs_RHE is not None or A_el is not None:
@@ -351,7 +354,7 @@ class Extraction(Dataset):
                 y2_interp,
                 color=color_1,
                 where=y2_interp > y1 * ratio,
-                alpha=0.5,
+                alpha=0.2,
             )
             axes[0].fill_between(
                 x1,
@@ -359,7 +362,7 @@ class Extraction(Dataset):
                 y2_interp,
                 color=color_2,
                 where=y2_interp < y1 * ratio,
-                alpha=0.2,
+                alpha=0.1,
                 hatch="//",
             )
         axes[-1].set_ylim([l / axes_ratio for l in axes[0].get_ylim()])

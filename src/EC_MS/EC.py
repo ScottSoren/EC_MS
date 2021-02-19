@@ -975,6 +975,7 @@ def get_through_sweep(
             except KeyError:
                 t_str = "time/s"
         t = data[t_str]
+    t_i = t_i or 0
     if V is None:
         if V_str is None:
             V_str = data["V_str"]
@@ -1295,6 +1296,8 @@ def get_capacitance(data, V_DL=[0.3, 0.6], V_str=None, J_str=None, t_i=0, out="c
     if J_str is None:
         J_str = J_str_1
     t_str = "time/s"
+    t_i = t_i or 0
+    out = out or "cap"
 
     t, V, J = data[t_str], data[V_str], data[J_str]
 
@@ -1324,12 +1327,19 @@ def get_capacitance(data, V_DL=[0.3, 0.6], V_str=None, J_str=None, t_i=0, out="c
     print("J_an = " + str(J_an) + " mA/cm^2 , J_cat = " + str(J_cat) + " mA")
     print("cap = " + str(cap) + " F/cm^2")
 
+    t_out = np.append(t[I_start_an: I_finish_an], t[I_start_cat:I_finish_cat])
+    V_out = np.append(V[I_start_an: I_finish_an], V[I_start_cat:I_finish_cat])
+    J_out = np.append(J[I_start_an: I_finish_an], J[I_start_cat:I_finish_cat])
+
     out_dict = {
         "cap": cap,
         "scan_rate": scan_rate,
         "J_an": J_an,
         "J_cat": J_cat,
-        "J": (J_an - J_cat) / 2,
+        "J_diff": (J_an - J_cat) / 2,
+        "t": t_out,
+        "V": V_out,
+        "J": J_out
     }
 
     if type(out) is str:

@@ -719,6 +719,7 @@ def plot_flux(
     logplot=True,
     leg=False,
     spec={},
+    alpha_under=None,
     override=False,
     verbose=True,
 ):
@@ -778,6 +779,8 @@ def plot_flux(
             l = mol.name
         print("color={}".format(color))  # debugging
         ax.plot(x, y, color=color, label=l, **spec)
+        if alpha_under:
+            ax.fill_between(x, np.zeros(x.shape), y, color=color, alpha=alpha_under)
     if leg:
         if type(leg) is not str:
             leg = "lower right"
